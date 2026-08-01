@@ -264,6 +264,8 @@ Gemini's free tier is rate-limited per project/key (as low as 5-15 requests/minu
 - A call can pin a single model (skipping the cascade for that call) via `options.model` — used for calls that specifically need Pro-tier reasoning and shouldn't silently downgrade to Flash
 - If every model on every key in the pool has failed, the call fails clearly (surfaced in the dashboard), same as the key-exhaustion case above
 
+**Structured output.** Calls that need reliable JSON back (e.g. Module 2's 3-variation listing response) pass `{ json: true }` in `options`, which sets Gemini's `generationConfig.responseMimeType = 'application/json'` — this is enforced by the API itself, not just requested via prompt wording, so parsing doesn't depend on the model reliably following instructions. The prompt still spells out the exact shape as a second layer of guidance.
+
 **Fallback: Claude.** Same interface, disabled by default. Can be turned on in config if the entire Gemini key×model cascade is exhausted, or for a specific module that needs it, without changing any module code.
 
 **Model choice on the Gemini side:** favor a Flash-tier model for the higher daily/rate-limit headroom; reserve a Pro-tier model only for calls that need stronger reasoning, since Pro's free-tier caps are far tighter. This preference is what the `GEMINI_MODELS` priority order encodes.
