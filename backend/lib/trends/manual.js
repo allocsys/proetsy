@@ -21,3 +21,14 @@ export function importFromCsvRows(rows) {
   });
   insertMany(rows);
 }
+
+// Single-entry manual add — the dashboard's one-at-a-time trend entry path, distinct
+// from importFromCsvRows' bulk path. Tagged source 'manual' so it's distinguishable from
+// a CSV-imported row.
+export function addManualTrend(term, category) {
+  const db = getDb();
+  const { lastInsertRowid } = db
+    .prepare('INSERT INTO trends (term, category, source) VALUES (?, ?, ?)')
+    .run(term, category ?? null, 'manual');
+  return db.prepare('SELECT * FROM trends WHERE id = ?').get(lastInsertRowid);
+}
