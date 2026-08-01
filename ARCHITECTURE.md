@@ -81,16 +81,24 @@ Etsy publishing is manual by design — no auto-uploader module. The app's job e
 ### Module 7 — Taste Filter (Curation) (optional, pre-pipeline)
 **What it does:** Ranks a batch of raw Midjourney-generated candidates against a learned taste profile, so obvious "slop" gets flagged before it ever becomes a listing candidate.
 **Input:** a batch of candidate images (generated manually in Midjourney, dragged into the dashboard)
-**Output:** each candidate gets a taste score and a suggested label (likely-keep / likely-discard / uncertain). Nothing is auto-deleted — the user confirms keep/discard, and that confirmation is the training signal.
+**Output:** each candidate gets **two taste scores** — a global score and a per-category score — plus a suggested label (likely-keep / likely-discard / uncertain). Nothing is auto-deleted — the user confirms keep/discard, and that confirmation is the training signal.
 **Tech:** local image embeddings (e.g. CLIP), run via a local script/child process invoked from the Node backend. No API key, no per-request cost, no network dependency — stays local-first.
 **How the "training" works:**
-- Every keep/discard decision is stored as a labeled example (embedding + label) in an `image_preferences` table
-- The taste profile is two running centroids: the average embedding of everything kept, and everything discarded
-- A new candidate's score = similarity to the "kept" centroid minus similarity to the "discarded" centroid
-- Recomputed after each batch (or on demand) — filtering sharpens as more images are labeled
-- **Cold start:** with only a handful of labels, the system shows scores but doesn't filter confidently; a few dozen labeled examples is typically enough for this kind of centroid scoring to become useful
+- Every keep/discard decision is stored as a labeled example (embedding + label + category, e.g. portrait/landscape/square) in an `image_preferences` table
+- **Two sets of centroids are maintained:** a **global** kept/discarded centroid pair (across all categories), and a **per-category** kept/discarded centroid pair for each product category (from the shared product-sizes config)
+- A new candidate gets scored against both: global score = similarity to global-kept centroid minus global-discarded centroid; category score = the same calculation using only that candidate's category's centroids
+- Both scores are shown side by side — global for quick overall sorting, category for catching cases where something scores fine globally but is off for its specific style bucket
+- **Recompute is both automatic and on-demand:** centroids recompute automatically after every labeled batch, and a **"Recompute now" button** in the dashboard triggers an immediate recompute (e.g. after relabeling older images) without waiting for the next batch
+- **Cold start:** with only a handful of labels, the system shows scores but doesn't filter confidently; a few dozen labeled examples is typically enough for this kind of centroid scoring to become useful. Per-category scores need cold-start tolerance per category too, since a category with few labels will be less confident than one with many
 **Never auto-discards:** consistent with the rest of the pipeline's human-in-the-loop principle — this only ranks and flags, the user always confirms
 **Can be skipped if:** the user is hand-picking Midjourney output already and doesn't want the extra step
+
+**Prompt-feedback link to Module 4 (optional, opt-in):**
+Module 7's embeddings and Module 4's text prompts don't share a representation, so the link between them isn't the embeddings themselves — it's tracking **which prompt terms tend to produce kept vs. discarded images**:
+- Each imported candidate is tagged with the prompt (or prompt components: subject, style words, medium) that generated it
+- As keep/discard labels accumulate, the system tallies which recurring prompt terms show up disproportionately in "kept" images vs. "discarded" ones
+- Module 4 can optionally pull a short "terms that have worked well" list as a style hint alongside the selected trend/category — it biases Gemini's word choices toward what's historically landed, it does not override the user's manual trend selection or dictate the whole prompt
+- This is secondary and opt-in: Module 4 works exactly as before if this is turned off
 
 **Future (planned, not built yet): auto-import via watched folder.**
 Once Midjourney generates and downloads images to a local folder, a lightweight file-watcher can detect new files and automatically pull them into Module 7's queue — no manual drag-and-drop needed for the *import* step. This is pure local file-system watching (chokidar or similar), no API call, no network dependency, no Midjourney ToS exposure at all, since it never touches Midjourney's systems. Safe to build whenever it's prioritized.
@@ -246,7 +254,7 @@ Every pipeline run is tracked as a **job**, and every module within a job has it
 - **Frontend:** React
 - **Backend:** Node.js
 - **Local-first:** entire pipeline (analyzer → generator → mockup composer → review) must run against local storage/local DB before any deployment decision. Deployment target (own VPS, Vercel/Render, etc.) is a separate, later discussion.
-- **Database:** same tables as the original plan (listings, images, mockups, tags, settings, prompts), plus a `trends` table (manual entries), a `pipeline_config` table/JSON file, a `jobs` table (job id, per-module status, error messages, timestamps) to support partial failure handling, a `product_sizes` table/config (dimensions, DPI, mockup template per size — shared by Modules 2 and 3), and an `image_preferences` table (image reference, embedding vector, keep/discard label, timestamp) for Module 7's taste model.
+- **Database:** same tables as the original plan (listings, images, mockups, tags, settings, prompts), plus a `trends` table (manual entries), a `pipeline_config` table/JSON file, a `jobs` table (job id, per-module status, error messages, timestamps) to support partial failure handling, a `product_sizes` table/config (dimensions, DPI, mockup template per size — shared by Modules 2 and 3), an `image_preferences` table (image reference, embedding vector, keep/discard label, category, prompt reference, timestamp) for Module 7's taste model, and a `prompt_terms` table (term, kept count, discarded count) for the optional Module 7 → Module 4 prompt-feedback link.
 - **Local embedding model:** a lightweight, local, open-source image embedding tool (e.g. CLIP) for Module 7. No API key, no cost, no network call — invoked as a local process from the Node backend.
 - **LLM keys:** a pool of Gemini API keys (env/config, not hardcoded), plus an optional single Claude key for fallback.
 - **Provider layers:** three swappable interfaces built in v1 — `lib/llm/`, `lib/trends/`, `lib/tags/` — each with a config-selected implementation, so any of the three can be flipped later without touching module code.
