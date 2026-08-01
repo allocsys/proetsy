@@ -4,6 +4,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { isInCooldown, getCooldownUntil, recordFailure, recordSuccess } from './rate-limits.js';
+import { withRequestSlot } from './queue.js';
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
