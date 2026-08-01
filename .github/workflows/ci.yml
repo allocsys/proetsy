@@ -23,8 +23,14 @@ name: CI
 on:
   push:
     branches: ['**']
+    paths-ignore:
+      - 'README.md'
+      - 'ARCHITECTURE.md'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - 'README.md'
+      - 'ARCHITECTURE.md'
 
 # Cancel superseded runs on the same branch/PR so pushing a fixup doesn't leave stale
 # runs queued behind it.
