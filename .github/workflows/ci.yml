@@ -6,6 +6,19 @@ name: CI
 # schedule or on demand, not on every commit, since they're slower. No Playwright suite
 # exists in the repo yet anyway (ARCHITECTURE.md -> Testing & CI/CD lists it as planned
 # coverage, not built).
+#
+# Structured as one `install` job feeding three independent, parallel jobs (lint,
+# backend-test, frontend-build) rather than one long sequential job. Two caching layers,
+# each solving a different cost:
+#   - `actions/setup-node`'s built-in `cache: npm` (install job only) caches npm's
+#     download cache (~/.npm) keyed on package-lock.json, so `npm ci` doesn't re-fetch
+#     tarballs from the registry on every run.
+#   - An explicit `actions/cache` for `node_modules` itself, keyed the same way, shared
+#     across all four jobs in a run: `install` populates it once (skipping `npm ci`
+#     entirely on a cache hit), and lint/backend-test/frontend-build each restore that
+#     same key instead of running their own `npm ci` — so dependency installation only
+#     ever happens once per unique package-lock.json, not once per job, and the three
+#     downstream jobs run concurrently instead of stacked behind each other.
 
 on:
   push:
@@ -19,36 +32,117 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  NODE_VERSION: '20'
+
 jobs:
-  lint-and-test:
+  install:
     runs-on: ubuntu-latest
+    outputs:
+      node-modules-key: ${{ steps.key.outputs.key }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      # Root package.json declares the backend/frontend workspaces, so a single
-      # `npm ci` at the repo root installs both. `.npmrc` already sets
-      # legacy-peer-deps=true, which npm ci respects automatically.
+      - id: key
+        run: echo "key=node-modules-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('package-lock.json') }}" >> "$GITHUB_OUTPUT"
+
+      # Root package.json declares the backend/frontend workspaces, so npm hoists most
+      # deps into the root node_modules — backend/node_modules and frontend/node_modules
+      # are included too in case anything needed a nested install (a version conflict
+      # between the two workspaces, etc.); `actions/cache` skips any path that doesn't
+      # exist without failing the step.
+      - name: Restore node_modules cache
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            backend/node_modules
+            frontend/node_modules
+          key: ${{ steps.key.outputs.key }}
+
+      # `.npmrc` already sets legacy-peer-deps=true, which npm ci respects automatically.
+      # Only runs on a cache miss (new/changed package-lock.json) — on a hit, node_modules
+      # is already exactly what `npm ci` would have produced, so re-running it would just
+      # burn time reproducing the same result.
       - name: Install dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
+  lint:
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Restore node_modules cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            backend/node_modules
+            frontend/node_modules
+          key: ${{ needs.install.outputs.node-modules-key }}
+      - run: npm run lint
 
+  backend-test:
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Restore node_modules cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            backend/node_modules
+            frontend/node_modules
+          key: ${{ needs.install.outputs.node-modules-key }}
       # Only the backend has an automated test suite today (Vitest — unit +
-      # Supertest integration tests, per ARCHITECTURE.md's Module 2/3/1 status notes).
+      # Supertest integration tests, per ARCHITECTURE.md's Module 1/2/3 status notes).
       # better-sqlite3 (backend/db) needs no external service or Gemini key: every test
       # touching the LLM provider layer mocks lib/llm/index.js, and DB tests point
       # DB_PATH at a throwaway temp-file SQLite DB instead of the real local one.
-      - name: Backend tests
-        run: npm run test -w backend
+      - run: npm run test -w backend
 
+  frontend-build:
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Restore node_modules cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            backend/node_modules
+            frontend/node_modules
+          key: ${{ needs.install.outputs.node-modules-key }}
+      # Vite's own transform/dependency-optimization cache — separate from node_modules
+      # since it's keyed on source content, not just installed deps, and falls back to a
+      # prefix match (restore-keys) rather than requiring an exact hit, since any
+      # same-branch cache is still useful even if the newest source files changed it.
+      - name: Restore Vite cache
+        uses: actions/cache@v4
+        with:
+          path: frontend/node_modules/.vite
+          key: vite-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            vite-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}-
       # No automated test suite for the frontend yet (ARCHITECTURE.md's Playwright
       # critical-path suite is planned, not built) — `vite build` at least catches
       # syntax errors, broken imports, and JSX mistakes on every push.
-      - name: Frontend build check
-        run: npm run build -w frontend
+      - run: npm run build -w frontend
