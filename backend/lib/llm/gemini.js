@@ -19,6 +19,13 @@ const models = (process.env.GEMINI_MODELS || 'gemini-2.5-flash,gemini-2.0-flash,
   .map((m) => m.trim())
   .filter(Boolean);
 
+// Default model for generateImage() calls (Module 3's AI-outpainting fallback). Image calls
+// pin a single model via options.model instead of walking the text-oriented GEMINI_MODELS
+// cascade list above — see ARCHITECTURE.md -> Module 3 -> "AI-outpainting fallback" step 1
+// findings for why gemini-3.1-flash-image ("Nano Banana 2") was chosen over the legacy
+// gemini-2.5-flash-image or the pricier gemini-3-pro-image.
+const DEFAULT_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image';
+
 // Round-robin starting point across separate generateText()/generateVision() calls, so
 // repeated calls don't all hammer key[0] first. Cascading within a single call (below)
 // is independent of this — it always walks forward from this starting index.
@@ -141,18 +148,17 @@ function extractRetryDelayMs(response, bodyText) {
   return null;
 }
 
-// Single generateContent call against one (key, model) pair. `contents` follows Gemini's
-// request shape ([{ role, parts: [...] }]). Throws with `.status` set to the HTTP status
-// on failure so cascade() can tell a 429 (retryable) apart from anything else.
-async function callGenerateContent(key, model, contents, options = {}) {
+// Shared request/response plumbing for both text (callGenerateContent) and image
+// (callGenerateImage) calls — builds the request body, sends it, and throws with `.status`
+// set to the HTTP status on failure so cascade() can tell a 429 (retryable) apart from
+// anything else. Returns the parsed JSON response; callers below interpret
+// `candidates[0].content.parts` differently depending on whether they want text or
+// inlineData back.
+async function sendGenerateContentRequest(key, model, contents, generationConfig) {
   const url = `${GEMINI_API_BASE}/models/${model}:generateContent?key=${key}`;
 
-  const generationConfig = {};
-  if (options.json) generationConfig.responseMimeType = 'application/json';
-  if (options.temperature !== undefined) generationConfig.temperature = options.temperature;
-
   const body = { contents };
-  if (Object.keys(generationConfig).length) body.generationConfig = generationConfig;
+  if (generationConfig && Object.keys(generationConfig).length) body.generationConfig = generationConfig;
 
   const response = await fetch(url, {
     method: 'POST',
@@ -171,7 +177,18 @@ async function callGenerateContent(key, model, contents, options = {}) {
     throw err;
   }
 
-  const data = await response.json();
+  return response.json();
+}
+
+// Text-out call (Modules 1/2/4). `contents` follows Gemini's request shape
+// ([{ role, parts: [...] }]). options.json forces structured JSON output;
+// options.temperature is passed through as-is.
+async function callGenerateContent(key, model, contents, options = {}) {
+  const generationConfig = {};
+  if (options.json) generationConfig.responseMimeType = 'application/json';
+  if (options.temperature !== undefined) generationConfig.temperature = options.temperature;
+
+  const data = await sendGenerateContentRequest(key, model, contents, generationConfig);
   const text = (data?.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');
   if (!text) {
     throw new Error(
@@ -180,6 +197,28 @@ async function callGenerateContent(key, model, contents, options = {}) {
     );
   }
   return text;
+}
+
+// Image-out call (Module 3's AI-outpainting fallback — see ARCHITECTURE.md -> Module 3).
+// Confirmed against Google's current docs that the classic generateContent endpoint this
+// file already uses still serves image output for gemini-3.1-flash-image and siblings: the
+// only addition is generationConfig.responseModalities, and the image comes back as an
+// inlineData part in the same shape callGenerateContent's vision *input* already uses, just
+// now appearing in the *output* too.
+async function callGenerateImage(key, model, contents, options = {}) {
+  const generationConfig = { responseModalities: options.responseModalities || ['IMAGE'] };
+  if (options.temperature !== undefined) generationConfig.temperature = options.temperature;
+
+  const data = await sendGenerateContentRequest(key, model, contents, generationConfig);
+  const parts = data?.candidates?.[0]?.content?.parts || [];
+  const imagePart = parts.find((p) => p.inlineData && p.inlineData.data);
+  if (!imagePart) {
+    throw new Error(
+      `Gemini response for model=${model} had no image content (possibly blocked). ` +
+        `promptFeedback: ${JSON.stringify(data?.promptFeedback || {})}`
+    );
+  }
+  return { data: imagePart.inlineData.data, mimeType: imagePart.inlineData.mimeType || 'image/png' };
 }
 
 function guessMimeType(imagePath) {
@@ -222,6 +261,39 @@ export async function generateVision(prompt, imagePath, options = {}) {
     const text = await callGenerateContent(key, model, contents, options);
     return { text, provider: 'gemini', model };
   }, options);
+  keyStartIndex = (keyStartIndex + 1) % keys.length;
+  return result;
+}
+
+// Generates (or edits, when imagePath is given) an image. Mirrors generateVision()'s
+// (prompt, imagePath, options) shape since Module 3's AI-outpainting always starts from the
+// artwork being extended — imagePath is optional so this also works for pure text-to-image.
+// Pins DEFAULT_IMAGE_MODEL by default (overridable via options.model) rather than walking
+// the text-oriented GEMINI_MODELS cascade list — see DEFAULT_IMAGE_MODEL above. Still
+// cascades across the key pool for that pinned model, same as a model-pinned generateText()
+// call. Returns { data (base64), mimeType, provider, model } — not a text string.
+export async function generateImage(prompt, imagePath, options = {}) {
+  const imageOptions = { ...options, model: options.model || DEFAULT_IMAGE_MODEL };
+  const result = await cascade(async (key, model) => {
+    const contents = [
+      {
+        role: 'user',
+        parts: imagePath
+          ? [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: guessMimeType(imagePath),
+                  data: fs.readFileSync(imagePath).toString('base64'),
+                },
+              },
+            ]
+          : [{ text: prompt }],
+      },
+    ];
+    const { data, mimeType } = await callGenerateImage(key, model, contents, imageOptions);
+    return { data, mimeType, provider: 'gemini', model };
+  }, imageOptions);
   keyStartIndex = (keyStartIndex + 1) % keys.length;
   return result;
 }
