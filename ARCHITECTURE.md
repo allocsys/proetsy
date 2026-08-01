@@ -256,9 +256,17 @@ Gemini's free tier is rate-limited per project/key (as low as 5-15 requests/minu
 - On a 429 (rate-limit) response, it retries with the next key in the pool before failing
 - If all keys are exhausted, the call fails clearly (surfaced in the dashboard) rather than hanging — no silent fallback to Claude unless that's explicitly enabled in config
 
-**Fallback: Claude.** Same interface, disabled by default. Can be turned on in config if the Gemini key pool is exhausted, or for a specific module that needs it, without changing any module code.
+**Model cascade within a key (checked before rotating keys).** A single Gemini key isn't just tried against one model — it's tried against a **priority-ordered list of models** first, and only after every model on that list has failed (429 or other retryable error) on the *current* key does the provider layer move to the *next* key and restart from the top of the model list:
 
-**Model choice on the Gemini side:** favor a Flash-tier model for the higher daily/rate-limit headroom; reserve a Pro-tier model only for calls that need stronger reasoning, since Pro's free-tier caps are far tighter.
+- Model priority list is config/env-driven, e.g. `GEMINI_MODELS=gemini-2.5-flash,gemini-2.0-flash,gemini-2.5-pro` (Flash-tier first for headroom, Pro-tier last since its free-tier caps are far tighter — see "Model choice" below)
+- **Loop order is: for each key → for each model (in priority order) → attempt call.** So a 429 on `key1`/`gemini-2.5-flash` first retries as `key1`/`gemini-2.0-flash`, then `key1`/`gemini-2.5-pro`, and only once every model on `key1` has 429'd does it move to `key2`/`gemini-2.5-flash`
+- Rationale: a key's rate limit is typically per-model on Google's side, so a model that's rate-limited on a given key doesn't mean the *key* itself is exhausted — a different model on that same key may still have headroom. Rotating keys before exhausting a key's own model options would burn through the key pool faster than necessary
+- A call can pin a single model (skipping the cascade for that call) via `options.model` — used for calls that specifically need Pro-tier reasoning and shouldn't silently downgrade to Flash
+- If every model on every key in the pool has failed, the call fails clearly (surfaced in the dashboard), same as the key-exhaustion case above
+
+**Fallback: Claude.** Same interface, disabled by default. Can be turned on in config if the entire Gemini key×model cascade is exhausted, or for a specific module that needs it, without changing any module code.
+
+**Model choice on the Gemini side:** favor a Flash-tier model for the higher daily/rate-limit headroom; reserve a Pro-tier model only for calls that need stronger reasoning, since Pro's free-tier caps are far tighter. This preference is what the `GEMINI_MODELS` priority order encodes.
 
 **Data note:** Gemini's free tier may use inputs/outputs to improve Google's models. Since Module 1 sends artwork images and Module 2 sends shop copy through it, factor that into whether free tier is acceptable for this data, or whether a paid tier / different privacy setting is needed later.
 
