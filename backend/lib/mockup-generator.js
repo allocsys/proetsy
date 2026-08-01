@@ -31,10 +31,10 @@ const OUTPUT_DIR = process.env.MOCKUP_OUTPUT_DIR
   ? path.resolve(process.cwd(), process.env.MOCKUP_OUTPUT_DIR)
   : path.join(BACKEND_ROOT, 'data', 'mockups');
 
-// See ARCHITECTURE.md -> Module 3 -> "Aspect-ratio mismatch handling". This pass only
-// implements the small-mismatch path (smart-crop); a mismatch at/above this ratio just
-// gets flagged with a warning instead of triggering the (not-yet-built) AI-outpainting
-// fallback.
+// See ARCHITECTURE.md -> Module 3 -> "Aspect-ratio mismatch handling". Below this ratio,
+// mismatches always go through content-aware smart-crop; at/above it, AI outpainting is
+// attempted first (via resolveArtworkForTarget() below), with smart-crop as the guaranteed
+// fallback if the outpaint call fails for any reason.
 const LARGE_MISMATCH_RATIO = process.env.MOCKUP_LARGE_MISMATCH_RATIO
   ? Number(process.env.MOCKUP_LARGE_MISMATCH_RATIO)
   : 0.35;
@@ -55,11 +55,11 @@ export function computeMismatchRatio(artRatio, targetRatio) {
   return Math.abs(artRatio - targetRatio) / targetRatio;
 }
 
-function largeMismatchWarning(sizeKey, mismatch) {
+function outpaintFailureWarning(sizeKey, mismatch, err) {
   return (
     `Artwork aspect ratio differs from the "${sizeKey}" template by ${(mismatch * 100).toFixed(1)}% ` +
-    '(large mismatch). AI outpainting would preserve more of the artwork than a crop, but that ' +
-    'fallback isn\'t implemented in this pass — proceeding with a content-aware smart crop instead.'
+    `(large mismatch). AI outpainting was attempted but failed (${err.message}) — falling back to ` +
+    'a content-aware smart crop instead.'
   );
 }
 
@@ -160,6 +160,45 @@ export async function outpaintArtwork(artwork, targetWidth, targetHeight) {
 }
 
 /**
+ * Resolves artwork resized/cropped/extended to exactly (targetWidth, targetHeight),
+ * choosing between the two mismatch-handling paths from ARCHITECTURE.md -> Module 3 ->
+ * "Aspect-ratio mismatch handling": below LARGE_MISMATCH_RATIO, always smart-crop; at/above
+ * it, attempt AI outpainting first via outpaintArtwork() and fall back to smart-crop if
+ * that call fails for any reason (network error, no image in the response, etc.) — smart-
+ * crop is always the guaranteed fallback, so a bad or failed AI result never blocks mockup
+ * composition. Shared by both composeMockupFlat and composeMockupPsd since the mismatch-
+ * handling *decision* doesn't depend on template kind — only what targetWidth/targetHeight
+ * mean differs between them (full canvas vs. placement-layer bounds).
+ *
+ * On outpaint failure, an explanatory entry is pushed to `warnings` (the failure is
+ * flagged, not hidden — consistent with this doc's Partial Failure Handling principle) but
+ * nothing throws from this function; only a smart-crop failure would propagate up.
+ *
+ * @param {Jimp} artwork
+ * @param {number} targetWidth
+ * @param {number} targetHeight
+ * @param {number} mismatch - precomputed via computeMismatchRatio()
+ * @param {string} sizeKey
+ * @param {string[]} warnings - mutated in place
+ * @returns {Promise<Jimp>}
+ */
+async function resolveArtworkForTarget(artwork, targetWidth, targetHeight, mismatch, sizeKey, warnings) {
+  if (mismatch < LARGE_MISMATCH_RATIO) {
+    return smartCropAndResize(artwork, targetWidth, targetHeight);
+  }
+
+  try {
+    const outpainted = await outpaintArtwork(artwork, targetWidth, targetHeight);
+    // The model isn't guaranteed to return exactly targetWidth x targetHeight pixels, so
+    // resize to fit exactly — the same guarantee smart-crop already provides.
+    return outpainted.resize(targetWidth, targetHeight);
+  } catch (err) {
+    warnings.push(outpaintFailureWarning(sizeKey, mismatch, err));
+    return smartCropAndResize(artwork, targetWidth, targetHeight);
+  }
+}
+
+/**
  * Composes a mockup against a flat PNG/JPEG template.
  *
  * Compositing convention (spec-filling decision — product-sizes.json has no placement
@@ -188,9 +227,7 @@ async function composeMockupFlat(artwork, templatePath, sizeKey) {
   const mismatch = computeMismatchRatio(artRatio, targetRatio);
 
   const warnings = [];
-  if (mismatch >= LARGE_MISMATCH_RATIO) warnings.push(largeMismatchWarning(sizeKey, mismatch));
-
-  const resized = await smartCropAndResize(artwork, targetWidth, targetHeight);
+  const resized = await resolveArtworkForTarget(artwork, targetWidth, targetHeight, mismatch, sizeKey, warnings);
   // Template on top, artwork as the base layer — see compositing convention above.
   // Default blend mode (source-over) is correct here: the template's transparent
   // window lets the artwork show through, its opaque areas cover it.
@@ -243,9 +280,7 @@ async function composeMockupPsd(artwork, templatePath, sizeEntry, sizeKey) {
   const mismatch = computeMismatchRatio(artRatio, targetRatio);
 
   const warnings = [];
-  if (mismatch >= LARGE_MISMATCH_RATIO) warnings.push(largeMismatchWarning(sizeKey, mismatch));
-
-  const resizedArtwork = await smartCropAndResize(artwork, bounds.width, bounds.height);
+  const resizedArtwork = await resolveArtworkForTarget(artwork, bounds.width, bounds.height, mismatch, sizeKey, warnings);
   const artworkBitmap = jimpToPureimageBitmap(resizedArtwork);
 
   const outputCanvas = pureimage.make(psd.width, psd.height);
