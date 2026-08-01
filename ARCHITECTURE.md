@@ -126,10 +126,9 @@ since `mockups.product_size_id`'s FK needs a row to point at, and gained a
 `placement_layer` column (with a defensive `ALTER TABLE` migration in `backend/db/init.js`
 for existing dev DBs). **AI-outpainting fallback for large aspect-ratio mismatches and the
 dashboard side-by-side smart-crop/AI-extended review step are now ✅ done too** — see the
-full 8-step build sequence below; all 8 steps are complete. Still not built: a real PSD
-test fixture checked into the repo (verified during development via a synthetic PSD
-round-tripped through `ag-psd`'s own `writePsd`/`readPsd`, not committed as a fixture), and
-integration/idempotency tests for the PSD-specific compositing path itself — ✅ done. A synthetic layered PSD (background +
+full 8-step build sequence below; all 8 steps are complete. A committed real PSD test
+fixture, and integration/idempotency tests for the PSD-specific compositing path itself —
+both ✅ done. A synthetic layered PSD (background +
 an `artwork` placement layer + a nested `frame group` -> `top border`, generated once via
 ag-psd's own `writePsd()` and verified round-tripping through `readPsd()` + the project's
 real pureimage canvas shim before committing) is checked into the repo as
