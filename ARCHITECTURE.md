@@ -51,6 +51,7 @@ Etsy publishing is manual by design — no auto-uploader module. The app's job e
 - No frames mentioned in titles
 - No AI disclosure in descriptions
 - No delivery details in descriptions
+- Image sizes referenced: 5×7, 8×10, 11×14 at 300 DPI
 **Tag selection:** pulls from the user's pre-made tag list, matched to image analysis output — not freely generated
 **Tech:** Gemini API via the LLM provider layer
 
