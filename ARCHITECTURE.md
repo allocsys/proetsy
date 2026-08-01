@@ -54,7 +54,7 @@ Etsy publishing is manual by design — no auto-uploader module. The app's job e
 - No AI disclosure in descriptions
 - No delivery details in descriptions
 - Sizes referenced in the listing come from the shared **product-sizes config** (see Module 3) — not a hardcoded list. Only sizes that have a matching mockup template configured are offered/mentioned.
-**Tag selection:** pulls from the user's pre-made tag list, matched to image analysis output — not freely generated
+**Tag selection:** calls the **tags provider layer** (see below), not a hardcoded source — currently backed by the user's pre-made tag list, matched to image analysis output
 **Tech:** Gemini API via the LLM provider layer
 
 ### Module 3 — Mockup Composer (optional)
@@ -73,7 +73,7 @@ Etsy publishing is manual by design — no auto-uploader module. The app's job e
 - New product types/templates/sizes are added by editing this one config, not the code, and not duplicated anywhere else
 
 ### Module 4 — Trend/Prompt Helper (optional, manual-trend version)
-**What changed from the original plan:** no live Etsy trend-pulling API call. Trends are a **manually maintained/selected list** (e.g. a `trends.json` or a dropdown in Settings) that the user updates themselves.
+**What changed from the original plan:** no live Etsy trend-pulling API call. Module 4 calls the **trends provider layer** (see below), currently backed by a manually maintained/selected list (e.g. a `trends.json` or a dropdown in Settings) that the user updates themselves.
 **Input:** selected trend + desired category
 **Output:** ready-to-paste Midjourney prompts using shop conventions (`--v 7`, `--style raw`, aspect ratio per category, `--s 50–150`)
 **Tech:** Gemini API via the LLM provider layer, no Etsy API dependency. (This module only *writes* Midjourney-formatted prompt text — it never calls a Midjourney API.)
@@ -155,6 +155,36 @@ Example shape:
 
 ---
 
+## Trends Provider Layer (built in v1)
+
+Module 4 (and Module 2, for trend-aware listing angles) calls a shared interface instead of a hardcoded source:
+
+```
+lib/trends/
+  index.js         -> exports getTrends(), chosen by config
+  manual.js         -> reads trends.json / dashboard-entered list (v1 implementation)
+  etsy-scraper.js   -> future: pulls live Etsy trend data (not built)
+```
+
+**v1 implementation: manual.** Trends are entered/edited by the user in the dashboard (or `trends.json` directly) — no scraping, no external dependency. Flipping to a scraper later is a config change (`TRENDS_PROVIDER=etsy-scraper`), not a rewrite of Module 4.
+
+---
+
+## Tags Provider Layer (built in v1)
+
+Module 2's tag selection calls a shared interface instead of reading the tag list directly:
+
+```
+lib/tags/
+  index.js          -> exports getTagCandidates(imageAnalysis), chosen by config
+  user-list.js       -> matches against the user's pre-made tag list (v1 implementation)
+  auto-suggest.js    -> future: suggests new tags from trend/market data (not built)
+```
+
+**v1 implementation: user-list.** Tags are chosen from the user's pre-made tag library, matched against Module 1's image analysis output — never freely generated. Flipping to an auto-suggest source later is a config change, not a Module 2 rewrite.
+
+---
+
 ## LLM Provider Layer
 
 All three LLM-using modules (1, 2, 4) call a single shared interface instead of hitting a provider's SDK directly:
@@ -215,6 +245,7 @@ Every pipeline run is tracked as a **job**, and every module within a job has it
 - **Database:** same tables as the original plan (listings, images, mockups, tags, settings, prompts), plus a `trends` table (manual entries), a `pipeline_config` table/JSON file, a `jobs` table (job id, per-module status, error messages, timestamps) to support partial failure handling, a `product_sizes` table/config (dimensions, DPI, mockup template per size — shared by Modules 2 and 3), and an `image_preferences` table (image reference, embedding vector, keep/discard label, timestamp) for Module 7's taste model.
 - **Local embedding model:** a lightweight, local, open-source image embedding tool (e.g. CLIP) for Module 7. No API key, no cost, no network call — invoked as a local process from the Node backend.
 - **LLM keys:** a pool of Gemini API keys (env/config, not hardcoded), plus an optional single Claude key for fallback.
+- **Provider layers:** three swappable interfaces built in v1 — `lib/llm/`, `lib/trends/`, `lib/tags/` — each with a config-selected implementation, so any of the three can be flipped later without touching module code.
 
 ---
 
@@ -229,12 +260,13 @@ Every pipeline run is tracked as a **job**, and every module within a job has it
 | Implicit "must deploy" | Local-first; deployment is a later, separate decision |
 | Tags freely generated | Tags chosen from a pre-made list, matched to image content |
 | Etsy API auto-upload (Module 5) | Removed. Publishing to Etsy is manual — no Etsy API integration, no OAuth |
+| Trends/tags hardcoded to their source | Both sit behind swappable provider interfaces (`lib/trends/`, `lib/tags/`), manual by default, flippable to a scraper/auto-suggest source later via config |
 
 ---
 
 ## Suggested build order
 
-1. **Local skeleton**: React frontend + Node backend running locally, DB schema in place, pipeline config wired up (even if most modules are stubs)
+1. **Local skeleton**: React frontend + Node backend running locally, DB schema in place, pipeline config wired up (even if most modules are stubs), plus the three provider-layer interfaces (`lib/llm/`, `lib/trends/`, `lib/tags/`) scaffolded with their v1 (manual) implementations
 2. **Module 2** (Listing Generator) — core, get this solid first, matches original Phase 1
 3. **Module 3** (Mockup Composer with own templates) — no external mockup API needed, so this can move up earlier than the original plan's Phase 2
 4. **Module 4** (manual-trend prompt helper) — low complexity now that trend-pulling is removed
