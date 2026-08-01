@@ -1,0 +1,54 @@
+name: CI
+
+# See ARCHITECTURE.md -> Testing & CI/CD:
+# "On every push/PR: install, lint, run unit + integration tests."
+# E2E (Playwright) is intentionally NOT run here — the same doc says those run on a
+# schedule or on demand, not on every commit, since they're slower. No Playwright suite
+# exists in the repo yet anyway (ARCHITECTURE.md -> Testing & CI/CD lists it as planned
+# coverage, not built).
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same branch/PR so pushing a fixup doesn't leave stale
+# runs queued behind it.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Root package.json declares the backend/frontend workspaces, so a single
+      # `npm ci` at the repo root installs both. `.npmrc` already sets
+      # legacy-peer-deps=true, which npm ci respects automatically.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # Only the backend has an automated test suite today (Vitest — unit +
+      # Supertest integration tests, per ARCHITECTURE.md's Module 2/3/1 status notes).
+      # better-sqlite3 (backend/db) needs no external service or Gemini key: every test
+      # touching the LLM provider layer mocks lib/llm/index.js, and DB tests point
+      # DB_PATH at a throwaway temp-file SQLite DB instead of the real local one.
+      - name: Backend tests
+        run: npm run test -w backend
+
+      # No automated test suite for the frontend yet (ARCHITECTURE.md's Playwright
+      # critical-path suite is planned, not built) — `vite build` at least catches
+      # syntax errors, broken imports, and JSX mistakes on every push.
+      - name: Frontend build check
+        run: npm run build -w frontend
