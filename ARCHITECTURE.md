@@ -186,12 +186,31 @@ independently-committable sub-steps, each testable before the next depends on it
    after the generation run that created it, so both variants' files remain independently
    recoverable no matter how many times `selected_variant` is toggled.
    **Not yet used anywhere:** no dashboard UI calls this route yet (that's step 7).
-7. **Dashboard review UI** — a minimal `JobMockupReview` component (smart-crop vs
-   AI-extended side by side, select buttons when `needs_review` is true), wired minimally
-   into `App.jsx` (Module 6 itself is still just a skeleton — don't build the rest of it
-   here). Depends on 1–6 actually producing two variants to show.
-8. **Tests** — unit tests for the outpaint-trigger logic and prompt-building (the pure
-   parts of step 3), plus an idempotency test for the new upsert in step 6.
+7. **Dashboard review UI — ✅ done.** A minimal `JobMockupReview` component
+   (`frontend/src/JobMockupReview.jsx`): smart-crop vs AI-extended side by side with a
+   select button each when `needs_review` is true, or just the currently-selected variant
+   otherwise. Wired minimally into `App.jsx` via a bare job-ID input + "View mockups"
+   button (Module 6 itself is still just a skeleton — the rest of it isn't built here, per
+   the plan). Selecting a variant calls the step-6 PATCH route and reloads the list.
+   **Schema-adjacent addition needed to make this real (not in steps 1–6's original
+   scope):** the mockups table only ever stored server-side filesystem paths, with no way
+   for the frontend to fetch the actual image bytes. `backend/server.js` now serves
+   `OUTPUT_DIR` statically at `/mockup-files` (exported from `mockup-generator.js` for
+   this purpose) and both mockup-returning routes (`GET .../mockups`, the step-6 PATCH)
+   attach `file_url`/`smart_crop_url`/`ai_extended_url` alongside the raw paths, built from
+   each path's basename since `OUTPUT_DIR` is flat (no subdirectories). `frontend/vite.config.js`
+   proxies `/mockup-files` to the backend in dev, matching the existing `/api` proxy.
+8. **Tests — ✅ done.** Unit tests for the outpaint-trigger logic and prompt-building (the
+   pure parts of step 3) in `mockup-generator.test.js`: `shouldAttemptOutpaint` (a pure
+   trigger-threshold decision extracted out of `resolveArtworkVariants` in this pass
+   specifically so it's testable without real image files or a network call) and
+   `buildOutpaintPrompt` (already pure/exported from step 3). Plus an idempotency suite
+   for the step-6 upsert in `mockup-generator.idempotency.test.js`, run end-to-end against
+   a real temp SQLite DB and tiny synthetic image fixtures with a matching aspect ratio
+   (keeps the mismatch under `LARGE_MISMATCH_RATIO` so no Gemini call happens, keeping the
+   suite hermetic) — verifies `UNIQUE(job_id, product_size_id)` updates the existing row
+   rather than duplicating it, and that a re-run resets `selected_variant` back to
+   `'smart_crop'` even if a prior run had been switched to `'ai_extended'`.
 
 **Input:** artwork file + product type (e.g. "8x10 print", "square canvas")
 **Output:** composited mockup image(s), in the shop's defined display order
