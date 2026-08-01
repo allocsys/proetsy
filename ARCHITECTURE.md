@@ -303,6 +303,37 @@ Every pipeline run is tracked as a **job**, and every module within a job has it
 
 ---
 
+## Database Schema
+
+SQLite (matches the local-first, local-DB decision above). `pipeline_config` and backups stay as JSON/files, not tables.
+
+**Core pipeline**
+- `artworks` — id, file_path, original_filename, image_analysis (JSON from Module 1), uploaded_at
+- `jobs` — id, artwork_id (FK), overall_status, created_at, updated_at
+- `job_modules` — id, job_id (FK), module_name, status (pending/running/success/failed/skipped), error_message, retry_count, started_at, completed_at. **`UNIQUE(job_id, module_name)`** — re-running a module updates this row rather than inserting a second one, which is what makes the idempotency rule in Partial Failure Handling actually hold at the DB level.
+- `listings` — id, job_id (FK), variation (fine_art/aesthetic/gift), title, description, tags (JSON array of 13), tag_alternates (JSON array of 5), edited_at. `UNIQUE(job_id, variation)` for the same idempotency reason.
+- `mockups` — id, job_id (FK), product_size_id (FK), file_path, status. `UNIQUE(job_id, product_size_id)` — re-running Module 3 for a size replaces the file reference, not a duplicate row.
+
+**Config-as-data**
+- `product_sizes` — id, size_key, dimensions, dpi, orientation, mockup_template_path (shared source of truth for Modules 2 & 3)
+- `tags` — id, tag_text, category, source (the tag library Module 2 matches against)
+- `settings` — key, value (default price, delivery text, shop conventions)
+
+**Trends (Module 4)**
+- `trends` — id, term, category, source (manual/csv/etsy_api), added_at
+- `prompts` — id, trend_id (FK, nullable), category, prompt_text, created_at
+
+**Taste model (Module 7)**
+- `image_preferences` — id, image_path, embedding (BLOB), label (keep/discard), category, prompt_id (FK, nullable — links to the prompt that generated it), promoted_artwork_id (FK, nullable — set if this image later got dragged into Upload Artwork), created_at
+- `taste_centroids` — id, category (NULL = global), kept_centroid (BLOB), discarded_centroid (BLOB), updated_at (cached, recomputed on relabel/schedule rather than calculated fresh every score)
+- `prompt_terms` — term, kept_count, discarded_count, updated_at (the Module 7 → Module 4 feedback link)
+
+**Indexes:** beyond the uniqueness constraints above, index `job_modules(job_id)`, `listings(job_id)`, `mockups(job_id)` for the dashboard's per-job status lookups, and `image_preferences(category)` and `trends(term)` for the lookups Module 7 and Module 4 do most often.
+
+**Cascade behavior:** deleting a `job` cascades to its `job_modules`, `listings`, and `mockups` rows — there's no scenario where those should outlive the job they belong to. `artworks`, `image_preferences`, `trends`, and `tags` are never cascade-deleted by a job/prompt deletion, since they're reference data the taste model and tag matching depend on independently.
+
+---
+
 ## Differences from the original plan
 
 | Original plan | This version |
