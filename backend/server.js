@@ -5,6 +5,7 @@ import cors from 'cors';
 import { getDb } from './db/init.js';
 import { getPipelineConfig, getProductSizes } from './config/index.js';
 import { createJob, getJobWithModules, setManualNotes, setModuleStatus } from './lib/jobs.js';
+import { analyzeArtworkForJob } from './lib/image-analyzer/index.js';
 import { generateListingsForJob } from './lib/listing-generator/index.js';
 import { enforceConventions } from './lib/listing-generator/validate.js';
 import { generateMockupForJob, OUTPUT_DIR } from './lib/mockup-generator.js';
@@ -83,6 +84,13 @@ app.post('/api/artworks', (req, res) => {
   res.status(201).json(db.prepare('SELECT * FROM artworks WHERE id = ?').get(lastInsertRowid));
 });
 
+app.get('/api/artworks/:id', (req, res) => {
+  const db = getDb();
+  const artwork = db.prepare('SELECT * FROM artworks WHERE id = ?').get(Number(req.params.id));
+  if (!artwork) return res.status(404).json({ error: 'Artwork not found' });
+  res.json({ ...artwork, image_analysis: artwork.image_analysis ? JSON.parse(artwork.image_analysis) : null });
+});
+
 // Creates a job for an artwork, seeding job_modules from the current pipeline config.
 app.post('/api/jobs', (req, res) => {
   const { artwork_id } = req.body || {};
@@ -106,6 +114,27 @@ app.patch('/api/jobs/:id/manual-notes', (req, res) => {
   const { notes } = req.body || {};
   setManualNotes(Number(req.params.id), notes ?? null);
   res.json(getJobWithModules(Number(req.params.id)));
+});
+
+// Runs Module 1 (Image Analyzer) for a job. Optional/non-required module: on failure the
+// job's module status is 'failed' but overall_status is NOT forced to 'failed' — per
+// ARCHITECTURE.md -> Partial Failure Handling, "the job pauses and asks the user for
+// manual notes instead of auto-failing the whole job" rather than blocking Module 2. The
+// user can PATCH /api/jobs/:id/manual-notes and proceed as if Module 1 had been skipped.
+// Persists to `artworks.image_analysis`, so a re-run overwrites the analysis rather than
+// duplicating anything (single column, not a separate job-scoped table row).
+app.post('/api/jobs/:id/run/image-analyzer', async (req, res) => {
+  const jobId = Number(req.params.id);
+
+  setModuleStatus(jobId, 'image_analyzer', 'running', { required: false });
+  try {
+    const imageAnalysis = await analyzeArtworkForJob(jobId);
+    setModuleStatus(jobId, 'image_analyzer', 'success', { required: false });
+    res.json({ job: getJobWithModules(jobId), imageAnalysis });
+  } catch (err) {
+    setModuleStatus(jobId, 'image_analyzer', 'failed', { required: false, errorMessage: err.message });
+    res.status(422).json({ error: err.message, job: getJobWithModules(jobId) });
+  }
 });
 
 // Runs Module 2 (Listing Generator) for a job. Core/required module: on failure the job
