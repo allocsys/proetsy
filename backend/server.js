@@ -247,6 +247,14 @@ app.patch('/api/jobs/:id/mockups/:mockupId/variant', (req, res) => {
   res.json(withMockupUrls(db.prepare('SELECT * FROM mockups WHERE id = ?').get(mockupId)));
 });
 
-app.listen(PORT, () => {
-  console.log(`ProEtsy backend listening on http://localhost:${PORT}`);
-});
+// Guarded so importing this module (e.g. supertest-based integration tests, which wrap
+// the `app` export directly and don't need a real listening socket) doesn't also bind a
+// real port. Only binds when server.js is actually run as the entry point.
+const isMainModule = process.argv[1] && import.meta.url === `file://${process.argv[1]}`;
+if (isMainModule) {
+  app.listen(PORT, () => {
+    console.log(`ProEtsy backend listening on http://localhost:${PORT}`);
+  });
+}
+
+export default app;
