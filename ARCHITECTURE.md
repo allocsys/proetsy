@@ -190,3 +190,10 @@ Every pipeline run is tracked as a **job**, and every module within a job has it
 5. **Deployment** — separate discussion once the local app works end-to-end
 
 (Etsy Uploader is no longer part of the build — publishing is manual.)
+
+---
+
+## Open Risks — Reviewed, Accepted As-Is
+
+- **AI-disclosure content policy** (Module 2 hardcodes "no AI disclosure in descriptions") — reviewed and accepted; no change needed.
+- **Multi-key Gemini ToS risk** (rotating a pool of free-tier keys) — reviewed; not a current concern. May move to a paid Gemini Pro key later, decision deferred until then.
