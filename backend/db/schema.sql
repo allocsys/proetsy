@@ -67,6 +67,12 @@ CREATE TABLE IF NOT EXISTS mockups (
   -- currently selected (smart_crop by default), so existing readers of `file_path` don't
   -- need to change.
   ai_extended_path TEXT,
+  -- Smart-crop variant's own file path, kept independently of `file_path` so the step-6
+  -- PATCH variant route can always restore it. `file_path` gets overwritten to track
+  -- whichever variant is currently selected, so once the user switches to ai_extended,
+  -- file_path alone can no longer recover the smart-crop file. Always populated —
+  -- composeMockup() always produces a smart-crop variant.
+  smart_crop_path TEXT,
   -- Set when both a smart-crop and an AI-extended variant exist and the user hasn't picked
   -- one yet; cleared once `selected_variant` is set via the dashboard review step.
   needs_review INTEGER NOT NULL DEFAULT 0,
