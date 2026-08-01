@@ -80,4 +80,15 @@ describe('analyzeArtworkForJob (ARCHITECTURE.md -> Module 1)', () => {
   it('throws for a job that does not exist', async () => {
     await expect(analyzeArtworkForJob(999999)).rejects.toThrow(/not found/i);
   });
+
+  it('throws (and does not persist anything) when the model response is missing required fields', async () => {
+    const db = getDb();
+    const { generateVision } = await import('../llm/index.js');
+    generateVision.mockImplementationOnce(async () => ({ text: JSON.stringify({ mood: 'calm' }) }));
+
+    const before = db.prepare('SELECT image_analysis FROM artworks WHERE id = ?').get(artworkId).image_analysis;
+    await expect(analyzeArtworkForJob(jobId)).rejects.toThrow(/subject/i);
+    const after = db.prepare('SELECT image_analysis FROM artworks WHERE id = ?').get(artworkId).image_analysis;
+    expect(after).toBe(before);
+  });
 });
