@@ -239,6 +239,8 @@ lib/tags/
 
 ## LLM Provider Layer
 
+**Status: key x model cascade — ✅ done; request spacing/cooldown/escalation hardening — ✅ done.** Implemented in `backend/lib/llm/gemini.js` (cascade wiring), `backend/lib/llm/rate-limits.js` (cooldown Map + DB persistence), and `backend/lib/llm/queue.js` (per-key spacing + global concurrency cap); backing table added to `backend/db/schema.sql`; new env vars in `backend/.env.example`. Not yet built: the Claude fallback path (`claude.js` is a stub) and a dashboard surface for rate-limit/cooldown status.
+
 All three LLM-using modules (1, 2, 4) call a single shared interface instead of hitting a provider's SDK directly:
 
 ```
