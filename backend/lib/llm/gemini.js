@@ -1,8 +1,11 @@
 // Primary LLM provider. Free-tier key pool with round-robin rotation, and — within each
 // key — a priority-ordered model cascade tried before moving to the next key.
 // See ARCHITECTURE.md -> LLM Provider Layer -> "Model cascade within a key".
-// TODO: replace the stub call bodies below with real Gemini API calls once Modules 1/2/4
-// are being built. The retry/cascade control flow around them is real, not stubbed.
+
+import fs from 'node:fs';
+import path from 'node:path';
+
+const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 const keys = (process.env.GEMINI_API_KEYS || '')
   .split(',')
@@ -63,11 +66,63 @@ async function cascade(callFn, options = {}) {
   );
 }
 
+// Single generateContent call against one (key, model) pair. `contents` follows Gemini's
+// request shape ([{ role, parts: [...] }]). Throws with `.status` set to the HTTP status
+// on failure so cascade() can tell a 429 (retryable) apart from anything else.
+async function callGenerateContent(key, model, contents, options = {}) {
+  const url = `${GEMINI_API_BASE}/models/${model}:generateContent?key=${key}`;
+
+  const generationConfig = {};
+  if (options.json) generationConfig.responseMimeType = 'application/json';
+  if (options.temperature !== undefined) generationConfig.temperature = options.temperature;
+
+  const body = { contents };
+  if (Object.keys(generationConfig).length) body.generationConfig = generationConfig;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errBody = await response.text().catch(() => '');
+    const err = new Error(`Gemini API error ${response.status} (model=${model}): ${errBody.slice(0, 300)}`);
+    err.status = response.status;
+    throw err;
+  }
+
+  const data = await response.json();
+  const text = (data?.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');
+  if (!text) {
+    throw new Error(
+      `Gemini response for model=${model} had no text content (possibly blocked). ` +
+        `promptFeedback: ${JSON.stringify(data?.promptFeedback || {})}`
+    );
+  }
+  return text;
+}
+
+function guessMimeType(imagePath) {
+  const byExt = {
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp',
+    '.gif': 'image/gif',
+  };
+  return byExt[path.extname(imagePath).toLowerCase()] || 'application/octet-stream';
+}
+
+// options.json: true forces Gemini's structured-output mode (generationConfig.
+// responseMimeType = 'application/json') instead of relying solely on prompt wording to
+// get valid JSON back — used by Module 2 so listing parsing doesn't depend on the model
+// reliably following instructions. options.model pins a single model (bypasses cascade
+// for model choice, still cascades across keys).
 export async function generateText(prompt, options = {}) {
   const result = await cascade(async (key, model) => {
-    // TODO: call Gemini's generateContent endpoint for `model` using `key`; throw an
-    // Error with `.status = 429` on rate-limit responses so cascade() retries correctly.
-    return { text: `[stub] Gemini text response for: ${prompt}`, provider: 'gemini', model };
+    const text = await callGenerateContent(key, model, [{ role: 'user', parts: [{ text: prompt }] }], options);
+    return { text, provider: 'gemini', model };
   }, options);
   keyStartIndex = (keyStartIndex + 1) % keys.length;
   return result;
@@ -75,9 +130,18 @@ export async function generateText(prompt, options = {}) {
 
 export async function generateVision(prompt, imagePath, options = {}) {
   const result = await cascade(async (key, model) => {
-    // TODO: call a vision-capable Gemini model with the image + prompt; same 429 -> retry
-    // contract as generateText above.
-    return { text: `[stub] Gemini vision response for ${imagePath}`, provider: 'gemini', model };
+    const imageBuffer = fs.readFileSync(imagePath);
+    const contents = [
+      {
+        role: 'user',
+        parts: [
+          { text: prompt },
+          { inlineData: { mimeType: guessMimeType(imagePath), data: imageBuffer.toString('base64') } },
+        ],
+      },
+    ];
+    const text = await callGenerateContent(key, model, contents, options);
+    return { text, provider: 'gemini', model };
   }, options);
   keyStartIndex = (keyStartIndex + 1) % keys.length;
   return result;
