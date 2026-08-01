@@ -38,6 +38,32 @@ Etsy publishing is manual by design — no auto-uploader module. The app's job e
 ## Modules
 
 ### Module 1 — Image Analyzer (optional)
+**Status: backend analysis — ✅ done. Automated tests — ✅ done. Dashboard surface — not yet done (no dedicated review UI; the analysis is currently only visible via `GET /api/artworks/:id`).**
+Implemented in `backend/lib/image-analyzer/index.js` (`analyzeArtworkForJob`), prompt
+building in `prompt.js` (`buildImageAnalysisPrompt`), wired up via
+`POST /api/jobs/:id/run/image-analyzer` in `backend/server.js`. Unlike Modules 2/3, this
+persists onto `artworks.image_analysis` directly (a single column, keyed by artwork, not
+job) rather than a job-scoped table row, since the analysis describes the artwork itself
+and a re-run should overwrite it, not accumulate per-job history — same idempotency
+principle as the other modules' upserts, just via `UPDATE` instead of
+`ON CONFLICT DO UPDATE`. The route treats Module 1 as optional (`required: false` to
+`setModuleStatus`), matching the Partial Failure Handling rule below: a failure here
+never forces the job's `overall_status` to `'failed'`, so the user can fall back to
+`PATCH /api/jobs/:id/manual-notes` and proceed straight to Module 2. A new
+`GET /api/artworks/:id` route (added alongside this module, since nothing previously
+exposed a single artwork's stored analysis) returns `image_analysis` pre-parsed from its
+stored JSON string. Test coverage: unit tests for the prompt builder
+(`prompt.test.js`), a persistence/idempotency suite for `analyzeArtworkForJob`
+(`index.idempotency.test.js` — persists correctly, re-running overwrites rather than
+duplicating, throws without persisting on a malformed model response), and an
+integration suite for the HTTP routes (`backend/server.image-analyzer-routes.test.js`,
+Supertest against the exported Express `app`) — successful analysis, the
+optional-module failure path (job not forced to `'failed'`, manual-notes fallback still
+works afterward), re-run idempotency at the route level, and the new artwork-lookup
+route (including its 404 case). **Not yet done:** a dashboard review/edit surface
+(mirroring `JobListingReview.jsx`/`JobMockupReview.jsx`) — Module 6 itself is still just
+a skeleton, per that module's own section.
+
 **Input:** artwork file
 **Output:** structured description (subject, style, palette, mood) used by Module 2 and for tag matching
 **Tech:** Gemini API (vision, multimodal) via the LLM provider layer
