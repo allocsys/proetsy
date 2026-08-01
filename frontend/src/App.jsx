@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import JobListingReview from './JobListingReview.jsx';
 import JobMockupReview from './JobMockupReview.jsx';
 
 function App() {
@@ -44,7 +45,14 @@ function App() {
           View mockups
         </button>
       </div>
-      {activeJobId && <JobMockupReview jobId={activeJobId} />}
+      {activeJobId && (
+        <>
+          <h3>Listings</h3>
+          <JobListingReview jobId={activeJobId} />
+          <h3>Mockups</h3>
+          <JobMockupReview jobId={activeJobId} />
+        </>
+      )}
 
       <p style={{ color: '#888' }}>
         Skeleton dashboard — modules are stubbed. See ARCHITECTURE.md for the full plan.
