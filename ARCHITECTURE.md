@@ -144,11 +144,19 @@ independently-committable sub-steps, each testable before the next depends on it
    to anything — by design, since step 4 (not this step) owns deciding what "fallback to
    smart-crop" means. **Still not wired into `composeMockup`** — nothing calls
    `outpaintArtwork()` yet, and no test file was added this pass (formal tests are step 8).
-4. **Wire it into `composeMockup` for both template paths** (flat-PNG and PSD), triggered
-   only when `mismatch >= MOCKUP_LARGE_MISMATCH_RATIO`, wrapped so any outpaint failure
-   falls back to the existing smart-crop path silently — smart-crop must remain the
-   guaranteed fallback per this section's design above; a bad or failed AI result should
-   never block the pipeline.
+4. **Wire it into `composeMockup` for both template paths — ✅ done.** A new shared
+   `resolveArtworkForTarget(artwork, targetWidth, targetHeight, mismatch, sizeKey,
+   warnings)` holds the mismatch-handling decision itself (below `LARGE_MISMATCH_RATIO`
+   → smart-crop; at/above it → try `outpaintArtwork()`, resize its result to exactly
+   `targetWidth`x`targetHeight` since the model isn't guaranteed to return exact pixel
+   dimensions) and is called from both `composeMockupFlat` (target = template canvas size)
+   and `composeMockupPsd` (target = placement-layer bounds) — the decision doesn't depend
+   on template kind, only what the target dimensions mean does. On outpaint failure, the
+   old `largeMismatchWarning()` (which said the AI fallback "isn't implemented") was
+   replaced with `outpaintFailureWarning()`, which names the actual error and notes the
+   smart-crop fallback; nothing throws from `resolveArtworkForTarget` itself, so a bad or
+   failed AI result never blocks mockup composition — the failure is flagged in
+   `warnings` (surfaced the same way any other Module 3 warning already is), not hidden.
 5. **Schema + migration** for the review step (can happen in parallel with 2–4): add
    `mockups.ai_extended_path` (nullable TEXT), `needs_review` (INTEGER DEFAULT 0),
    `selected_variant` (TEXT DEFAULT `'smart_crop'`) to `backend/db/schema.sql`, plus a
