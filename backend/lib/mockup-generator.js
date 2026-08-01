@@ -348,7 +348,7 @@ function writePureimagePng(canvas, outputPath) {
  *
  * @param {string} artworkPath - path to the source artwork image
  * @param {string} sizeKey - key into product-sizes.json (e.g. "8x10-portrait")
- * @returns {Promise<{ outputPath: string, warnings: string[] }>}
+ * @returns {Promise<{ outputPath: string, aiExtendedPath: string | null, warnings: string[] }>}
  */
 export async function composeMockup(artworkPath, sizeKey) {
   const productSizesConfig = getProductSizes();
@@ -373,17 +373,32 @@ export async function composeMockup(artworkPath, sizeKey) {
   const artwork = await Jimp.read(resolvedArtworkPath);
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   const artworkBase = path.basename(resolvedArtworkPath, path.extname(resolvedArtworkPath));
-  const outputPath = path.join(OUTPUT_DIR, `${artworkBase}-${sizeKey}-${Date.now()}.png`);
+  const timestamp = Date.now();
+  // `file_path`'s naming (no suffix) is unchanged from before this pass, so existing
+  // readers of that column keep working; the AI-extended variant gets its own file next
+  // to it, only written when an outpaint attempt actually succeeded.
+  const outputPath = path.join(OUTPUT_DIR, `${artworkBase}-${sizeKey}-${timestamp}.png`);
+  const aiExtendedOutputPath = path.join(OUTPUT_DIR, `${artworkBase}-${sizeKey}-${timestamp}-ai-extended.png`);
 
   if (detectTemplateKind(templatePath) === 'psd') {
-    const { canvas, warnings } = await composeMockupPsd(artwork, templatePath, sizeEntry, sizeKey);
+    const { canvas, canvasAiExtended, warnings } = await composeMockupPsd(artwork, templatePath, sizeEntry, sizeKey);
     await writePureimagePng(canvas, outputPath);
-    return { outputPath, warnings };
+    let aiExtendedPath = null;
+    if (canvasAiExtended) {
+      await writePureimagePng(canvasAiExtended, aiExtendedOutputPath);
+      aiExtendedPath = aiExtendedOutputPath;
+    }
+    return { outputPath, aiExtendedPath, warnings };
   }
 
-  const { composed, warnings } = await composeMockupFlat(artwork, templatePath, sizeKey);
+  const { composed, composedAiExtended, warnings } = await composeMockupFlat(artwork, templatePath, sizeKey);
   await composed.writeAsync(outputPath);
-  return { outputPath, warnings };
+  let aiExtendedPath = null;
+  if (composedAiExtended) {
+    await composedAiExtended.writeAsync(aiExtendedOutputPath);
+    aiExtendedPath = aiExtendedOutputPath;
+  }
+  return { outputPath, aiExtendedPath, warnings };
 }
 
 /**
@@ -396,9 +411,16 @@ export async function composeMockup(artworkPath, sizeKey) {
  * `listings` table (UNIQUE(job_id, product_size_id) makes a re-run replace, not
  * duplicate — see ARCHITECTURE.md -> Partial Failure Handling -> Idempotency).
  *
+ * Also persists the AI-outpainting review state (ARCHITECTURE.md -> Module 3 ->
+ * "AI-outpainting fallback" step 6): `ai_extended_path` when composeMockup() produced one,
+ * `needs_review` set whenever it did (there's a real choice for the user to make),
+ * `selected_variant` reset to the `'smart_crop'` default on every run — a fresh run
+ * produces brand-new candidate files, so any previous selection from an earlier run no
+ * longer corresponds to what's on disk now.
+ *
  * @param {number} jobId
  * @param {string} sizeKey
- * @returns {Promise<{ outputPath: string, warnings: string[] }>}
+ * @returns {Promise<{ outputPath: string, aiExtendedPath: string | null, warnings: string[] }>}
  */
 export async function generateMockupForJob(jobId, sizeKey) {
   const db = getDb();
@@ -409,7 +431,7 @@ export async function generateMockupForJob(jobId, sizeKey) {
   const artwork = db.prepare('SELECT * FROM artworks WHERE id = ?').get(job.artwork_id);
   if (!artwork) throw new Error(`Artwork for job ${jobId} not found`);
 
-  const { outputPath, warnings } = await composeMockup(artwork.file_path, sizeKey);
+  const { outputPath, aiExtendedPath, warnings } = await composeMockup(artwork.file_path, sizeKey);
 
   const productSizesConfig = getProductSizes();
   const sizeEntry = productSizesConfig[sizeKey];
@@ -438,17 +460,22 @@ export async function generateMockupForJob(jobId, sizeKey) {
   const productSizeRow = db.prepare('SELECT id FROM product_sizes WHERE size_key = ?').get(sizeKey);
 
   const upsertMockup = db.prepare(`
-    INSERT INTO mockups (job_id, product_size_id, file_path, status)
-    VALUES (@job_id, @product_size_id, @file_path, 'success')
+    INSERT INTO mockups (job_id, product_size_id, file_path, status, ai_extended_path, needs_review, selected_variant)
+    VALUES (@job_id, @product_size_id, @file_path, 'success', @ai_extended_path, @needs_review, 'smart_crop')
     ON CONFLICT(job_id, product_size_id) DO UPDATE SET
       file_path = excluded.file_path,
-      status = excluded.status
+      status = excluded.status,
+      ai_extended_path = excluded.ai_extended_path,
+      needs_review = excluded.needs_review,
+      selected_variant = 'smart_crop'
   `);
   upsertMockup.run({
     job_id: jobId,
     product_size_id: productSizeRow.id,
     file_path: outputPath,
+    ai_extended_path: aiExtendedPath,
+    needs_review: aiExtendedPath ? 1 : 0,
   });
 
-  return { outputPath, warnings };
+  return { outputPath, aiExtendedPath, warnings };
 }
