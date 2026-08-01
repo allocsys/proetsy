@@ -2,7 +2,7 @@
 
 This document defines the modular version of the original build plan. It supersedes nothing — the original plan doc stays as-is — but this is the spec to build against: React frontend, Node.js backend, runnable fully locally first, deployable later.
 
-**LLM provider: Gemini (free tier, multiple keys) is primary. Claude API is kept as an optional fallback behind the same interface — not required to run the app.**
+**LLM provider: Gemini (free tier, multiple keys) is primary and native** — nothing has been built yet, so there's no migration or output-normalization concern; Modules 1, 2, and 4 are designed against Gemini's response format from the start. Claude API is kept as an optional fallback behind the same interface, not required to run the app.
 
 ## Guiding principles
 
@@ -132,12 +132,37 @@ Gemini's free tier is rate-limited per project/key (as low as 5-15 requests/minu
 
 ---
 
+## Partial Failure Handling
+
+Every pipeline run is tracked as a **job**, and every module within a job has its own status — a failure in one module doesn't corrupt or block the rest of the job, and one job's failure doesn't block other jobs.
+
+**Per-module status** (per job): `pending` → `running` → `success` | `failed` | `skipped`
+
+**Job-level rules:**
+- If **Module 1** (Image Analyzer) fails, the job pauses and asks the user for manual notes instead of auto-failing the whole job — Module 1 is optional, so a failure here shouldn't block Module 2.
+- If **Module 2** (Listing Generator) fails, the job stops there and is marked `failed` — Module 2 is core/required, nothing downstream can run without it. The user sees the error and can retry just that module (not the whole job).
+- If **Module 3** (Mockup Composer) fails (e.g. missing template for a product type), the job still surfaces the generated listing for review — mockups are optional, so a listing without mockups is still usable. The failure is flagged, not hidden.
+- If **Module 4** (Trend/Prompt Helper) fails, it's fully isolated — it's not part of the main listing pipeline, so a failure there never touches jobs in progress.
+
+**Retry model:**
+- Each failed module gets a **retry button** in the dashboard — retrying re-runs only that module, using the job's already-stored inputs/outputs from prior successful steps (no need to re-upload the artwork or re-run steps that already succeeded).
+- Retries against Gemini respect the same key-pool rotation as a fresh call (see LLM Provider Layer above) — a retry isn't guaranteed to hit the same key that just failed.
+
+**Bulk mode:**
+- Each artwork in a bulk batch is its own job with its own status. One item failing (e.g. a bad image file, a Gemini timeout) does not halt or roll back the rest of the batch.
+- The dashboard's listing history log shows per-item status within a batch, so failures are visible at a glance rather than buried in a single pass/fail for the whole batch.
+
+**Idempotency:**
+- Re-running a module for a job overwrites that module's prior output for the job rather than creating duplicates (e.g. re-running Module 3 replaces the old mockup file reference, it doesn't add a second copy).
+
+---
+
 ## Stack
 
 - **Frontend:** React
 - **Backend:** Node.js
 - **Local-first:** entire pipeline (analyzer → generator → mockup composer → review) must run against local storage/local DB before any deployment decision. Deployment target (own VPS, Vercel/Render, etc.) is a separate, later discussion.
-- **Database:** same tables as the original plan (listings, images, mockups, tags, settings, prompts), plus a `trends` table (manual entries) and a `pipeline_config` table/JSON file.
+- **Database:** same tables as the original plan (listings, images, mockups, tags, settings, prompts), plus a `trends` table (manual entries), a `pipeline_config` table/JSON file, and a `jobs` table (job id, per-module status, error messages, timestamps) to support partial failure handling.
 - **LLM keys:** a pool of Gemini API keys (env/config, not hardcoded), plus an optional single Claude key for fallback.
 
 ---
