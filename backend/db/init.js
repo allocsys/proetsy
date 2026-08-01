@@ -34,6 +34,11 @@ function runDefensiveMigrations(db) {
   const migrations = [
     // PSD template support — see ARCHITECTURE.md -> Module 3 -> "Template formats".
     'ALTER TABLE product_sizes ADD COLUMN placement_layer TEXT',
+    // AI-outpainting review step — see ARCHITECTURE.md -> Module 3 -> "AI-outpainting
+    // fallback" step 5.
+    'ALTER TABLE mockups ADD COLUMN ai_extended_path TEXT',
+    "ALTER TABLE mockups ADD COLUMN needs_review INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE mockups ADD COLUMN selected_variant TEXT NOT NULL DEFAULT 'smart_crop'",
   ];
   for (const sql of migrations) {
     try {
