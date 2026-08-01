@@ -36,7 +36,10 @@ CREATE TABLE IF NOT EXISTS product_sizes (
   dimensions TEXT,
   dpi INTEGER,
   orientation TEXT,
-  mockup_template_path TEXT
+  mockup_template_path TEXT,
+  -- Nullable — only meaningful for .psd templates; names the PSD layer whose bounds the
+  -- artwork is placed into. See ARCHITECTURE.md -> Module 3 -> "Template formats".
+  placement_layer TEXT
 );
 
 CREATE TABLE IF NOT EXISTS listings (
