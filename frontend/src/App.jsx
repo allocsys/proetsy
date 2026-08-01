@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import JobArtworkAnalysisReview from './JobArtworkAnalysisReview.jsx';
 import JobListingReview from './JobListingReview.jsx';
 import JobMockupReview from './JobMockupReview.jsx';
 
@@ -47,6 +48,8 @@ function App() {
       </div>
       {activeJobId && (
         <>
+          <h3>Image analysis</h3>
+          <JobArtworkAnalysisReview jobId={activeJobId} />
           <h3>Listings</h3>
           <JobListingReview jobId={activeJobId} />
           <h3>Mockups</h3>
