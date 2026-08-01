@@ -27,7 +27,9 @@ const BACKEND_ROOT = path.join(__dirname, '..');
 const TEMPLATES_BASE_DIR = process.env.MOCKUP_TEMPLATES_DIR
   ? path.resolve(process.cwd(), process.env.MOCKUP_TEMPLATES_DIR)
   : BACKEND_ROOT;
-const OUTPUT_DIR = process.env.MOCKUP_OUTPUT_DIR
+// Exported so server.js can serve this directory statically for the dashboard review UI
+// (step 7) without duplicating the env-var-driven path resolution here.
+export const OUTPUT_DIR = process.env.MOCKUP_OUTPUT_DIR
   ? path.resolve(process.cwd(), process.env.MOCKUP_OUTPUT_DIR)
   : path.join(BACKEND_ROOT, 'data', 'mockups');
 
