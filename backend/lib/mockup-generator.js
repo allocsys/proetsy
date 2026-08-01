@@ -265,7 +265,7 @@ async function composeMockupFlat(artwork, templatePath, sizeKey) {
  * @param {string} templatePath
  * @param {object} sizeEntry - the product-sizes.json entry (for `placement_layer`)
  * @param {string} sizeKey
- * @returns {Promise<{ canvas: import('pureimage').Bitmap, warnings: string[] }>}
+ * @returns {Promise<{ canvas: import('pureimage').Bitmap, canvasAiExtended: import('pureimage').Bitmap | null, warnings: string[] }>}
  */
 async function composeMockupPsd(artwork, templatePath, sizeEntry, sizeKey) {
   ensurePsdCanvasInitialized();
@@ -288,9 +288,30 @@ async function composeMockupPsd(artwork, templatePath, sizeEntry, sizeKey) {
   const mismatch = computeMismatchRatio(artRatio, targetRatio);
 
   const warnings = [];
-  const resizedArtwork = await resolveArtworkForTarget(artwork, bounds.width, bounds.height, mismatch, sizeKey, warnings);
-  const artworkBitmap = jimpToPureimageBitmap(resizedArtwork);
+  const { smartCrop, aiExtended } = await resolveArtworkVariants(artwork, bounds.width, bounds.height, mismatch, sizeKey, warnings);
 
+  const canvas = paintPsdCanvas(psd, placementLayer, bounds, jimpToPureimageBitmap(smartCrop));
+  const canvasAiExtended = aiExtended
+    ? paintPsdCanvas(psd, placementLayer, bounds, jimpToPureimageBitmap(aiExtended))
+    : null;
+
+  return { canvas, canvasAiExtended, warnings };
+}
+
+/**
+ * Renders every visible PSD layer, in stacking order, onto a fresh canvas the size of the
+ * full document, substituting `artworkBitmap` in for the placement layer's own pixel data
+ * — the actual compositing step shared by both composeMockupPsd variants (smart-crop and
+ * AI-extended). Split out of composeMockupPsd in outpainting sub-step 6 so it can be
+ * called once per variant instead of duplicating the paint loop inline.
+ *
+ * @param {object} psd - parsed PSD document (from ag-psd's readPsd)
+ * @param {object} placementLayer - the PSD layer node being substituted
+ * @param {{ left: number, top: number, width: number, height: number }} bounds - placementLayer's resolved bounds
+ * @param {import('pureimage').Bitmap} artworkBitmap - artwork already sized to (bounds.width, bounds.height)
+ * @returns {import('pureimage').Bitmap}
+ */
+function paintPsdCanvas(psd, placementLayer, bounds, artworkBitmap) {
   const outputCanvas = pureimage.make(psd.width, psd.height);
   const outputCtx = outputCanvas.getContext('2d');
 
@@ -313,7 +334,7 @@ async function composeMockupPsd(artwork, templatePath, sizeEntry, sizeKey) {
   }
   outputCtx.globalAlpha = 1;
 
-  return { canvas: outputCanvas, warnings };
+  return outputCanvas;
 }
 
 function writePureimagePng(canvas, outputPath) {
