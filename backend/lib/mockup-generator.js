@@ -3,8 +3,18 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Jimp from 'jimp';
 import smartcrop from 'smartcrop-jimp';
+import { readPsd } from 'ag-psd';
+import pureimage from 'pureimage';
 import { getDb } from '../db/init.js';
 import { getProductSizes } from '../config/index.js';
+import { ensurePsdCanvasInitialized } from './psd-canvas.js';
+import {
+  DEFAULT_PLACEMENT_LAYER,
+  detectTemplateKind,
+  findPlacementLayer,
+  flattenPaintOrder,
+  resolvePlacementBounds,
+} from './psd-template.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Backend package root (mirrors backend/db/init.js's __dirname-based approach) — paths
@@ -32,7 +42,59 @@ function resolveBackendPath(p) {
 }
 
 /**
- * Composes a mockup for one artwork + product size.
+ * Pure mismatch-ratio calculation, split out of composeMockup so it's unit-testable
+ * without needing real image files. See ARCHITECTURE.md -> Module 3 -> "Aspect-ratio
+ * mismatch handling".
+ * @param {number} artRatio
+ * @param {number} targetRatio
+ * @returns {number}
+ */
+export function computeMismatchRatio(artRatio, targetRatio) {
+  return Math.abs(artRatio - targetRatio) / targetRatio;
+}
+
+function largeMismatchWarning(sizeKey, mismatch) {
+  return (
+    `Artwork aspect ratio differs from the "${sizeKey}" template by ${(mismatch * 100).toFixed(1)}% ` +
+    '(large mismatch). AI outpainting would preserve more of the artwork than a crop, but that ' +
+    'fallback isn\'t implemented in this pass — proceeding with a content-aware smart crop instead.'
+  );
+}
+
+/**
+ * Content-aware crop-and-resize shared by both the flat-PNG and PSD compositing paths.
+ * Never a blind center-crop, per ARCHITECTURE.md -> Module 3. The crop rect smartcrop
+ * returns is in the *original* artwork's pixel coordinate space, at the target aspect
+ * ratio but not necessarily the exact target pixel dimensions, so a resize to
+ * (targetWidth, targetHeight) still follows the crop.
+ * @param {Jimp} artwork
+ * @param {number} targetWidth
+ * @param {number} targetHeight
+ * @returns {Promise<Jimp>}
+ */
+async function smartCropAndResize(artwork, targetWidth, targetHeight) {
+  const { topCrop } = await smartcrop.crop(artwork, { width: targetWidth, height: targetHeight });
+  return artwork.clone().crop(topCrop.x, topCrop.y, topCrop.width, topCrop.height).resize(targetWidth, targetHeight);
+}
+
+/**
+ * Copies a Jimp image's pixels into a pureimage Bitmap. Both store pixels as a flat
+ * RGBA Uint8(Clamped)Array in row-major order, so this is a direct byte copy — no channel
+ * reordering needed. Used to hand a smart-cropped artwork off to the PSD compositing path,
+ * which draws onto a pureimage canvas (see psd-canvas.js for why pureimage, not
+ * node-canvas).
+ * @param {Jimp} jimpImage
+ * @returns {import('pureimage').Bitmap}
+ */
+function jimpToPureimageBitmap(jimpImage) {
+  const { width, height, data } = jimpImage.bitmap;
+  const bitmap = pureimage.make(width, height);
+  bitmap.data.set(data);
+  return bitmap;
+}
+
+/**
+ * Composes a mockup against a flat PNG/JPEG template.
  *
  * Compositing convention (spec-filling decision — product-sizes.json has no placement
  * rect, see ARCHITECTURE.md -> Module 3): the template PNG's own pixel dimensions ARE the
@@ -41,6 +103,118 @@ function resolveBackendPath(p) {
  * print area, with opaque frame/background graphics everywhere else — that's what lets a
  * single generic composite step work for any template without per-size placement
  * metadata. Documented here and in ARCHITECTURE.md -> Module 3.
+ *
+ * @param {Jimp} artwork
+ * @param {string} templatePath
+ * @param {string} sizeKey
+ * @returns {Promise<{ composed: Jimp, warnings: string[] }>}
+ */
+async function composeMockupFlat(artwork, templatePath, sizeKey) {
+  const template = await Jimp.read(templatePath);
+
+  // The template's own pixel size is canonical for the target aspect ratio — not the
+  // human-readable `dimensions` string in product-sizes.json (e.g. "8x10"), which is
+  // print-size/DPI metadata, not necessarily the template PNG's exact pixel ratio.
+  const targetWidth = template.bitmap.width;
+  const targetHeight = template.bitmap.height;
+  const targetRatio = targetWidth / targetHeight;
+  const artRatio = artwork.bitmap.width / artwork.bitmap.height;
+  const mismatch = computeMismatchRatio(artRatio, targetRatio);
+
+  const warnings = [];
+  if (mismatch >= LARGE_MISMATCH_RATIO) warnings.push(largeMismatchWarning(sizeKey, mismatch));
+
+  const resized = await smartCropAndResize(artwork, targetWidth, targetHeight);
+  // Template on top, artwork as the base layer — see compositing convention above.
+  // Default blend mode (source-over) is correct here: the template's transparent
+  // window lets the artwork show through, its opaque areas cover it.
+  const composed = resized.composite(template, 0, 0);
+
+  return { composed, warnings };
+}
+
+/**
+ * Composes a mockup against a layered PSD template. See ARCHITECTURE.md -> Module 3 ->
+ * "Template formats" for the full design rationale (placement-layer convention, the
+ * ag-psd + pureimage canvas shim, and the known warp-transform limitation).
+ *
+ * Placement is layer-based, not whole-canvas: the artwork is smart-cropped/resized to the
+ * named placement layer's own pixel bounds (not the full document canvas), then every
+ * visible PSD layer is rendered in its original stacking order onto a canvas the size of
+ * the full document, substituting the artwork bitmap in for the placement layer's own
+ * pixel data.
+ *
+ * Known, accepted limitation (documented in ARCHITECTURE.md, repeated here since it's
+ * exactly the code path it applies to): this does not re-evaluate Photoshop smart-object
+ * warp/perspective transforms — the artwork is placed as an unwarped, axis-aligned
+ * rectangle within the placement layer's bounding box, not warped to match a photographed
+ * frame's angle if the template's smart object was originally warped.
+ *
+ * @param {Jimp} artwork
+ * @param {string} templatePath
+ * @param {object} sizeEntry - the product-sizes.json entry (for `placement_layer`)
+ * @param {string} sizeKey
+ * @returns {Promise<{ canvas: import('pureimage').Bitmap, warnings: string[] }>}
+ */
+async function composeMockupPsd(artwork, templatePath, sizeEntry, sizeKey) {
+  ensurePsdCanvasInitialized();
+
+  const psdBuffer = fs.readFileSync(templatePath);
+  const psd = readPsd(psdBuffer, { useImageData: false });
+
+  const placementLayerName = sizeEntry.placement_layer || DEFAULT_PLACEMENT_LAYER;
+  const placementLayer = findPlacementLayer(psd.children, placementLayerName);
+  if (!placementLayer) {
+    throw new Error(
+      `PSD template "${templatePath}" has no layer named "${placementLayerName}" ` +
+        `(product size "${sizeKey}"'s placement_layer). Check the template's layer names in Photoshop.`
+    );
+  }
+  const bounds = resolvePlacementBounds(placementLayer);
+
+  const targetRatio = bounds.width / bounds.height;
+  const artRatio = artwork.bitmap.width / artwork.bitmap.height;
+  const mismatch = computeMismatchRatio(artRatio, targetRatio);
+
+  const warnings = [];
+  if (mismatch >= LARGE_MISMATCH_RATIO) warnings.push(largeMismatchWarning(sizeKey, mismatch));
+
+  const resizedArtwork = await smartCropAndResize(artwork, bounds.width, bounds.height);
+  const artworkBitmap = jimpToPureimageBitmap(resizedArtwork);
+
+  const outputCanvas = pureimage.make(psd.width, psd.height);
+  const outputCtx = outputCanvas.getContext('2d');
+
+  // Paint in stacking order (bottom-most first) so later layers correctly cover earlier
+  // ones — see flattenPaintOrder's doc comment for the array-order convention.
+  for (const layer of flattenPaintOrder(psd.children)) {
+    const left = layer.left ?? 0;
+    const top = layer.top ?? 0;
+    outputCtx.globalAlpha = layer.opacity ?? 1;
+
+    if (layer === placementLayer) {
+      // Substitute the artwork bitmap for this layer's own pixel data, positioned at the
+      // *original* placement layer's bounds — this is the actual placement step.
+      outputCtx.drawImage(artworkBitmap, 0, 0, bounds.width, bounds.height, bounds.left, bounds.top, bounds.width, bounds.height);
+    } else {
+      const layerWidth = (layer.right ?? 0) - (layer.left ?? 0);
+      const layerHeight = (layer.bottom ?? 0) - (layer.top ?? 0);
+      outputCtx.drawImage(layer.canvas, 0, 0, layerWidth, layerHeight, left, top, layerWidth, layerHeight);
+    }
+  }
+  outputCtx.globalAlpha = 1;
+
+  return { canvas: outputCanvas, warnings };
+}
+
+function writePureimagePng(canvas, outputPath) {
+  return pureimage.encodePNGToStream(canvas, fs.createWriteStream(outputPath));
+}
+
+/**
+ * Composes a mockup for one artwork + product size. Dispatches to the flat-PNG or PSD
+ * compositing path based on the template file's extension (see psd-template.js ->
+ * detectTemplateKind) — no separate config flag needed, per ARCHITECTURE.md -> Module 3.
  *
  * @param {string} artworkPath - path to the source artwork image
  * @param {string} sizeKey - key into product-sizes.json (e.g. "8x10-portrait")
@@ -66,48 +240,19 @@ export async function composeMockup(artworkPath, sizeKey) {
     throw new Error(`Mockup template not found: ${templatePath}`);
   }
 
-  const [artwork, template] = await Promise.all([Jimp.read(resolvedArtworkPath), Jimp.read(templatePath)]);
-
-  // The template's own pixel size is canonical for the target aspect ratio — not the
-  // human-readable `dimensions` string in product-sizes.json (e.g. "8x10"), which is
-  // print-size/DPI metadata, not necessarily the template PNG's exact pixel ratio. See
-  // ARCHITECTURE.md -> Module 3 -> "Aspect-ratio mismatch handling".
-  const targetWidth = template.bitmap.width;
-  const targetHeight = template.bitmap.height;
-  const targetRatio = targetWidth / targetHeight;
-
-  const artRatio = artwork.bitmap.width / artwork.bitmap.height;
-  const mismatch = Math.abs(artRatio - targetRatio) / targetRatio;
-
-  const warnings = [];
-  if (mismatch >= LARGE_MISMATCH_RATIO) {
-    warnings.push(
-      `Artwork aspect ratio differs from the "${sizeKey}" template by ${(mismatch * 100).toFixed(1)}% ` +
-        '(large mismatch). AI outpainting would preserve more of the artwork than a crop, but that ' +
-        'fallback isn\'t implemented in this pass — proceeding with a content-aware smart crop instead.'
-    );
-  }
-
-  // Always smart-crop — never a blind center-crop, per ARCHITECTURE.md -> Module 3. The
-  // crop rect smartcrop returns is in the *original* artwork's pixel coordinate space, at
-  // the target aspect ratio but not necessarily the exact target pixel dimensions, so a
-  // resize to (targetWidth, targetHeight) still follows the crop.
-  const { topCrop } = await smartcrop.crop(artwork, { width: targetWidth, height: targetHeight });
-
-  const composed = artwork
-    .clone()
-    .crop(topCrop.x, topCrop.y, topCrop.width, topCrop.height)
-    .resize(targetWidth, targetHeight)
-    // Template on top, artwork as the base layer — see compositing convention above.
-    // Default blend mode (source-over) is correct here: the template's transparent
-    // window lets the artwork show through, its opaque areas cover it.
-    .composite(template, 0, 0);
-
+  const artwork = await Jimp.read(resolvedArtworkPath);
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   const artworkBase = path.basename(resolvedArtworkPath, path.extname(resolvedArtworkPath));
   const outputPath = path.join(OUTPUT_DIR, `${artworkBase}-${sizeKey}-${Date.now()}.png`);
-  await composed.writeAsync(outputPath);
 
+  if (detectTemplateKind(templatePath) === 'psd') {
+    const { canvas, warnings } = await composeMockupPsd(artwork, templatePath, sizeEntry, sizeKey);
+    await writePureimagePng(canvas, outputPath);
+    return { outputPath, warnings };
+  }
+
+  const { composed, warnings } = await composeMockupFlat(artwork, templatePath, sizeKey);
+  await composed.writeAsync(outputPath);
   return { outputPath, warnings };
 }
 
@@ -140,13 +285,14 @@ export async function generateMockupForJob(jobId, sizeKey) {
   const sizeEntry = productSizesConfig[sizeKey];
 
   const upsertProductSize = db.prepare(`
-    INSERT INTO product_sizes (size_key, dimensions, dpi, orientation, mockup_template_path)
-    VALUES (@size_key, @dimensions, @dpi, @orientation, @mockup_template_path)
+    INSERT INTO product_sizes (size_key, dimensions, dpi, orientation, mockup_template_path, placement_layer)
+    VALUES (@size_key, @dimensions, @dpi, @orientation, @mockup_template_path, @placement_layer)
     ON CONFLICT(size_key) DO UPDATE SET
       dimensions = excluded.dimensions,
       dpi = excluded.dpi,
       orientation = excluded.orientation,
-      mockup_template_path = excluded.mockup_template_path
+      mockup_template_path = excluded.mockup_template_path,
+      placement_layer = excluded.placement_layer
   `);
   upsertProductSize.run({
     size_key: sizeKey,
@@ -154,6 +300,9 @@ export async function generateMockupForJob(jobId, sizeKey) {
     dpi: sizeEntry.dpi || null,
     orientation: sizeEntry.orientation || null,
     mockup_template_path: sizeEntry.mockup_template,
+    // Nullable — only meaningful for .psd templates, see ARCHITECTURE.md -> Module 3 ->
+    // "Template formats". Left null for flat PNG/JPEG templates.
+    placement_layer: sizeEntry.placement_layer || null,
   });
 
   const productSizeRow = db.prepare('SELECT id FROM product_sizes WHERE size_key = ?').get(sizeKey);
