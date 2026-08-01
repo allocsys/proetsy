@@ -61,6 +61,16 @@ CREATE TABLE IF NOT EXISTS mockups (
   product_size_id INTEGER NOT NULL REFERENCES product_sizes(id),
   file_path TEXT,
   status TEXT NOT NULL DEFAULT 'pending',
+  -- AI-outpainting review step (ARCHITECTURE.md -> Module 3 -> "AI-outpainting fallback"
+  -- step 5/build order). Nullable — only populated when an outpaint attempt actually
+  -- succeeded for this mockup; `file_path` above still holds whichever variant is
+  -- currently selected (smart_crop by default), so existing readers of `file_path` don't
+  -- need to change.
+  ai_extended_path TEXT,
+  -- Set when both a smart-crop and an AI-extended variant exist and the user hasn't picked
+  -- one yet; cleared once `selected_variant` is set via the dashboard review step.
+  needs_review INTEGER NOT NULL DEFAULT 0,
+  selected_variant TEXT NOT NULL DEFAULT 'smart_crop',
   UNIQUE(job_id, product_size_id)
 );
 CREATE INDEX IF NOT EXISTS idx_mockups_job_id ON mockups(job_id);
