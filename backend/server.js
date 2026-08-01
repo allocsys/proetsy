@@ -1,11 +1,12 @@
 import 'dotenv/config';
+import path from 'node:path';
 import express from 'express';
 import cors from 'cors';
 import { getDb } from './db/init.js';
 import { getPipelineConfig, getProductSizes } from './config/index.js';
 import { createJob, getJobWithModules, setManualNotes, setModuleStatus } from './lib/jobs.js';
 import { generateListingsForJob } from './lib/listing-generator/index.js';
-import { generateMockupForJob } from './lib/mockup-generator.js';
+import { generateMockupForJob, OUTPUT_DIR } from './lib/mockup-generator.js';
 import { initRateLimitCache } from './lib/llm/rate-limits.js';
 
 const app = express();
@@ -13,6 +14,25 @@ const PORT = process.env.PORT || 4000;
 
 app.use(cors());
 app.use(express.json());
+
+// Serves generated mockup images for the dashboard review UI (step 7). Files in
+// OUTPUT_DIR are flat (no subdirectories — see composeMockup's naming convention), so a
+// basename is a safe, stable public URL; mockupFileUrl() below is the one place that
+// turns a stored server-side path into one.
+app.use('/mockup-files', express.static(OUTPUT_DIR));
+
+function mockupFileUrl(filePath) {
+  return filePath ? `/mockup-files/${path.basename(filePath)}` : null;
+}
+
+function withMockupUrls(row) {
+  return {
+    ...row,
+    file_url: mockupFileUrl(row.file_path),
+    smart_crop_url: mockupFileUrl(row.smart_crop_path),
+    ai_extended_url: mockupFileUrl(row.ai_extended_path),
+  };
+}
 
 // Initializes the schema on boot (CREATE TABLE IF NOT EXISTS, so safe to call every start).
 getDb();
@@ -152,7 +172,7 @@ app.get('/api/jobs/:id/mockups', (req, res) => {
        ORDER BY mockups.id`
     )
     .all(Number(req.params.id));
-  res.json(rows);
+  res.json(rows.map(withMockupUrls));
 });
 
 // Module 3 -> "AI-outpainting fallback" step 6: lets the user pick between the smart-crop
@@ -186,7 +206,7 @@ app.patch('/api/jobs/:id/mockups/:mockupId/variant', (req, res) => {
     `UPDATE mockups SET file_path = ?, selected_variant = ?, needs_review = 0 WHERE id = ?`
   ).run(targetPath, variant, mockupId);
 
-  res.json(db.prepare('SELECT * FROM mockups WHERE id = ?').get(mockupId));
+  res.json(withMockupUrls(db.prepare('SELECT * FROM mockups WHERE id = ?').get(mockupId)));
 });
 
 app.listen(PORT, () => {
