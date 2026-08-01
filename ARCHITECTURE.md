@@ -73,16 +73,16 @@ closes a schema gap: the `product_sizes` table is now populated (upserted from
 `product-sizes.json` on each mockup run, keyed on `size_key`) instead of staying empty,
 since `mockups.product_size_id`'s FK needs a row to point at, and gained a
 `placement_layer` column (with a defensive `ALTER TABLE` migration in `backend/db/init.js`
-for existing dev DBs). **Not yet built:** the Gemini AI-outpainting fallback for large
-aspect-ratio mismatches (mismatches above `MOCKUP_LARGE_MISMATCH_RATIO` are flagged with a
-warning and still smart-cropped, not outpainted — this applies to both template kinds now)
-and the dashboard side-by-side smart-crop/AI-extended review step — both deferred to a
-later pass. Also not yet built: integration/idempotency tests for `composeMockup`/
-`generateMockupForJob` themselves (only the pure helpers have test coverage so far) and a
-real PSD test fixture checked into the repo (verified during development via a synthetic
-PSD round-tripped through `ag-psd`'s own `writePsd`/`readPsd`, not committed as a fixture).
+for existing dev DBs). **AI-outpainting fallback for large aspect-ratio mismatches and the
+dashboard side-by-side smart-crop/AI-extended review step are now ✅ done too** — see the
+full 8-step build sequence below; all 8 steps are complete. Still not built: a real PSD
+test fixture checked into the repo (verified during development via a synthetic PSD
+round-tripped through `ag-psd`'s own `writePsd`/`readPsd`, not committed as a fixture), and
+integration/idempotency tests for the PSD-specific compositing path itself (the
+non-PSD/flat-template path's upsert idempotency is now covered — see step 8 below — but
+`composeMockupPsd`'s own file-IO isn't).
 
-**AI-outpainting fallback — planned build sequence (not started).** Broken into
+**AI-outpainting fallback — ✅ done (all 8 steps).** Broken into
 independently-committable sub-steps, each testable before the next depends on it:
 1. **Verify the current Gemini image-generation model string — ✅ done (research only, no code yet).**
    Findings as of this pass (verify again before actually wiring step 2, since this family
