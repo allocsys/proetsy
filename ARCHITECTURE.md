@@ -135,9 +135,15 @@ independently-committable sub-steps, each testable before the next depends on it
    switch and calls `gemini.js` directly, so it keeps working even when `LLM_PROVIDER=claude`
    is set for text/vision calls. Not yet tested (no test file touched this pass) and not yet
    called from anywhere — that's step 3.
-3. **A standalone outpaint-call helper in `mockup-generator.js`** — takes the artwork +
-   target dimensions, builds the outpaint prompt, calls `generateImage()`, returns the
-   extended image or throws. Not wired into `composeMockup` yet; testable on its own.
+3. **A standalone outpaint-call helper in `mockup-generator.js` — ✅ done.**
+   `buildOutpaintPrompt(targetWidth, targetHeight)` is a pure function (unit-testable
+   without a real image or network call); `outpaintArtwork(artwork, targetWidth,
+   targetHeight)` writes the artwork to a temp file (`generateImage()` takes a path, not a
+   Jimp instance), calls `generateImage()`, best-effort cleans up the temp file, and
+   returns the result as a Jimp instance. Always throws on failure rather than falling back
+   to anything — by design, since step 4 (not this step) owns deciding what "fallback to
+   smart-crop" means. **Still not wired into `composeMockup`** — nothing calls
+   `outpaintArtwork()` yet, and no test file was added this pass (formal tests are step 8).
 4. **Wire it into `composeMockup` for both template paths** (flat-PNG and PSD), triggered
    only when `mismatch >= MOCKUP_LARGE_MISMATCH_RATIO`, wrapped so any outpaint failure
    falls back to the existing smart-crop path silently — smart-crop must remain the
