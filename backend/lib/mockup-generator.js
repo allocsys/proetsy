@@ -184,10 +184,23 @@ export async function outpaintArtwork(artwork, targetWidth, targetHeight) {
  * @param {string[]} warnings - mutated in place
  * @returns {Promise<{ smartCrop: Jimp, aiExtended: Jimp | null }>}
  */
+/**
+ * Pure decision of whether an aspect-ratio mismatch is large enough to attempt AI
+ * outpainting, vs. staying with smart-crop only. Split out of resolveArtworkVariants so
+ * the trigger threshold is unit-testable on its own, without real image files or a
+ * network call. See ARCHITECTURE.md -> Module 3 -> "Aspect-ratio mismatch handling".
+ * @param {number} mismatch - from computeMismatchRatio()
+ * @param {number} [threshold] - defaults to the module's configured LARGE_MISMATCH_RATIO
+ * @returns {boolean}
+ */
+export function shouldAttemptOutpaint(mismatch, threshold = LARGE_MISMATCH_RATIO) {
+  return mismatch >= threshold;
+}
+
 async function resolveArtworkVariants(artwork, targetWidth, targetHeight, mismatch, sizeKey, warnings) {
   const smartCrop = await smartCropAndResize(artwork, targetWidth, targetHeight);
 
-  if (mismatch < LARGE_MISMATCH_RATIO) {
+  if (!shouldAttemptOutpaint(mismatch)) {
     return { smartCrop, aiExtended: null };
   }
 
