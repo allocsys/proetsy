@@ -44,6 +44,26 @@ Etsy publishing is manual by design — no auto-uploader module. The app's job e
 **Can be skipped if:** user wants to hand-write listing angle/keywords instead
 
 ### Module 2 — Listing Generator (core, not skippable)
+**Status: backend generation — ✅ done. Dashboard review/edit UI — ✅ done. Automated tests — ✅ done.**
+Generation lives in `backend/lib/listing-generator/index.js` (`generateListingsForJob`),
+convention enforcement in `validate.js` (`enforceConventions`), wired up via
+`POST /api/jobs/:id/run/listing-generator`, `GET /api/jobs/:id/listings`, and
+`PATCH /api/jobs/:id/listings/:listingId` in `backend/server.js`. The dashboard side is
+`frontend/src/JobListingReview.jsx` — one editable card per variation (title, description,
+tags, alternate tags), a Save button that PATCHes the edit and re-applies
+`enforceConventions()` server-side (so a manual edit can't slip a forbidden title word or
+an oversized tag past the shop conventions), a Copy-for-Etsy button, and inline warnings —
+wired into `App.jsx` alongside `JobMockupReview` behind the same bare job-ID input (Module
+6 itself is still just a skeleton — see that module's own section). Test coverage: unit
+tests for prompt-building and convention enforcement (`prompt.test.js`, `validate.test.js`),
+an idempotency suite for the generation upsert (`index.idempotency.test.js` — re-running
+for a job updates existing rows rather than duplicating, `UNIQUE(job_id, variation)`), and
+an integration suite for the three HTTP routes themselves
+(`backend/server.listing-routes.test.js`, Supertest against the exported Express `app`) —
+generate/list/edit, the required-module failure path, re-run idempotency at the route
+level, partial-field PATCH updates, the convention backstop on manual edits, and a
+cross-job 404 check.
+
 **Input:** image analysis (or manual notes if Module 1 skipped) + selected trend (manual) + tag library
 **Output:** 3 listing variations (fine art/decor, aesthetic/trend, gift angle), each with title, description, tags
 **Must hardcode shop conventions:**
@@ -603,7 +623,7 @@ SQLite (matches the local-first, local-DB decision above). `pipeline_config` and
 ## Suggested build order
 
 1. **Local skeleton** — ✅ done: React frontend + Node backend running locally, DB schema in place, pipeline config wired up (modules currently stubbed), plus the three provider-layer interfaces (`lib/llm/`, `lib/trends/`, `lib/tags/`) scaffolded with their v1 implementations
-2. **Module 2** (Listing Generator) — core, get this solid first, matches original Phase 1. **✅ backend core done:** generation (`backend/lib/listing-generator/index.js`), shop-convention enforcement (`validate.js`), tags-provider integration, and the LLM provider layer's key×model cascade plus request-spacing/cooldown/escalation hardening (see LLM Provider Layer status note above). **Not yet done:** dashboard review/edit UI for generated listings (Module 6 territory) and automated tests for this module.
+2. **Module 2** (Listing Generator) — core, get this solid first, matches original Phase 1. **✅ done:** generation (`backend/lib/listing-generator/index.js`), shop-convention enforcement (`validate.js`), tags-provider integration, the LLM provider layer's key×model cascade plus request-spacing/cooldown/escalation hardening (see LLM Provider Layer status note above), a dashboard review/edit UI (`JobListingReview.jsx`), and automated tests (unit, idempotency, and route-level integration — see Module 2 status note above).
 3. **Module 3** (Mockup Composer with own templates) — no external mockup API needed, so this can move up earlier than the original plan's Phase 2. **✅ core + smart-crop + PSD template support + AI-outpainting fallback + dashboard review UI done** (see Module 3 status note above). **Not yet done:** a committed real PSD test fixture, and integration/idempotency tests for the PSD-specific compositing path's own file-IO (the flat-template path's upsert idempotency is covered; PSD's isn't yet).
 4. **Module 4** (manual-trend prompt helper) — low complexity now that trend-pulling is removed
 5. **Local persistent deployment** — running the finished app as an always-on local process (own machine or a small home server); not a cloud/serverless deployment (see Stack section)
@@ -617,7 +637,7 @@ SQLite (matches the local-first, local-DB decision above). `pipeline_config` and
 
 **Test suite:**
 - Unit tests (Vitest) for the swappable provider layers (`lib/llm/`, `lib/trends/`, `lib/tags/`) and for pipeline logic that's easy to silently break — partial failure handling, retry behavior, idempotency on re-running a module.
-- Integration tests (Supertest) against the Node backend's API routes, run against a throwaway test DB (in-memory or temp-file SQLite) so tests never touch the real local DB.
+- Integration tests (Supertest) against the Node backend's API routes, run against a throwaway test DB (in-memory or temp-file SQLite) so tests never touch the real local DB. **In place for Module 2's listing routes** (`backend/server.listing-routes.test.js`); Module 3's routes (mockup-composer run + variant PATCH) don't have this level of coverage yet — see that module's status note.
 - A small set of Playwright end-to-end tests covering the critical path only (upload artwork → generate listing → review → copy-to-clipboard) rather than exhaustive UI coverage.
 
 **CI (GitHub Actions):**
