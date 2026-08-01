@@ -82,6 +82,41 @@ later pass. Also not yet built: integration/idempotency tests for `composeMockup
 real PSD test fixture checked into the repo (verified during development via a synthetic
 PSD round-tripped through `ag-psd`'s own `writePsd`/`readPsd`, not committed as a fixture).
 
+**AI-outpainting fallback — planned build sequence (not started).** Broken into
+independently-committable sub-steps, each testable before the next depends on it:
+1. **Verify the current Gemini image-generation model string** via web search before
+   hardcoding anything — ARCHITECTURE.md's "2.5/3 Flash Image, Nano Banana" naming (see
+   below) is unverified against Google's current model list. Blocks step 2 only.
+2. **Add `generateImage()` to the LLM provider layer** (`backend/lib/llm/gemini.js`,
+   stubbed in `claude.js`, re-exported from `llm/index.js`) — reuses the existing key×model
+   cascade, queue, and cooldown machinery (see LLM Provider Layer above); the only new part
+   is extracting `inlineData` (image bytes) from the response instead of `.text`.
+   Testable in isolation, no mockup-generator involvement yet.
+3. **A standalone outpaint-call helper in `mockup-generator.js`** — takes the artwork +
+   target dimensions, builds the outpaint prompt, calls `generateImage()`, returns the
+   extended image or throws. Not wired into `composeMockup` yet; testable on its own.
+4. **Wire it into `composeMockup` for both template paths** (flat-PNG and PSD), triggered
+   only when `mismatch >= MOCKUP_LARGE_MISMATCH_RATIO`, wrapped so any outpaint failure
+   falls back to the existing smart-crop path silently — smart-crop must remain the
+   guaranteed fallback per this section's design above; a bad or failed AI result should
+   never block the pipeline.
+5. **Schema + migration** for the review step (can happen in parallel with 2–4): add
+   `mockups.ai_extended_path` (nullable TEXT), `needs_review` (INTEGER DEFAULT 0),
+   `selected_variant` (TEXT DEFAULT `'smart_crop'`) to `backend/db/schema.sql`, plus a
+   defensive `ALTER TABLE` in `backend/db/init.js` (same pattern already used for
+   `product_sizes.placement_layer`, see Database Schema below).
+6. **Persist both variants + a new route.** `generateMockupForJob` writes both
+   `file_path` (smart-crop) and `ai_extended_path` (when outpainting succeeded) and sets
+   `needs_review`; a new `PATCH /api/jobs/:id/mockups/:mockupId/variant` route
+   (body `{ variant: 'smart_crop' | 'ai_extended' }`) sets `selected_variant`, syncs
+   `file_path` to the chosen variant, clears `needs_review`.
+7. **Dashboard review UI** — a minimal `JobMockupReview` component (smart-crop vs
+   AI-extended side by side, select buttons when `needs_review` is true), wired minimally
+   into `App.jsx` (Module 6 itself is still just a skeleton — don't build the rest of it
+   here). Depends on 1–6 actually producing two variants to show.
+8. **Tests** — unit tests for the outpaint-trigger logic and prompt-building (the pure
+   parts of step 3), plus an idempotency test for the new upsert in step 6.
+
 **Input:** artwork file + product type (e.g. "8x10 print", "square canvas")
 **Output:** composited mockup image(s), in the shop's defined display order
 **Tech:** a single `mockup-generator.js` file. No Canvas/Pillow/Canva API.
