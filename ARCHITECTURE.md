@@ -38,7 +38,7 @@ Etsy publishing is manual by design — no auto-uploader module. The app's job e
 ## Modules
 
 ### Module 1 — Image Analyzer (optional)
-**Status: backend analysis — ✅ done. Automated tests — ✅ done. Dashboard surface — not yet done (no dedicated review UI; the analysis is currently only visible via `GET /api/artworks/:id`).**
+**Status: backend analysis — ✅ done. Automated tests — ✅ done. Dashboard surface — ✅ done.**
 Implemented in `backend/lib/image-analyzer/index.js` (`analyzeArtworkForJob`), prompt
 building in `prompt.js` (`buildImageAnalysisPrompt`), wired up via
 `POST /api/jobs/:id/run/image-analyzer` in `backend/server.js`. Unlike Modules 2/3, this
@@ -60,9 +60,14 @@ integration suite for the HTTP routes (`backend/server.image-analyzer-routes.tes
 Supertest against the exported Express `app`) — successful analysis, the
 optional-module failure path (job not forced to `'failed'`, manual-notes fallback still
 works afterward), re-run idempotency at the route level, and the new artwork-lookup
-route (including its 404 case). **Not yet done:** a dashboard review/edit surface
-(mirroring `JobListingReview.jsx`/`JobMockupReview.jsx`) — Module 6 itself is still just
-a skeleton, per that module's own section.
+route (including its 404 case). **Dashboard surface:** `frontend/src/JobArtworkAnalysisReview.jsx`
+(mirroring `JobListingReview.jsx`/`JobMockupReview.jsx`'s jobId-in, self-contained-state
+shape) — loads the job + its artwork's stored `image_analysis` via the routes above,
+lets the user trigger a (re-)run via `POST /api/jobs/:id/run/image-analyzer`, and covers
+the optional-module fallback flow (a manual-notes textarea wired to
+`PATCH /api/jobs/:id/manual-notes`) for when analysis is skipped or fails. Wired into
+`App.jsx` alongside `JobListingReview`/`JobMockupReview` behind the same bare job-ID
+input (Module 6 itself is still just a skeleton — see that module's own section).
 
 **Input:** artwork file
 **Output:** structured description (subject, style, palette, mood) used by Module 2 and for tag matching
@@ -124,9 +129,20 @@ dashboard side-by-side smart-crop/AI-extended review step are now ✅ done too**
 full 8-step build sequence below; all 8 steps are complete. Still not built: a real PSD
 test fixture checked into the repo (verified during development via a synthetic PSD
 round-tripped through `ag-psd`'s own `writePsd`/`readPsd`, not committed as a fixture), and
-integration/idempotency tests for the PSD-specific compositing path itself (the
-non-PSD/flat-template path's upsert idempotency is now covered — see step 8 below — but
-`composeMockupPsd`'s own file-IO isn't).
+integration/idempotency tests for the PSD-specific compositing path itself — ✅ done. A synthetic layered PSD (background +
+an `artwork` placement layer + a nested `frame group` -> `top border`, generated once via
+ag-psd's own `writePsd()` and verified round-tripping through `readPsd()` + the project's
+real pureimage canvas shim before committing) is checked into the repo as
+`backend/lib/__fixtures__/framed-wall-test.psd.b64` (base64 text, decoded back to the
+identical original bytes by `__fixtures__/load-psd-fixture.js` — committed as base64
+since this repo's tooling writes plain-text file content, not raw binary). A new
+`backend/lib/mockup-generator.psd.test.js` exercises `composeMockup()`/
+`generateMockupForJob()` end-to-end against that real fixture: the PSD decode + layer
+substitution + full-canvas compositing path, the "placement layer not found" error path
+against a real decoded PSD (not a hand-built plain object), and the same
+`UNIQUE(job_id, product_size_id)` upsert-not-duplicate idempotency rule
+mockup-generator.idempotency.test.js already covers for flat templates, now exercised
+specifically against `composeMockupPsd`'s own file-IO.
 
 **AI-outpainting fallback — ✅ done (all 8 steps).** Broken into
 independently-committable sub-steps, each testable before the next depends on it:
