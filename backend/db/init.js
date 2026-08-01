@@ -37,6 +37,9 @@ function runDefensiveMigrations(db) {
     // AI-outpainting review step — see ARCHITECTURE.md -> Module 3 -> "AI-outpainting
     // fallback" step 5.
     'ALTER TABLE mockups ADD COLUMN ai_extended_path TEXT',
+    // Lets the step-6 PATCH variant route restore the smart-crop file after file_path has
+    // been synced to ai_extended_path — see schema.sql for the full rationale.
+    'ALTER TABLE mockups ADD COLUMN smart_crop_path TEXT',
     "ALTER TABLE mockups ADD COLUMN needs_review INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE mockups ADD COLUMN selected_variant TEXT NOT NULL DEFAULT 'smart_crop'",
   ];
