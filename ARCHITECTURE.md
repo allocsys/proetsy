@@ -317,7 +317,7 @@ SQLite (matches the local-first, local-DB decision above). `pipeline_config` and
 
 **Core pipeline**
 - `artworks` — id, file_path, original_filename, image_analysis (JSON from Module 1), uploaded_at
-- `jobs` — id, artwork_id (FK), overall_status, created_at, updated_at
+- `jobs` — id, artwork_id (FK), overall_status, manual_notes (Module 2's fallback input when Module 1 is skipped or fails), created_at, updated_at
 - `job_modules` — id, job_id (FK), module_name, status (pending/running/success/failed/skipped), error_message, retry_count, started_at, completed_at. **`UNIQUE(job_id, module_name)`** — re-running a module updates this row rather than inserting a second one, which is what makes the idempotency rule in Partial Failure Handling actually hold at the DB level.
 - `listings` — id, job_id (FK), variation (fine_art/aesthetic/gift), title, description, tags (JSON array of 13), tag_alternates (JSON array of 5), edited_at. `UNIQUE(job_id, variation)` for the same idempotency reason.
 - `mockups` — id, job_id (FK), product_size_id (FK), file_path, status. `UNIQUE(job_id, product_size_id)` — re-running Module 3 for a size replaces the file reference, not a duplicate row.
