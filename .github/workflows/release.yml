@@ -1,0 +1,84 @@
+name: Release
+
+# See ARCHITECTURE.md -> Testing & CI/CD -> "CD (packaging, not deployment)":
+# "On a tagged release, a GitHub Actions workflow runs electron-builder and attaches the
+# resulting Windows installer/exe as a release artifact automatically."
+#
+# That's the *target* CD step, but electron-builder packaging isn't built yet
+# (ARCHITECTURE.md -> Suggested build order, step 6: "Electron packaging (Windows exe) —
+# once the app is fully working as a normal local web app... wrap it with
+# electron-builder"). No Electron main process, no electron-builder config, and no
+# packaging dependency exist in the repo as of this workflow.
+#
+# Rather than fabricate an electron-builder step against config that doesn't exist (which
+# would just fail on the first tag), this workflow does the CD-adjacent work that *is*
+# real today: gate the tag on the same lint+test checks CI runs, build the frontend for
+# production, and publish a local-bundle tarball (backend source + frontend's built
+# `dist/` + the config files a local install needs) as a GitHub Release artifact — enough
+# for `npm ci && npm start`-style local deployment without cloning the repo.
+#
+# TODO(step 6): once electron-builder + a main process are added, replace (or add
+# alongside) the "package-local-bundle" job below with the real
+# `electron-builder --publish always` step this doc describes, producing the actual
+# Windows installer/exe.
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+jobs:
+  # Same gate as CI — a release should never ship on top of a red build. This job is
+  # intentionally duplicated (not `needs: ci`) since the CI workflow only triggers on
+  # push/pull_request, not on tag pushes.
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test -w backend
+      - run: npm run build -w frontend
+
+  package-local-bundle:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w frontend
+
+      - name: Assemble local-bundle archive
+        run: |
+          set -euo pipefail
+          BUNDLE_DIR="proetsy-${{ github.ref_name }}"
+          mkdir -p "$BUNDLE_DIR"
+          cp -r backend "$BUNDLE_DIR/backend"
+          rm -rf "$BUNDLE_DIR/backend/node_modules" "$BUNDLE_DIR/backend/data"
+          mkdir -p "$BUNDLE_DIR/frontend"
+          cp -r frontend/dist "$BUNDLE_DIR/frontend/dist"
+          cp package.json package-lock.json README.md ARCHITECTURE.md "$BUNDLE_DIR/"
+          tar -czf "$BUNDLE_DIR.tar.gz" "$BUNDLE_DIR"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: proetsy-${{ github.ref_name }}.tar.gz
+          generate_release_notes: true
+          body: |
+            Local-bundle release for ${{ github.ref_name }}. Extract, then from the
+            extracted folder: `npm ci --workspace backend`, copy `backend/.env.example`
+            to `backend/.env` and fill in a Gemini key, then `npm start -w backend`.
+            The built frontend (`frontend/dist`) is included but not yet served by the
+            backend or packaged into an installer — see ARCHITECTURE.md's build order
+            step 6 (Electron packaging) for what a real installable release will look
+            like once that's built.
