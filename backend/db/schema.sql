@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   artwork_id INTEGER NOT NULL REFERENCES artworks(id),
   overall_status TEXT NOT NULL DEFAULT 'pending',
+  manual_notes TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
