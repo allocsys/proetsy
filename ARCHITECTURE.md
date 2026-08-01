@@ -148,6 +148,16 @@ React frontend that:
 
 ---
 
+## Local Backup
+
+All data lives only on the local machine (DB, `image_preferences` taste model, tag library, mockup templates, configs), so backups are local-to-local for now (a separate off-machine/cloud copy is not in scope here):
+
+- **Scheduled job inside the existing Node process.** A `node-cron` job (e.g. nightly) snapshots the DB and zips it together with `uploads/`, `templates/`, and the config files (`product-sizes.json`, `trends.json`, `pipeline.config.json`) into a timestamped archive in a local backup folder. No OS-level cron needed since the app already runs as a persistent process.
+- **Retention/rotation.** Keep the last 7 daily archives plus the last 4 weekly ones; delete anything older so the backup folder doesn't grow unbounded.
+- **"Backup now" button.** Same pattern as Module 7's "Recompute now" button — a manual trigger in the dashboard Settings panel to force an immediate backup before a risky operation (e.g. relabeling a large batch), without waiting for the nightly job.
+
+---
+
 ## Step control model
 
 Two layers, both required:
