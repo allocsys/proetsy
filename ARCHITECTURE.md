@@ -84,9 +84,43 @@ PSD round-tripped through `ag-psd`'s own `writePsd`/`readPsd`, not committed as 
 
 **AI-outpainting fallback — planned build sequence (not started).** Broken into
 independently-committable sub-steps, each testable before the next depends on it:
-1. **Verify the current Gemini image-generation model string** via web search before
-   hardcoding anything — ARCHITECTURE.md's "2.5/3 Flash Image, Nano Banana" naming (see
-   below) is unverified against Google's current model list. Blocks step 2 only.
+1. **Verify the current Gemini image-generation model string — ✅ done (research only, no code yet).**
+   Findings as of this pass (verify again before actually wiring step 2, since this family
+   has been shipping fast):
+   - The "Nano Banana" family is now **four models**, not the "2.5/3 Flash Image" guess
+     this doc originally had: legacy `gemini-2.5-flash-image` ("Nano Banana" — Google's
+     docs now say to migrate off this one), `gemini-3.1-flash-lite-image` ("Nano Banana 2
+     Lite" — cheapest/fastest), `gemini-3.1-flash-image` ("Nano Banana 2" — Google's
+     recommended default, best speed/quality/cost balance), and `gemini-3-pro-image`
+     ("Nano Banana Pro" — highest fidelity, tighter free-tier caps, has a "thinking" step).
+     **Decision: pin `gemini-3.1-flash-image` for the outpaint call** (matches the
+     `GEMINI_MODELS` cascade's existing Flash-first-Pro-last philosophy) — this is a single
+     `options.model`-pinned call per the LLM Provider Layer's existing pin mechanism, not a
+     new cascade list, since outpainting has different quality needs than Modules 1/2/4's
+     text calls.
+   - **Good news for step 2 — no endpoint migration needed.** Google now promotes a new
+     **Interactions API** (`POST /v1beta/interactions`, different request/response shape:
+     `input`/`output_image` instead of `contents`/`inlineData`) as the go-forward path, but
+     the **classic `generateContent` endpoint `gemini.js` already uses still works** with
+     all four image models — confirmed against Google's "Generate Content API (Legacy)"
+     docs. The only addition needed is `generationConfig.responseModalities: ["IMAGE"]` (or
+     `["TEXT", "IMAGE"]`) in the request; the response comes back as the same
+     `candidates[0].content.parts[].inlineData` shape `callGenerateContent()` already parses
+     for vision input, just now appearing in the output too. So step 2 is additive to
+     `gemini.js`, not a rewrite.
+   - **Flag, not a step-2 blocker: rate limits are per-project, not per-key.** Google's rate
+     limits page states this explicitly. `GEMINI_MODELS`/`GEMINI_API_KEYS` cascade rotation
+     (already built, LLM Provider Layer above) assumes a key-rotation benefit that may not
+     hold if all pooled keys sit under the same billing project — worth a closer look
+     separately, but out of scope for this outpainting sub-step and not re-litigated here.
+   - **Free-tier headroom for `gemini-3.1-flash-image` specifically is unverified** — third-
+     party sources (not Google's own docs) still cite the old `gemini-2.5-flash-image`
+     "~500 images/day" figure this doc already has a caveat on; image models also have their
+     own per-minute "images per minute" (IPM) limit separate from token limits. Re-check
+     actual free-tier RPD/IPM for `gemini-3.1-flash-image` via the AI Studio rate-limit
+     dashboard (not a blog) before step 4 wires this into the real pipeline, since it
+     changes how urgent the multi-key pool is for this specific call.
+   Blocked step 2 only; step 2 itself is not started.
 2. **Add `generateImage()` to the LLM provider layer** (`backend/lib/llm/gemini.js`,
    stubbed in `claude.js`, re-exported from `llm/index.js`) — reuses the existing key×model
    cascade, queue, and cooldown machinery (see LLM Provider Layer above); the only new part
