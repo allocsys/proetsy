@@ -326,6 +326,22 @@ Every pipeline run is tracked as a **job**, and every module within a job has it
 
 ---
 
+## Testing & CI/CD
+
+**Test suite:**
+- Unit tests (Vitest) for the swappable provider layers (`lib/llm/`, `lib/trends/`, `lib/tags/`) and for pipeline logic that's easy to silently break — partial failure handling, retry behavior, idempotency on re-running a module.
+- Integration tests (Supertest) against the Node backend's API routes, run against a throwaway test DB (in-memory or temp-file SQLite) so tests never touch the real local DB.
+- A small set of Playwright end-to-end tests covering the critical path only (upload artwork → generate listing → review → copy-to-clipboard) rather than exhaustive UI coverage.
+
+**CI (GitHub Actions):**
+- On every push/PR: install, lint, run unit + integration tests.
+- E2E tests run on a schedule (e.g. nightly) or on demand, since they're slower and matter most right before a release rather than on every commit.
+
+**CD (packaging, not deployment):**
+- No cloud deploy target since the app is local-only by design — "CD" here means the Electron packaging step, not shipping to a server. On a tagged release, a GitHub Actions workflow runs `electron-builder` and attaches the resulting Windows installer/exe as a release artifact automatically, rather than building it by hand each time.
+
+---
+
 ## Open Risks — Reviewed, Accepted As-Is
 
 - **AI-disclosure content policy** (Module 2 hardcodes "no AI disclosure in descriptions") — reviewed and accepted; no change needed.
