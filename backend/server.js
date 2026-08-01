@@ -10,6 +10,9 @@ import { generateListingsForJob } from './lib/listing-generator/index.js';
 import { enforceConventions } from './lib/listing-generator/validate.js';
 import { generateMockupForJob, OUTPUT_DIR } from './lib/mockup-generator.js';
 import { initRateLimitCache } from './lib/llm/rate-limits.js';
+import { getTrends } from './lib/trends/index.js';
+import { addManualTrend } from './lib/trends/manual.js';
+import { generatePromptsForTrend, listPrompts } from './lib/prompt-helper/index.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -274,6 +277,58 @@ app.patch('/api/jobs/:id/mockups/:mockupId/variant', (req, res) => {
   ).run(targetPath, variant, mockupId);
 
   res.json(withMockupUrls(db.prepare('SELECT * FROM mockups WHERE id = ?').get(mockupId)));
+});
+
+// Module 4 (Trend/Prompt Helper) routes. Deliberately NOT nested under /api/jobs/:id —
+// per ARCHITECTURE.md -> Module 4 and -> Partial Failure Handling, this module is fully
+// isolated from the job pipeline (no job_modules row, no jobId), keyed only by an
+// optional trend + a target category.
+
+// Lists trends via the trends provider layer (config-selected — manual by default, or
+// etsy_api — see ARCHITECTURE.md -> Trends Provider Layer), optionally filtered by
+// category.
+app.get('/api/trends', async (req, res) => {
+  try {
+    const trends = await getTrends(req.query.category || undefined);
+    res.json(trends);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Single-entry manual trend creation (the dashboard's one-at-a-time path — CSV import is
+// a separate, not-yet-wired route using trends/manual.js's importFromCsvRows). Writes
+// directly via trends/manual.js rather than through the provider-layer abstraction,
+// since only the *manual* implementation has a concept of "add one" — swapping
+// TRENDS_PROVIDER later wouldn't give this write path a different meaning.
+app.post('/api/trends', (req, res) => {
+  const { term, category } = req.body || {};
+  if (!term) return res.status(400).json({ error: 'term is required' });
+  const trend = addManualTrend(term, category || null);
+  res.status(201).json(trend);
+});
+
+// Runs Module 4: generates a fresh batch of ready-to-paste Midjourney prompts for an
+// (optional) trend + a target category, and persists them. Isolated per
+// ARCHITECTURE.md's Partial Failure Handling — a failure here is just a 422, with no
+// job/job_modules state to update, since this route touches no job at all.
+app.post('/api/prompts/generate', async (req, res) => {
+  const { trend_id, category } = req.body || {};
+  try {
+    const prompts = await generatePromptsForTrend({ trendId: trend_id || null, category });
+    res.status(201).json({ prompts });
+  } catch (err) {
+    res.status(422).json({ error: err.message });
+  }
+});
+
+// Browsable history of previously generated prompt batches, optionally filtered by trend
+// and/or category — see generatePromptsForTrend's doc comment on why each generation run
+// inserts new rows rather than upserting.
+app.get('/api/prompts', (req, res) => {
+  const { trend_id, category } = req.query;
+  const prompts = listPrompts({ trendId: trend_id ? Number(trend_id) : undefined, category: category || undefined });
+  res.json(prompts);
 });
 
 // Guarded so importing this module (e.g. supertest-based integration tests, which wrap
