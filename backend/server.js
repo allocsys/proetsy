@@ -5,6 +5,7 @@ import { getDb } from './db/init.js';
 import { getPipelineConfig, getProductSizes } from './config/index.js';
 import { createJob, getJobWithModules, setManualNotes, setModuleStatus } from './lib/jobs.js';
 import { generateListingsForJob } from './lib/listing-generator/index.js';
+import { initRateLimitCache } from './lib/llm/rate-limits.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -14,6 +15,12 @@ app.use(express.json());
 
 // Initializes the schema on boot (CREATE TABLE IF NOT EXISTS, so safe to call every start).
 getDb();
+
+// Rehydrates the LLM provider layer's in-process cooldown Map from the durable
+// llm_rate_limits table, so a restart doesn't reset an already-exhausted key/model pair
+// back to "looks fine, try it". See ARCHITECTURE.md -> LLM Provider Layer -> "Rate-limit
+// cooldown tracking".
+initRateLimitCache();
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
