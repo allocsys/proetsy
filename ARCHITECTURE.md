@@ -2,6 +2,8 @@
 
 This document defines the modular version of the original build plan. It supersedes nothing — the original plan doc stays as-is — but this is the spec to build against: React frontend, Node.js backend, runnable fully locally first, deployable later.
 
+**LLM provider: Gemini (free tier, multiple keys) is primary. Claude API is kept as an optional fallback behind the same interface — not required to run the app.**
+
 ## Guiding principles
 
 - **Modular**: every pipeline stage is a self-contained module with a defined input/output contract. Any module can be swapped, disabled, or replaced without touching the others.
@@ -36,7 +38,7 @@ Every arrow above is a toggle point. A run can go straight from upload → listi
 ### Module 1 — Image Analyzer (optional)
 **Input:** artwork file
 **Output:** structured description (subject, style, palette, mood) used by Module 2 and for tag matching
-**Tech:** Claude API (vision)
+**Tech:** Gemini API (vision, multimodal) via the LLM provider layer
 **Can be skipped if:** user wants to hand-write listing angle/keywords instead
 
 ### Module 2 — Listing Generator (core, not skippable)
@@ -50,7 +52,7 @@ Every arrow above is a toggle point. A run can go straight from upload → listi
 - No AI disclosure in descriptions
 - No delivery details in descriptions
 **Tag selection:** pulls from the user's pre-made tag list, matched to image analysis output — not freely generated
-**Tech:** Claude API
+**Tech:** Gemini API via the LLM provider layer
 
 ### Module 3 — Mockup Composer (optional)
 **Input:** artwork file + product type (e.g. "8x10 print", "square canvas")
@@ -64,7 +66,7 @@ Every arrow above is a toggle point. A run can go straight from upload → listi
 **What changed from the original plan:** no live Etsy trend-pulling API call. Trends are a **manually maintained/selected list** (e.g. a `trends.json` or a dropdown in Settings) that the user updates themselves.
 **Input:** selected trend + desired category
 **Output:** ready-to-paste Midjourney prompts using shop conventions (`--v 7`, `--style raw`, aspect ratio per category, `--s 50–150`)
-**Tech:** Claude API, no Etsy API dependency
+**Tech:** Gemini API via the LLM provider layer, no Etsy API dependency. (This module only *writes* Midjourney-formatted prompt text — it never calls a Midjourney API.)
 
 ### Module 5 — Etsy Uploader (optional)
 **Input:** approved listing data + mockup files
@@ -104,12 +106,40 @@ Example shape:
 
 ---
 
+## LLM Provider Layer
+
+All three LLM-using modules (1, 2, 4) call a single shared interface instead of hitting a provider's SDK directly:
+
+```
+lib/llm/
+  index.js       -> exports generateText(), generateVision(), chosen by config
+  gemini.js      -> Gemini implementation (primary)
+  claude.js      -> Claude implementation (optional fallback)
+```
+
+**Primary: Gemini, multiple free API keys.**
+Gemini's free tier is rate-limited per project/key (as low as 5-15 requests/minute and roughly 100-1,000 requests/day depending on model, as of mid-2026 — check Google AI Studio's current numbers before relying on this). To stay within free limits at real usage volume, the provider layer supports a **pool of Gemini API keys** rather than a single key:
+
+- Keys are listed in config/env (e.g. `GEMINI_API_KEYS=key1,key2,key3`), not hardcoded
+- The provider layer rotates keys round-robin per request
+- On a 429 (rate-limit) response, it retries with the next key in the pool before failing
+- If all keys are exhausted, the call fails clearly (surfaced in the dashboard) rather than hanging — no silent fallback to Claude unless that's explicitly enabled in config
+
+**Fallback: Claude.** Same interface, disabled by default. Can be turned on in config if the Gemini key pool is exhausted, or for a specific module that needs it, without changing any module code.
+
+**Model choice on the Gemini side:** favor a Flash-tier model for the higher daily/rate-limit headroom; reserve a Pro-tier model only for calls that need stronger reasoning, since Pro's free-tier caps are far tighter.
+
+**Data note:** Gemini's free tier may use inputs/outputs to improve Google's models. Since Module 1 sends artwork images and Module 2 sends shop copy through it, factor that into whether free tier is acceptable for this data, or whether a paid tier / different privacy setting is needed later.
+
+---
+
 ## Stack
 
 - **Frontend:** React
 - **Backend:** Node.js
 - **Local-first:** entire pipeline (analyzer → generator → mockup composer → review) must run against local storage/local DB before any deployment decision. Deployment target (own VPS, Vercel/Render, etc.) is a separate, later discussion.
 - **Database:** same tables as the original plan (listings, images, mockups, tags, settings, prompts), plus a `trends` table (manual entries) and a `pipeline_config` table/JSON file.
+- **LLM keys:** a pool of Gemini API keys (env/config, not hardcoded), plus an optional single Claude key for fallback.
 
 ---
 
@@ -119,6 +149,7 @@ Example shape:
 |---|---|
 | Etsy API pulls trending data | Trends are manually selected/maintained |
 | Canva API or Pillow for mockups | Single `mockup-generator.js`, user's own mockup templates via config lookup |
+| Claude API as the only LLM | Gemini (multi-key pool) as primary LLM, Claude as optional fallback behind a shared provider interface |
 | Fixed phase order, all-or-nothing | Modular: any step can be enabled/disabled per run |
 | Implicit "must deploy" | Local-first; deployment is a later, separate decision |
 | Tags freely generated | Tags chosen from a pre-made list, matched to image content |
