@@ -103,6 +103,8 @@ Module 7's embeddings and Module 4's text prompts don't share a representation, 
 **Future (planned, not built yet): auto-import via watched folder.**
 Once Midjourney generates and downloads images to a local folder, a lightweight file-watcher can detect new files and automatically pull them into Module 7's queue — no manual drag-and-drop needed for the *import* step. This is pure local file-system watching (chokidar or similar), no API call, no network dependency, no Midjourney ToS exposure at all, since it never touches Midjourney's systems. Safe to build whenever it's prioritized.
 
+**Activation: a toggle in the dashboard Settings panel** (e.g. "Auto-import from folder: on/off" + a folder-path field), not always-on by default. Off by default keeps behavior predictable; the user turns it on once they've set the watched folder path.
+
 **The closed loop — how auto-import + Module 7 + self-improvement fit together:**
 
 ```
@@ -253,7 +255,9 @@ Every pipeline run is tracked as a **job**, and every module within a job has it
 
 - **Frontend:** React
 - **Backend:** Node.js
-- **Local-first:** entire pipeline (analyzer → generator → mockup composer → review) must run against local storage/local DB before any deployment decision. Deployment target (own VPS, Vercel/Render, etc.) is a separate, later discussion.
+- **Local-first:** entire pipeline (analyzer → generator → mockup composer → review) must run against local storage/local DB before any deployment decision.
+- **Deployment target: fully local.** The app runs as a persistent local process (`node server.js`, or a small always-on home server/mini PC), not a serverless platform. This isn't a temporary starting point — it's the actual target, for three concrete reasons tied to features already built into the plan: (1) the folder-watcher needs to run continuously on the same machine where Midjourney downloads land, which is inherently local; (2) local DB and local mockup/artwork storage need persistent disk, which serverless platforms don't provide (each invocation gets an ephemeral filesystem); (3) Module 7's CLIP embedding process needs a long-lived local process to invoke, not a stateless function call. Vercel (and similar serverless hosts) isn't a fit for this design unless those three things were rearchitected around cloud storage and a hosted embedding API — not planned.
+- **Secrets:** stored in a local `.env` file (Gemini key pool, optional Claude key), not hardcoded. A `.env.example` ships in the repo as a template; the real `.env` is gitignored.
 - **Database:** same tables as the original plan (listings, images, mockups, tags, settings, prompts), plus a `trends` table (manual entries), a `pipeline_config` table/JSON file, a `jobs` table (job id, per-module status, error messages, timestamps) to support partial failure handling, a `product_sizes` table/config (dimensions, DPI, mockup template per size — shared by Modules 2 and 3), an `image_preferences` table (image reference, embedding vector, keep/discard label, category, prompt reference, timestamp) for Module 7's taste model, and a `prompt_terms` table (term, kept count, discarded count) for the optional Module 7 → Module 4 prompt-feedback link.
 - **Local embedding model:** a lightweight, local, open-source image embedding tool (e.g. CLIP) for Module 7. No API key, no cost, no network call — invoked as a local process from the Node backend.
 - **LLM keys:** a pool of Gemini API keys (env/config, not hardcoded), plus an optional single Claude key for fallback.
@@ -282,7 +286,7 @@ Every pipeline run is tracked as a **job**, and every module within a job has it
 2. **Module 2** (Listing Generator) — core, get this solid first, matches original Phase 1
 3. **Module 3** (Mockup Composer with own templates) — no external mockup API needed, so this can move up earlier than the original plan's Phase 2
 4. **Module 4** (manual-trend prompt helper) — low complexity now that trend-pulling is removed
-5. **Deployment** — separate discussion once the local app works end-to-end
+5. **Local persistent deployment** — running the finished app as an always-on local process (own machine or a small home server); not a cloud/serverless deployment (see Stack section)
 
 (Etsy Uploader is no longer part of the build — publishing is manual.)
 
