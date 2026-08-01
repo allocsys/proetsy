@@ -30,3 +30,24 @@ export const SHOP_CONVENTIONS = Object.freeze({
     'delivered within',
   ],
 });
+
+// Hardcoded Midjourney prompt conventions for Module 4 (Trend/Prompt Helper). See
+// ARCHITECTURE.md -> Module 4 -> "Output: ready-to-paste Midjourney prompts using shop
+// conventions (--v 7, --style raw, aspect ratio per category, --s 50–150)". Baked into
+// the LLM prompt AND enforced again after generation (see
+// lib/prompt-helper/validate.js) as a backstop, same pattern as SHOP_CONVENTIONS above.
+export const MIDJOURNEY_CONVENTIONS = Object.freeze({
+  version: '--v 7',
+  style: '--style raw',
+  stylizeMin: 50,
+  stylizeMax: 150,
+  defaultStylize: 100,
+  // Keyed by product orientation/category (matches product-sizes.json's `orientation`
+  // field, e.g. 'portrait'/'landscape'/'square') so a selected category maps directly to
+  // the --ar flag without a separate lookup table.
+  aspectRatioByCategory: Object.freeze({
+    portrait: '2:3',
+    landscape: '3:2',
+    square: '1:1',
+  }),
+});
