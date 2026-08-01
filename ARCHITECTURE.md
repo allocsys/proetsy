@@ -157,11 +157,17 @@ independently-committable sub-steps, each testable before the next depends on it
    smart-crop fallback; nothing throws from `resolveArtworkForTarget` itself, so a bad or
    failed AI result never blocks mockup composition — the failure is flagged in
    `warnings` (surfaced the same way any other Module 3 warning already is), not hidden.
-5. **Schema + migration** for the review step (can happen in parallel with 2–4): add
-   `mockups.ai_extended_path` (nullable TEXT), `needs_review` (INTEGER DEFAULT 0),
-   `selected_variant` (TEXT DEFAULT `'smart_crop'`) to `backend/db/schema.sql`, plus a
-   defensive `ALTER TABLE` in `backend/db/init.js` (same pattern already used for
-   `product_sizes.placement_layer`, see Database Schema below).
+5. **Schema + migration — ✅ done.** Added to `backend/db/schema.sql`'s `mockups` table:
+   `ai_extended_path` (nullable TEXT — only populated when an outpaint attempt actually
+   succeeded), `needs_review` (INTEGER NOT NULL DEFAULT 0), `selected_variant` (TEXT NOT
+   NULL DEFAULT `'smart_crop'`). `file_path` is unchanged and keeps holding whichever
+   variant is currently selected, so nothing reading `file_path` today needs to change.
+   Same defensive-migration pattern as `product_sizes.placement_layer`: three new
+   `ALTER TABLE mockups ADD COLUMN ...` lines in `backend/db/init.js`'s `runDefensiveMigrations()`,
+   each already wrapped by that function's existing try/catch-on-"duplicate column" logic, so
+   no new error handling was needed. **Not yet used anywhere** — nothing in
+   `mockup-generator.js` writes these columns yet (step 4's `resolveArtworkForTarget` still
+   only produces one final image per run); that's step 6's job.
 6. **Persist both variants + a new route.** `generateMockupForJob` writes both
    `file_path` (smart-crop) and `ai_extended_path` (when outpainting succeeded) and sets
    `needs_review`; a new `PATCH /api/jobs/:id/mockups/:mockupId/variant` route
