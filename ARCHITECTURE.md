@@ -95,6 +95,29 @@ Etsy publishing is manual by design — no auto-uploader module. The app's job e
 **Future (planned, not built yet): auto-import via watched folder.**
 Once Midjourney generates and downloads images to a local folder, a lightweight file-watcher can detect new files and automatically pull them into Module 7's queue — no manual drag-and-drop needed for the *import* step. This is pure local file-system watching (chokidar or similar), no API call, no network dependency, no Midjourney ToS exposure at all, since it never touches Midjourney's systems. Safe to build whenever it's prioritized.
 
+**The closed loop — how auto-import + Module 7 + self-improvement fit together:**
+
+```
+[Manual: paste Module 4's prompt into Midjourney, generate images]
+              ↓
+[Midjourney downloads land in a local folder]
+              ↓
+[Auto-import: file-watcher detects new files → pulls into Module 7 queue]
+              ↓
+[Module 7 scores each image against the CURRENT taste model]
+              ↓
+[Dashboard shows ranked batch: likely-keep / likely-discard / uncertain]
+              ↓
+[User reviews, confirms keep/discard on each]
+              ↓
+[Every confirmation → new labeled row in image_preferences → centroids recomputed]
+              ↓                                                    ↑
+[Kept images flow into "Upload Artwork" → main pipeline]    (model gets sharper
+   (Module 1 → 2 → 3 → review → manual Etsy publish)         for the NEXT batch)
+```
+
+Nothing extra needs to be built to make this "self-improving" — every keep/discard decision the user is already making becomes training data automatically, so each new batch is scored against a slightly better model than the last one. There's no separate training mode; labeling *is* the training. It also never "finishes" training — it keeps adapting as the user keeps labeling, so it drifts with taste changes over time rather than freezing on an early snapshot.
+
 ### Module 5 — Etsy Uploader
 **Removed.** Etsy publishing is manual — the user copies the approved listing text and mockups into Etsy themselves. No Etsy API v3 integration, no OAuth, no bulk-publish. This removes the biggest external-account risk from the whole build (Etsy developer approval, bulk-publish bugs, API changes) and the module entirely.
 
