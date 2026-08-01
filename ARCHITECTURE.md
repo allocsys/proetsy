@@ -51,7 +51,7 @@ Etsy publishing is manual by design — no auto-uploader module. The app's job e
 - No frames mentioned in titles
 - No AI disclosure in descriptions
 - No delivery details in descriptions
-- Image sizes referenced: 5×7, 8×10, 11×14 at 300 DPI
+- Sizes referenced in the listing come from the shared **product-sizes config** (see Module 3) — not a hardcoded list. Only sizes that have a matching mockup template configured are offered/mentioned.
 **Tag selection:** pulls from the user's pre-made tag list, matched to image analysis output — not freely generated
 **Tech:** Gemini API via the LLM provider layer
 
@@ -59,9 +59,16 @@ Etsy publishing is manual by design — no auto-uploader module. The app's job e
 **Input:** artwork file + product type (e.g. "8x10 print", "square canvas")
 **Output:** composited mockup image(s), in the shop's defined display order
 **Tech:** a single `mockup-generator.js` file. No Canvas/Pillow/Canva API.
-- Reads a **config file** mapping product type → mockup template path (e.g. `{ "8x10-portrait": "templates/8x10-frame.png", "square-canvas": "templates/square.png" }`)
-- Given `(artworkPath, productType)`, looks up the matching template from config and composites the artwork into it
-- New product types/templates are added by editing the config, not the code
+- Reads the shared **`product-sizes.json` config** — one entry per size, e.g.:
+  ```json
+  {
+    "8x10-portrait": { "dimensions": "8x10", "dpi": 300, "orientation": "portrait", "mockup_template": "templates/8x10-frame.png" },
+    "square-canvas":  { "dimensions": "12x12", "dpi": 300, "orientation": "square",   "mockup_template": "templates/square.png" }
+  }
+  ```
+- Given `(artworkPath, productType)`, looks up the matching entry and composites the artwork into its template
+- **This same config is the single source of truth for Module 2** — no separate hardcoded size list. A size only shows up as sellable/mentionable once it has an entry here (dimensions, DPI, and a mockup template).
+- New product types/templates/sizes are added by editing this one config, not the code, and not duplicated anywhere else
 
 ### Module 4 — Trend/Prompt Helper (optional, manual-trend version)
 **What changed from the original plan:** no live Etsy trend-pulling API call. Trends are a **manually maintained/selected list** (e.g. a `trends.json` or a dropdown in Settings) that the user updates themselves.
@@ -79,7 +86,7 @@ React frontend that:
 - Previews and allows editing any generated field before publishing
 - Supports bulk mode (multiple artworks through the pipeline at once)
 - Keeps a listing history log
-- Settings panel: default price, delivery text, shop style conventions, tag library, trend list, mockup template config
+- Settings panel: default price, delivery text, shop style conventions, tag library, trend list, product-sizes config (dimensions, DPI, mockup template per size)
 - Provides an easy **copy-to-clipboard / export** view per listing (title, description, tags, mockup files) so pasting into Etsy manually is fast
 
 ---
@@ -163,7 +170,7 @@ Every pipeline run is tracked as a **job**, and every module within a job has it
 - **Frontend:** React
 - **Backend:** Node.js
 - **Local-first:** entire pipeline (analyzer → generator → mockup composer → review) must run against local storage/local DB before any deployment decision. Deployment target (own VPS, Vercel/Render, etc.) is a separate, later discussion.
-- **Database:** same tables as the original plan (listings, images, mockups, tags, settings, prompts), plus a `trends` table (manual entries), a `pipeline_config` table/JSON file, and a `jobs` table (job id, per-module status, error messages, timestamps) to support partial failure handling.
+- **Database:** same tables as the original plan (listings, images, mockups, tags, settings, prompts), plus a `trends` table (manual entries), a `pipeline_config` table/JSON file, a `jobs` table (job id, per-module status, error messages, timestamps) to support partial failure handling, and a `product_sizes` table/config (dimensions, DPI, mockup template per size — shared by Modules 2 and 3).
 - **LLM keys:** a pool of Gemini API keys (env/config, not hardcoded), plus an optional single Claude key for fallback.
 
 ---
