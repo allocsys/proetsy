@@ -5,6 +5,7 @@ import { getDb } from './db/init.js';
 import { getPipelineConfig, getProductSizes } from './config/index.js';
 import { createJob, getJobWithModules, setManualNotes, setModuleStatus } from './lib/jobs.js';
 import { generateListingsForJob } from './lib/listing-generator/index.js';
+import { generateMockupForJob } from './lib/mockup-generator.js';
 import { initRateLimitCache } from './lib/llm/rate-limits.js';
 
 const app = express();
@@ -116,6 +117,42 @@ app.get('/api/jobs/:id/listings', (req, res) => {
     tag_alternates: r.tag_alternates ? JSON.parse(r.tag_alternates) : [],
   }));
   res.json(listings);
+});
+
+// Runs Module 3 (Mockup Composer) for a job against one product size. Optional/
+// non-required module: on failure the job's module status is 'failed' but the job's
+// overall_status is NOT forced to 'failed' (required: false) — a listing without
+// mockups is still usable, so the failure is flagged, not fatal. See ARCHITECTURE.md ->
+// Partial Failure Handling. Re-running for the same size_key overwrites that size's
+// mockup rather than duplicating (UNIQUE(job_id, product_size_id) on the mockups table).
+app.post('/api/jobs/:id/run/mockup-composer', async (req, res) => {
+  const jobId = Number(req.params.id);
+  const { size_key } = req.body || {};
+  if (!size_key) return res.status(400).json({ error: 'size_key is required' });
+
+  setModuleStatus(jobId, 'mockup_composer', 'running', { required: false });
+  try {
+    const { outputPath, warnings } = await generateMockupForJob(jobId, size_key);
+    setModuleStatus(jobId, 'mockup_composer', 'success', { required: false });
+    res.json({ job: getJobWithModules(jobId), outputPath, warnings });
+  } catch (err) {
+    setModuleStatus(jobId, 'mockup_composer', 'failed', { required: false, errorMessage: err.message });
+    res.status(422).json({ error: err.message, job: getJobWithModules(jobId) });
+  }
+});
+
+app.get('/api/jobs/:id/mockups', (req, res) => {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT mockups.*, product_sizes.size_key, product_sizes.dimensions, product_sizes.orientation
+       FROM mockups
+       JOIN product_sizes ON product_sizes.id = mockups.product_size_id
+       WHERE mockups.job_id = ?
+       ORDER BY mockups.id`
+    )
+    .all(Number(req.params.id));
+  res.json(rows);
 });
 
 app.listen(PORT, () => {
