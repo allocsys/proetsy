@@ -6,6 +6,7 @@ import { getDb } from './db/init.js';
 import { getPipelineConfig, getProductSizes } from './config/index.js';
 import { createJob, getJobWithModules, setManualNotes, setModuleStatus } from './lib/jobs.js';
 import { generateListingsForJob } from './lib/listing-generator/index.js';
+import { enforceConventions } from './lib/listing-generator/validate.js';
 import { generateMockupForJob, OUTPUT_DIR } from './lib/mockup-generator.js';
 import { initRateLimitCache } from './lib/llm/rate-limits.js';
 
@@ -137,6 +138,43 @@ app.get('/api/jobs/:id/listings', (req, res) => {
     tag_alternates: r.tag_alternates ? JSON.parse(r.tag_alternates) : [],
   }));
   res.json(listings);
+});
+
+// Dashboard review/edit for a single generated listing (ARCHITECTURE.md -> Module 6 ->
+// "Previews and allows editing any generated field before publishing"). Any of
+// title/description/tags/tag_alternates may be omitted to leave that field unchanged.
+// Re-applies enforceConventions() to the merged result -- the same backstop generation
+// time already gets -- so a manual edit can't slip a forbidden title word, an oversized
+// tag, or too many tags past the shop conventions.
+app.patch('/api/jobs/:id/listings/:listingId', (req, res) => {
+  const jobId = Number(req.params.id);
+  const listingId = Number(req.params.listingId);
+  const { title, description, tags, tag_alternates } = req.body || {};
+
+  const db = getDb();
+  const existing = db.prepare('SELECT * FROM listings WHERE id = ? AND job_id = ?').get(listingId, jobId);
+  if (!existing) return res.status(404).json({ error: 'Listing not found for this job' });
+
+  const merged = {
+    angle: existing.variation,
+    title: title !== undefined ? title : existing.title,
+    description: description !== undefined ? description : existing.description,
+    tags: tags !== undefined ? tags : JSON.parse(existing.tags || '[]'),
+    tag_alternates: tag_alternates !== undefined ? tag_alternates : JSON.parse(existing.tag_alternates || '[]'),
+  };
+  const cleaned = enforceConventions(merged);
+
+  db.prepare(
+    `UPDATE listings SET title = ?, description = ?, tags = ?, tag_alternates = ?, edited_at = datetime('now') WHERE id = ?`
+  ).run(cleaned.title, cleaned.description, JSON.stringify(cleaned.tags), JSON.stringify(cleaned.tagAlternates), listingId);
+
+  const updated = db.prepare('SELECT * FROM listings WHERE id = ?').get(listingId);
+  res.json({
+    ...updated,
+    tags: JSON.parse(updated.tags || '[]'),
+    tag_alternates: JSON.parse(updated.tag_alternates || '[]'),
+    warnings: cleaned.warnings,
+  });
 });
 
 // Runs Module 3 (Mockup Composer) for a job against one product size. Optional/
