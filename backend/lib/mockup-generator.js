@@ -160,19 +160,21 @@ export async function outpaintArtwork(artwork, targetWidth, targetHeight) {
 }
 
 /**
- * Resolves artwork resized/cropped/extended to exactly (targetWidth, targetHeight),
- * choosing between the two mismatch-handling paths from ARCHITECTURE.md -> Module 3 ->
- * "Aspect-ratio mismatch handling": below LARGE_MISMATCH_RATIO, always smart-crop; at/above
- * it, attempt AI outpainting first via outpaintArtwork() and fall back to smart-crop if
- * that call fails for any reason (network error, no image in the response, etc.) — smart-
- * crop is always the guaranteed fallback, so a bad or failed AI result never blocks mockup
- * composition. Shared by both composeMockupFlat and composeMockupPsd since the mismatch-
- * handling *decision* doesn't depend on template kind — only what targetWidth/targetHeight
- * mean differs between them (full canvas vs. placement-layer bounds).
+ * Resolves BOTH candidate variants (smart-crop and, when triggered and successful, AI-
+ * extended) resized to exactly (targetWidth, targetHeight), per ARCHITECTURE.md -> Module
+ * 3 -> "Aspect-ratio mismatch handling" -> "Review step": when both approaches are viable
+ * they're shown side by side and the user picks, so this always computes the smart-crop
+ * variant (the guaranteed fallback / default selection) and, when the mismatch is large,
+ * *additionally* attempts AI outpainting rather than replacing smart-crop with it. Shared
+ * by both composeMockupFlat and composeMockupPsd since the mismatch-handling *decision*
+ * doesn't depend on template kind — only what targetWidth/targetHeight mean differs
+ * between them (full canvas vs. placement-layer bounds).
  *
- * On outpaint failure, an explanatory entry is pushed to `warnings` (the failure is
- * flagged, not hidden — consistent with this doc's Partial Failure Handling principle) but
- * nothing throws from this function; only a smart-crop failure would propagate up.
+ * `aiExtended` is null when the mismatch is small (outpainting isn't attempted at all) or
+ * when an attempted outpaint failed. On failure, an explanatory entry is pushed to
+ * `warnings` (flagged, not hidden — consistent with this doc's Partial Failure Handling
+ * principle) but nothing throws from this function; only a smart-crop failure would
+ * propagate up, since smart-crop must remain the guaranteed fallback.
  *
  * @param {Jimp} artwork
  * @param {number} targetWidth
@@ -180,21 +182,23 @@ export async function outpaintArtwork(artwork, targetWidth, targetHeight) {
  * @param {number} mismatch - precomputed via computeMismatchRatio()
  * @param {string} sizeKey
  * @param {string[]} warnings - mutated in place
- * @returns {Promise<Jimp>}
+ * @returns {Promise<{ smartCrop: Jimp, aiExtended: Jimp | null }>}
  */
-async function resolveArtworkForTarget(artwork, targetWidth, targetHeight, mismatch, sizeKey, warnings) {
+async function resolveArtworkVariants(artwork, targetWidth, targetHeight, mismatch, sizeKey, warnings) {
+  const smartCrop = await smartCropAndResize(artwork, targetWidth, targetHeight);
+
   if (mismatch < LARGE_MISMATCH_RATIO) {
-    return smartCropAndResize(artwork, targetWidth, targetHeight);
+    return { smartCrop, aiExtended: null };
   }
 
   try {
     const outpainted = await outpaintArtwork(artwork, targetWidth, targetHeight);
     // The model isn't guaranteed to return exactly targetWidth x targetHeight pixels, so
     // resize to fit exactly — the same guarantee smart-crop already provides.
-    return outpainted.resize(targetWidth, targetHeight);
+    return { smartCrop, aiExtended: outpainted.resize(targetWidth, targetHeight) };
   } catch (err) {
     warnings.push(outpaintFailureWarning(sizeKey, mismatch, err));
-    return smartCropAndResize(artwork, targetWidth, targetHeight);
+    return { smartCrop, aiExtended: null };
   }
 }
 
