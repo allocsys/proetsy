@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
+import JobMockupReview from './JobMockupReview.jsx';
 
 function App() {
   const [health, setHealth] = useState(null);
   const [pipeline, setPipeline] = useState(null);
+  const [jobIdInput, setJobIdInput] = useState('');
+  const [activeJobId, setActiveJobId] = useState(null);
 
   useEffect(() => {
     fetch('/api/health')
@@ -29,6 +32,20 @@ function App() {
           </li>
         ))}
       </ul>
+      <h2>Mockup review (Module 3)</h2>
+      <div style={{ marginBottom: '1rem' }}>
+        <input
+          type="number"
+          placeholder="Job ID"
+          value={jobIdInput}
+          onChange={(e) => setJobIdInput(e.target.value)}
+        />
+        <button onClick={() => setActiveJobId(jobIdInput)} disabled={!jobIdInput}>
+          View mockups
+        </button>
+      </div>
+      {activeJobId && <JobMockupReview jobId={activeJobId} />}
+
       <p style={{ color: '#888' }}>
         Skeleton dashboard — modules are stubbed. See ARCHITECTURE.md for the full plan.
       </p>
