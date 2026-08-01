@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Jimp from 'jimp';
@@ -8,6 +9,7 @@ import pureimage from 'pureimage';
 import { getDb } from '../db/init.js';
 import { getProductSizes } from '../config/index.js';
 import { ensurePsdCanvasInitialized } from './psd-canvas.js';
+import { generateImage } from './llm/index.js';
 import {
   DEFAULT_PLACEMENT_LAYER,
   detectTemplateKind,
@@ -91,6 +93,70 @@ function jimpToPureimageBitmap(jimpImage) {
   const bitmap = pureimage.make(width, height);
   bitmap.data.set(data);
   return bitmap;
+}
+
+/**
+ * Builds the outpaint prompt for extending artwork to a target pixel size via AI
+ * outpainting. Kept as its own pure function, separate from the network-calling code
+ * below, so the prompt wording is unit-testable and can be iterated on without touching
+ * outpaintArtwork(). See ARCHITECTURE.md -> Module 3 -> "Aspect-ratio mismatch handling"
+ * -> "Large mismatch → AI outpainting".
+ * @param {number} targetWidth
+ * @param {number} targetHeight
+ * @returns {string}
+ */
+export function buildOutpaintPrompt(targetWidth, targetHeight) {
+  return (
+    `Extend this artwork outward to fill a ${targetWidth}x${targetHeight} pixel canvas ` +
+    `(aspect ratio ${(targetWidth / targetHeight).toFixed(3)}). Keep the original artwork's ` +
+    "subject, composition, palette, and style completely unchanged in its current position " +
+    'and scale — do not crop, shrink, warp, or recompose it. Generatively fill in only the ' +
+    'new border area around it with plausible, stylistically-matched content that continues ' +
+    'the existing scene, texture, and lighting outward, as if the original canvas had simply ' +
+    'been larger to begin with. The result should read as a single seamless piece of art, ' +
+    'not artwork placed on top of a different background.'
+  );
+}
+
+/**
+ * Standalone AI-outpainting call — takes artwork + target pixel dimensions, builds the
+ * prompt, calls generateImage(), and returns the extended image as a Jimp instance.
+ * **Not wired into composeMockup yet** (see ARCHITECTURE.md -> Module 3 ->
+ * "AI-outpainting fallback" step 4 — the mismatch-triggered call + smart-crop-on-failure
+ * fallback wiring is that step's job, not this function's). This function itself always
+ * throws on failure rather than falling back to anything, by design — callers decide what
+ * "fallback" means once step 4 wires it in.
+ *
+ * generateImage() takes an image *path*, not a Jimp instance (see gemini.js), so this
+ * writes the artwork to a temp file for the call and best-effort cleans it up afterward
+ * (cleanup failure is logged, not thrown — it shouldn't fail an otherwise-successful
+ * outpaint).
+ *
+ * @param {Jimp} artwork - the source artwork, already loaded
+ * @param {number} targetWidth
+ * @param {number} targetHeight
+ * @returns {Promise<Jimp>}
+ */
+export async function outpaintArtwork(artwork, targetWidth, targetHeight) {
+  const prompt = buildOutpaintPrompt(targetWidth, targetHeight);
+
+  const tempPath = path.join(
+    os.tmpdir(),
+    `outpaint-src-${Date.now()}-${Math.random().toString(36).slice(2)}.png`
+  );
+  await artwork.writeAsync(tempPath);
+
+  let result;
+  try {
+    result = await generateImage(prompt, tempPath);
+  } finally {
+    fs.promises.rm(tempPath, { force: true }).catch((err) => {
+      console.warn(`outpaintArtwork: failed to clean up temp file ${tempPath}:`, err.message);
+    });
+  }
+
+  const imageBuffer = Buffer.from(result.data, 'base64');
+  return Jimp.read(imageBuffer);
 }
 
 /**
