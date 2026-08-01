@@ -318,7 +318,6 @@ Every pipeline run is tracked as a **job**, and every module within a job has it
 ## Open Discussions — Not Yet Decided
 
 - **Unsigned Windows exe / SmartScreen.** An unsigned Electron exe triggers a "Windows protected your PC" warning on first run. Not a blocker for personal use (click "More info → Run anyway"), but worth knowing before packaging so it doesn't look broken. Code-signing is a separate, optional later decision if the exe is ever shared beyond personal use.
-- **First-run setup flow.** No defined flow yet for a fresh clone of the repo — entering the first Gemini key, tag list, mockup templates, product-sizes config, etc. Low priority for a single-user personal tool, but worth a one-time setup checklist eventually.
 
 ---
 
