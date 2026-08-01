@@ -1,0 +1,7 @@
+{
+  "pipeline": [
+    { "module": "image_analyzer", "enabled": true },
+    { "module": "listing_generator", "enabled": true, "required": true },
+    { "module": "mockup_composer", "enabled": true }
+  ]
+}

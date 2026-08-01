@@ -1,0 +1,14 @@
+{
+  "8x10-portrait": {
+    "dimensions": "8x10",
+    "dpi": 300,
+    "orientation": "portrait",
+    "mockup_template": "templates/8x10-frame.png"
+  },
+  "square-canvas": {
+    "dimensions": "12x12",
+    "dpi": 300,
+    "orientation": "square",
+    "mockup_template": "templates/square.png"
+  }
+}
