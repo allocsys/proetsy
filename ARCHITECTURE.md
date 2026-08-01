@@ -16,6 +16,8 @@ This document defines the modular version of the original build plan. It superse
 ## Pipeline overview
 
 ```
+[Module 7: Taste Filter]          (optional, pre-pipeline — ranks raw Midjourney batches)
+      ↓
 [Upload Artwork]
       ↓
 [Module 1: Image Analyzer]        (optional)
@@ -29,7 +31,7 @@ This document defines the modular version of the original build plan. It superse
 [Done — publish to Etsy manually]
 ```
 
-Etsy publishing is manual by design — no auto-uploader module. The app's job ends at producing an approved, ready-to-copy listing (and mockups); the user pastes it into Etsy themselves. Every arrow above the final step is a toggle point. A run can go straight from upload → listing generator → manual copy-paste, skipping mockups entirely (this is Phase 1 / the "quick win").
+Etsy publishing is manual by design — no auto-uploader module. The app's job ends at producing an approved, ready-to-copy listing (and mockups); the user pastes it into Etsy themselves. Every arrow above the final step is a toggle point. A run can go straight from upload → listing generator → manual copy-paste, skipping mockups entirely (this is Phase 1 / the "quick win"). Module 7 is a separate, earlier gate for raw Midjourney output — it never touches the main listing pipeline directly; its only output is a ranked/labeled set of images, some of which then get dragged into the main pipeline as "Upload Artwork."
 
 ---
 
@@ -75,6 +77,20 @@ Etsy publishing is manual by design — no auto-uploader module. The app's job e
 **Input:** selected trend + desired category
 **Output:** ready-to-paste Midjourney prompts using shop conventions (`--v 7`, `--style raw`, aspect ratio per category, `--s 50–150`)
 **Tech:** Gemini API via the LLM provider layer, no Etsy API dependency. (This module only *writes* Midjourney-formatted prompt text — it never calls a Midjourney API.)
+
+### Module 7 — Taste Filter (Curation) (optional, pre-pipeline)
+**What it does:** Ranks a batch of raw Midjourney-generated candidates against a learned taste profile, so obvious "slop" gets flagged before it ever becomes a listing candidate.
+**Input:** a batch of candidate images (generated manually in Midjourney, dragged into the dashboard)
+**Output:** each candidate gets a taste score and a suggested label (likely-keep / likely-discard / uncertain). Nothing is auto-deleted — the user confirms keep/discard, and that confirmation is the training signal.
+**Tech:** local image embeddings (e.g. CLIP), run via a local script/child process invoked from the Node backend. No API key, no per-request cost, no network dependency — stays local-first.
+**How the "training" works:**
+- Every keep/discard decision is stored as a labeled example (embedding + label) in an `image_preferences` table
+- The taste profile is two running centroids: the average embedding of everything kept, and everything discarded
+- A new candidate's score = similarity to the "kept" centroid minus similarity to the "discarded" centroid
+- Recomputed after each batch (or on demand) — filtering sharpens as more images are labeled
+- **Cold start:** with only a handful of labels, the system shows scores but doesn't filter confidently; a few dozen labeled examples is typically enough for this kind of centroid scoring to become useful
+**Never auto-discards:** consistent with the rest of the pipeline's human-in-the-loop principle — this only ranks and flags, the user always confirms
+**Can be skipped if:** the user is hand-picking Midjourney output already and doesn't want the extra step
 
 ### Module 5 — Etsy Uploader
 **Removed.** Etsy publishing is manual — the user copies the approved listing text and mockups into Etsy themselves. No Etsy API v3 integration, no OAuth, no bulk-publish. This removes the biggest external-account risk from the whole build (Etsy developer approval, bulk-publish bugs, API changes) and the module entirely.
@@ -170,7 +186,8 @@ Every pipeline run is tracked as a **job**, and every module within a job has it
 - **Frontend:** React
 - **Backend:** Node.js
 - **Local-first:** entire pipeline (analyzer → generator → mockup composer → review) must run against local storage/local DB before any deployment decision. Deployment target (own VPS, Vercel/Render, etc.) is a separate, later discussion.
-- **Database:** same tables as the original plan (listings, images, mockups, tags, settings, prompts), plus a `trends` table (manual entries), a `pipeline_config` table/JSON file, a `jobs` table (job id, per-module status, error messages, timestamps) to support partial failure handling, and a `product_sizes` table/config (dimensions, DPI, mockup template per size — shared by Modules 2 and 3).
+- **Database:** same tables as the original plan (listings, images, mockups, tags, settings, prompts), plus a `trends` table (manual entries), a `pipeline_config` table/JSON file, a `jobs` table (job id, per-module status, error messages, timestamps) to support partial failure handling, a `product_sizes` table/config (dimensions, DPI, mockup template per size — shared by Modules 2 and 3), and an `image_preferences` table (image reference, embedding vector, keep/discard label, timestamp) for Module 7's taste model.
+- **Local embedding model:** a lightweight, local, open-source image embedding tool (e.g. CLIP) for Module 7. No API key, no cost, no network call — invoked as a local process from the Node backend.
 - **LLM keys:** a pool of Gemini API keys (env/config, not hardcoded), plus an optional single Claude key for fallback.
 
 ---
