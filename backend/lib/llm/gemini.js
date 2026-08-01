@@ -35,7 +35,19 @@ function isRetryable(err) {
 // Walks: for each key (starting at keyStartIndex, wrapping around) -> for each model
 // in priority order -> attempt. Only exhausts a key's full model list before rotating
 // to the next key (see ARCHITECTURE.md rationale: a rate limit is usually per-model,
-// not per-key, so a different model on the same key may still have headroom).
+// not per-key, so a different model on that key may still have headroom).
+//
+// Per-attempt ordering (ARCHITECTURE.md -> "Request spacing..." -> "This queue sits in
+// front of the cooldown cache, not instead of it" — read together with "Rate-limit
+// cooldown tracking", the cooldown check itself comes first):
+//   1. Cooldown check (no network call at all if this (key, model) pair is known-limited)
+//   2. Request-spacing queue slot (per-key in-flight limit + spacing/jitter + global cap)
+//   3. The actual call
+//
+// This single pass over the pool is the *only* sweep — per ARCHITECTURE.md -> "Backoff
+// means backing OFF, not retrying harder", there is deliberately no outer retry loop
+// around this function. A sweep that ends with every pair either live-429'd or already
+// in cooldown fails immediately; it does not wait and sweep again.
 async function cascade(callFn, options = {}) {
   if (keys.length === 0) {
     throw new Error('No Gemini API keys configured. Set GEMINI_API_KEYS in backend/.env.');
@@ -46,22 +58,52 @@ async function cascade(callFn, options = {}) {
   }
 
   let lastError;
+  let madeALiveAttempt = false; // false only if every pair this sweep touched was skipped via cooldown
+  let earliestCooldownEnd = Infinity;
+
   for (let i = 0; i < keys.length; i += 1) {
-    const key = keys[(keyStartIndex + i) % keys.length];
+    const keyIndex = (keyStartIndex + i) % keys.length;
+    const key = keys[keyIndex];
     for (const model of modelsToTry) {
+      // 1. Cooldown check — skip known-limited pairs with no network call at all.
+      if (isInCooldown(keyIndex, model)) {
+        earliestCooldownEnd = Math.min(earliestCooldownEnd, getCooldownUntil(keyIndex, model));
+        continue;
+      }
       try {
+        // 2 + 3. Queue slot (spacing/jitter/concurrency), then the actual call.
         // eslint-disable-next-line no-await-in-loop
-        return await callFn(key, model);
+        const result = await withRequestSlot(keyIndex, () => callFn(key, model));
+        madeALiveAttempt = true;
+        recordSuccess(keyIndex, model);
+        return result;
       } catch (err) {
+        madeALiveAttempt = true;
         lastError = err;
         if (!isRetryable(err)) throw err;
-        // retryable: fall through to the next model on this same key, or (once this
-        // key's models are exhausted) the next key via the outer loop
+        // Retryable (429): record it (escalating this pair's cooldown if it's still
+        // recovering from a prior hit), then fall through to the next model on this
+        // same key, or — once this key's models are exhausted — the next key.
+        recordFailure(keyIndex, model, { retryDelayMs: err.retryDelayMs, reason: err.reason || err.message });
       }
     }
   }
 
   keyStartIndex = (keyStartIndex + 1) % keys.length;
+
+  if (!madeALiveAttempt) {
+    // Every pair this sweep would have tried was already in cooldown — distinct from the
+    // "we tried and all 429'd" case below, per ARCHITECTURE.md -> "Rate-limit cooldown
+    // tracking": useful for telling the two apart in the dashboard.
+    const nextAvailable = Number.isFinite(earliestCooldownEnd)
+      ? new Date(earliestCooldownEnd).toISOString()
+      : 'unknown';
+    throw new Error(
+      `All Gemini keys/models (${keys.length} keys x ${modelsToTry.join(', ')}) are currently in ` +
+        `rate-limit cooldown, next available at ~${nextAvailable}. Not retrying within this request.`
+    );
+  }
+
   throw new Error(
     `All Gemini keys (${keys.length}) exhausted across all models (${modelsToTry.join(', ')}). ` +
       `Last error: ${lastError?.message || 'unknown'}`
