@@ -345,6 +345,9 @@ SQLite (matches the local-first, local-DB decision above). `pipeline_config` and
 - `tags` — id, tag_text, category, source (the tag library Module 2 matches against)
 - `settings` — key, value (default price, delivery text, shop conventions)
 
+**LLM provider layer**
+- `llm_rate_limits` — key_index, model, limited_until, reason (nullable — e.g. raw status/error text for debugging), updated_at. `UNIQUE(key_index, model)`. Durable backing store for the in-process cooldown cache described in LLM Provider Layer → "Rate-limit cooldown tracking" — rehydrated into memory on backend startup, written to on every 429.
+
 **Trends (Module 4)**
 - `trends` — id, term, category, source (manual/csv/etsy_api), added_at
 - `prompts` — id, trend_id (FK, nullable), category, prompt_text, created_at
