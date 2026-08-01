@@ -300,6 +300,16 @@ Every pipeline run is tracked as a **job**, and every module within a job has it
 
 ---
 
+## Open Discussions — Not Yet Decided
+
+- **Local data backup.** Everything now lives only on the local machine — DB, `image_preferences` (the taste model), tag library, mockup templates, configs. No backup plan exists yet; a drive failure or accidental delete loses all of it, including months of taste-training. Needs a simple scheduled copy of the DB + uploads/templates folders to another drive or cloud storage.
+- **Unsigned Windows exe / SmartScreen.** An unsigned Electron exe triggers a "Windows protected your PC" warning on first run. Not a blocker for personal use (click "More info → Run anyway"), but worth knowing before packaging so it doesn't look broken. Code-signing is a separate, optional later decision if the exe is ever shared beyond personal use.
+- **CLIP ONNX model sourcing.** `onnxruntime-node` needs an actual pre-converted CLIP model file to run — this has to be sourced from a public model hub and its license checked; it doesn't ship automatically with the `onnxruntime-node` package.
+- **First-run setup flow.** No defined flow yet for a fresh clone of the repo — entering the first Gemini key, tag list, mockup templates, product-sizes config, etc. Low priority for a single-user personal tool, but worth a one-time setup checklist eventually.
+- **Aspect-ratio mismatch in Module 3.** Not yet addressed: what happens when artwork doesn't match a product size's mockup template aspect ratio (crop, letterbox, reject, or prompt the user to choose)?
+
+---
+
 ## Future Consideration — Full Midjourney Submission Automation (not planned)
 
 Two separate things get conflated under "automate Midjourney":
