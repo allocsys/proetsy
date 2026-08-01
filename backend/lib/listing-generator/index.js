@@ -61,7 +61,7 @@ export async function generateListingsForJob(jobId, { trendId = null } = {}) {
     availableSizes,
   });
 
-  const { text: rawResponse } = await generateText(prompt);
+  const { text: rawResponse } = await generateText(prompt, { json: true });
   const rawVariations = parseModelJson(rawResponse);
 
   const byAngle = new Map(rawVariations.map((v) => [v.angle, v]));
