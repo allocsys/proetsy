@@ -133,6 +133,10 @@ async function callGenerateContent(key, model, contents, options = {}) {
     const errBody = await response.text().catch(() => '');
     const err = new Error(`Gemini API error ${response.status} (model=${model}): ${errBody.slice(0, 300)}`);
     err.status = response.status;
+    if (response.status === 429) {
+      err.retryDelayMs = extractRetryDelayMs(response, errBody);
+      err.reason = errBody;
+    }
     throw err;
   }
 
