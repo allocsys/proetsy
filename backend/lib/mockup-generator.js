@@ -216,7 +216,7 @@ async function resolveArtworkVariants(artwork, targetWidth, targetHeight, mismat
  * @param {Jimp} artwork
  * @param {string} templatePath
  * @param {string} sizeKey
- * @returns {Promise<{ composed: Jimp, warnings: string[] }>}
+ * @returns {Promise<{ composed: Jimp, composedAiExtended: Jimp | null, warnings: string[] }>}
  */
 async function composeMockupFlat(artwork, templatePath, sizeKey) {
   const template = await Jimp.read(templatePath);
@@ -231,13 +231,17 @@ async function composeMockupFlat(artwork, templatePath, sizeKey) {
   const mismatch = computeMismatchRatio(artRatio, targetRatio);
 
   const warnings = [];
-  const resized = await resolveArtworkForTarget(artwork, targetWidth, targetHeight, mismatch, sizeKey, warnings);
+  const { smartCrop, aiExtended } = await resolveArtworkVariants(artwork, targetWidth, targetHeight, mismatch, sizeKey, warnings);
   // Template on top, artwork as the base layer — see compositing convention above.
   // Default blend mode (source-over) is correct here: the template's transparent
-  // window lets the artwork show through, its opaque areas cover it.
-  const composed = resized.composite(template, 0, 0);
+  // window lets the artwork show through, its opaque areas cover it. `template` is only
+  // ever the composite *source*, so compositing it onto two separate receivers below
+  // (smartCrop, aiExtended) doesn't require cloning it — Jimp's composite() mutates and
+  // returns the receiver, not the source.
+  const composed = smartCrop.composite(template, 0, 0);
+  const composedAiExtended = aiExtended ? aiExtended.composite(template, 0, 0) : null;
 
-  return { composed, warnings };
+  return { composed, composedAiExtended, warnings };
 }
 
 /**
