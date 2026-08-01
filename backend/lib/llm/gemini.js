@@ -110,6 +110,37 @@ async function cascade(callFn, options = {}) {
   );
 }
 
+// Reads a 429 response's retry-delay signal, if Gemini supplied one: either a
+// `Retry-After` header (seconds, or an HTTP-date) or `error.details[].retryDelay` (a
+// "30s"-style string) in the JSON error body. Returns milliseconds, or null if neither is
+// present/parseable — callers then fall back to LLM_RATE_LIMIT_DEFAULT_COOLDOWN_MS. See
+// ARCHITECTURE.md -> LLM Provider Layer -> "Rate-limit cooldown tracking" -> "Cooldown
+// duration".
+function extractRetryDelayMs(response, bodyText) {
+  const retryAfter = response.headers.get('retry-after');
+  if (retryAfter) {
+    const asSeconds = Number(retryAfter);
+    if (!Number.isNaN(asSeconds)) return asSeconds * 1000;
+    const asDate = Date.parse(retryAfter);
+    if (!Number.isNaN(asDate)) return Math.max(0, asDate - Date.now());
+  }
+
+  try {
+    const parsed = JSON.parse(bodyText);
+    const details = parsed?.error?.details || [];
+    const retryInfo = details.find((d) => typeof d['@type'] === 'string' && d['@type'].includes('RetryInfo'));
+    const retryDelay = retryInfo?.retryDelay; // e.g. "30s"
+    if (typeof retryDelay === 'string' && retryDelay.endsWith('s')) {
+      const seconds = Number(retryDelay.slice(0, -1));
+      if (!Number.isNaN(seconds)) return seconds * 1000;
+    }
+  } catch {
+    // Body wasn't JSON, or didn't have the expected shape — fall through to null.
+  }
+
+  return null;
+}
+
 // Single generateContent call against one (key, model) pair. `contents` follows Gemini's
 // request shape ([{ role, parts: [...] }]). Throws with `.status` set to the HTTP status
 // on failure so cascade() can tell a 429 (retryable) apart from anything else.
