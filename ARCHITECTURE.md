@@ -58,6 +58,18 @@ Etsy publishing is manual by design — no auto-uploader module. The app's job e
 **Tech:** Gemini API via the LLM provider layer
 
 ### Module 3 — Mockup Composer (optional)
+**Status: core + smart-crop — ✅ done.** Implemented in `backend/lib/mockup-generator.js`
+(`composeMockup` for the smart-crop + template-compositing logic, `generateMockupForJob`
+for the DB/job wiring), wired up via `POST /api/jobs/:id/run/mockup-composer` and
+`GET /api/jobs/:id/mockups` in `backend/server.js`. Uses `jimp` (pinned `^0.22.x`) +
+`smartcrop-jimp` for content-aware cropping. This pass also closes a schema gap: the
+`product_sizes` table is now populated (upserted from `product-sizes.json` on each mockup
+run, keyed on `size_key`) instead of staying empty, since `mockups.product_size_id`'s FK
+needs a row to point at. **Not yet built:** the Gemini AI-outpainting fallback for large
+aspect-ratio mismatches (mismatches above `MOCKUP_LARGE_MISMATCH_RATIO` are flagged with a
+warning and still smart-cropped, not outpainted) and the dashboard side-by-side
+smart-crop/AI-extended review step — both deferred to a later pass.
+
 **Input:** artwork file + product type (e.g. "8x10 print", "square canvas")
 **Output:** composited mockup image(s), in the shop's defined display order
 **Tech:** a single `mockup-generator.js` file. No Canvas/Pillow/Canva API.
@@ -389,7 +401,7 @@ SQLite (matches the local-first, local-DB decision above). `pipeline_config` and
 
 1. **Local skeleton** — ✅ done: React frontend + Node backend running locally, DB schema in place, pipeline config wired up (modules currently stubbed), plus the three provider-layer interfaces (`lib/llm/`, `lib/trends/`, `lib/tags/`) scaffolded with their v1 implementations
 2. **Module 2** (Listing Generator) — core, get this solid first, matches original Phase 1. **✅ backend core done:** generation (`backend/lib/listing-generator/index.js`), shop-convention enforcement (`validate.js`), tags-provider integration, and the LLM provider layer's key×model cascade plus request-spacing/cooldown/escalation hardening (see LLM Provider Layer status note above). **Not yet done:** dashboard review/edit UI for generated listings (Module 6 territory) and automated tests for this module.
-3. **Module 3** (Mockup Composer with own templates) — no external mockup API needed, so this can move up earlier than the original plan's Phase 2. **▶ next up.**
+3. **Module 3** (Mockup Composer with own templates) — no external mockup API needed, so this can move up earlier than the original plan's Phase 2. **✅ core + smart-crop done** (see Module 3 status note above). **Not yet done:** AI-outpainting fallback for large mismatches, dashboard review UI, automated tests.
 4. **Module 4** (manual-trend prompt helper) — low complexity now that trend-pulling is removed
 5. **Local persistent deployment** — running the finished app as an always-on local process (own machine or a small home server); not a cloud/serverless deployment (see Stack section)
 6. **Electron packaging (Windows exe)** — once the app is fully working as a normal local web app (steps 1-5), wrap it with `electron-builder` into a Windows installer/exe. Electron's window points at the existing React frontend and spawns the existing Node backend as a child process inside the packaged app. This is a packaging step at the end, not an architectural change — nothing upstream needs to be built "Electron-aware" except the JS-only CLIP decision (Module 7) already made for exactly this reason, avoiding a bundled Python runtime.
