@@ -148,6 +148,24 @@ React frontend that:
 
 ---
 
+## First-Run Setup
+
+No separate installer or CLI wizard — the app detects its own setup state on launch and drives the dashboard accordingly.
+
+**Detection:** on backend startup, check for (1) at least one Gemini key in `.env`, (2) an initialized DB, (3) at least one entry in `product-sizes.json`. If any are missing, the dashboard opens directly into a setup screen instead of the normal UI.
+
+**Setup steps, ordered by what's actually required:**
+- **Required to run at all:** at least one Gemini API key, entered in the setup screen and saved to `.env` (never committed — same pattern as the existing `.env.example`). DB schema auto-creates with no user action.
+- **Required for Module 2 (core):** a starter tag list — paste a list or upload a CSV, not one-at-a-time entry.
+- **Required for Module 3 (optional but likely wanted):** at least one product size + mockup template pair, since nothing is offered until one exists.
+- **Skippable entirely:** trends list, additional Gemini keys, Claude fallback key — the app runs fine with just the three items above.
+
+**Persistent status, not just a one-time modal.** The same three checks live permanently in the dashboard's Settings panel as a ✅/⚠️ setup-status list, so anything skipped initially (or missing after moving to a new machine) stays visible without re-triggering the full wizard.
+
+**Fail loud, not silent.** If a module runs without its required setup item (e.g. Module 2 with no Gemini key configured), the error points directly at the setup screen rather than surfacing a generic API error.
+
+---
+
 ## Local Backup
 
 All data lives only on the local machine (DB, `image_preferences` taste model, tag library, mockup templates, configs), so backups are local-to-local for now (a separate off-machine/cloud copy is not in scope here):
