@@ -58,17 +58,29 @@ Etsy publishing is manual by design — no auto-uploader module. The app's job e
 **Tech:** Gemini API via the LLM provider layer
 
 ### Module 3 — Mockup Composer (optional)
-**Status: core + smart-crop — ✅ done.** Implemented in `backend/lib/mockup-generator.js`
-(`composeMockup` for the smart-crop + template-compositing logic, `generateMockupForJob`
-for the DB/job wiring), wired up via `POST /api/jobs/:id/run/mockup-composer` and
+**Status: core + smart-crop — ✅ done. PSD (layered/smart-object) template support — ✅ done.**
+Implemented in `backend/lib/mockup-generator.js` (`composeMockup` dispatches to a flat-PNG
+or PSD compositing path based on template extension, `generateMockupForJob` for the
+DB/job wiring), wired up via `POST /api/jobs/:id/run/mockup-composer` and
 `GET /api/jobs/:id/mockups` in `backend/server.js`. Uses `jimp` (pinned `^0.22.x`) +
-`smartcrop-jimp` for content-aware cropping. This pass also closes a schema gap: the
-`product_sizes` table is now populated (upserted from `product-sizes.json` on each mockup
-run, keyed on `size_key`) instead of staying empty, since `mockups.product_size_id`'s FK
-needs a row to point at. **Not yet built:** the Gemini AI-outpainting fallback for large
+`smartcrop-jimp` for content-aware cropping (both template kinds), `ag-psd` for PSD layer
+decoding, and a pure-JS `pureimage`-backed Canvas2D shim (`backend/lib/psd-canvas.js`) so
+`ag-psd` never needs `node-canvas` — see "Template formats" below for the full rationale.
+PSD-specific logic (template-kind detection, placement-layer lookup/bounds, paint-order
+flattening) lives in `backend/lib/psd-template.js` as pure, unit-tested helpers
+(`psd-template.test.js`, `mockup-generator.test.js` — 23 tests, Vitest). This pass also
+closes a schema gap: the `product_sizes` table is now populated (upserted from
+`product-sizes.json` on each mockup run, keyed on `size_key`) instead of staying empty,
+since `mockups.product_size_id`'s FK needs a row to point at, and gained a
+`placement_layer` column (with a defensive `ALTER TABLE` migration in `backend/db/init.js`
+for existing dev DBs). **Not yet built:** the Gemini AI-outpainting fallback for large
 aspect-ratio mismatches (mismatches above `MOCKUP_LARGE_MISMATCH_RATIO` are flagged with a
-warning and still smart-cropped, not outpainted) and the dashboard side-by-side
-smart-crop/AI-extended review step — both deferred to a later pass.
+warning and still smart-cropped, not outpainted — this applies to both template kinds now)
+and the dashboard side-by-side smart-crop/AI-extended review step — both deferred to a
+later pass. Also not yet built: integration/idempotency tests for `composeMockup`/
+`generateMockupForJob` themselves (only the pure helpers have test coverage so far) and a
+real PSD test fixture checked into the repo (verified during development via a synthetic
+PSD round-tripped through `ag-psd`'s own `writePsd`/`readPsd`, not committed as a fixture).
 
 **Input:** artwork file + product type (e.g. "8x10 print", "square canvas")
 **Output:** composited mockup image(s), in the shop's defined display order
@@ -89,7 +101,7 @@ smart-crop/AI-extended review step — both deferred to a later pass.
 - **This same config is the single source of truth for Module 2** — no separate hardcoded size list. A size only shows up as sellable/mentionable once it has an entry here (dimensions, DPI, and a mockup template).
 - New product types/templates/sizes are added by editing this one config, not the code, and not duplicated anywhere else
 
-**Template formats: PNG (flat) today, PSD (layered, smart-object-style) — planned, not yet built.**
+**Template formats: PNG (flat) and PSD (layered, smart-object-style) — both ✅ done.**
 Most purchased/downloaded Etsy mockup packs ship as layered `.psd` files built around a
 Photoshop smart object, not a single flat PNG — so real template quality means reading
 the PSD's own layer structure rather than requiring the user to pre-flatten every
@@ -97,21 +109,41 @@ template by hand. Decided approach (prioritizing fidelity to how these templates
 actually built over implementation effort — a flatten-to-PNG shortcut was considered and
 rejected as a quality regression for exactly the templates most likely to be used):
 - **Which kind of template a `mockup_template` path is** is inferred from its file
-  extension (`.psd` vs `.png`/`.jpg`/etc.) — no separate config flag needed.
+  extension (`.psd` vs `.png`/`.jpg`/etc.) — no separate config flag needed. Implemented as
+  `detectTemplateKind()` in `backend/lib/psd-template.js`.
 - **Library: `ag-psd`** (pure JS, no native deps — same Termux/Electron-friendly
   constraint used elsewhere, e.g. Module 7's `onnxruntime-web` choice). Reads a PSD's
   layer tree, each layer's pixel bounds, and (where the format exposes it) blend mode/
   opacity.
+- **Canvas2D requirement — resolved with a pure-JS shim, not `node-canvas`.** Reading
+  layer *pixel data* (not just structure) requires `ag-psd` to have a Canvas2D
+  implementation registered via its `initializeCanvas(createCanvas, createImageData)`
+  hook; without one it throws rather than silently degrading. `ag-psd`'s own docs point to
+  `node-canvas`, but that has native Cairo bindings, which conflicts with this project's
+  zero-native-deps/Termux-Electron constraint. Instead, `backend/lib/psd-canvas.js`
+  registers a shim backed by **`pureimage`** (pure JS, no native deps): `pureimage.make()`
+  returns a `Bitmap` whose `.getContext('2d')` and flat RGBA `.data` buffer satisfy both
+  roles `ag-psd` needs (`createCanvas` and `createImageData`) with a direct byte copy, no
+  adapter code needed beyond wiring the two functions in. Verified against `ag-psd`'s
+  actual decode path, not just the registration call succeeding: a synthetic layered PSD
+  written via `ag-psd`'s own `writePsd`, then read back via `readPsd` through this shim,
+  round-trips layer pixel data correctly.
 - **Placement is layer-based, not whole-canvas.** `product-sizes.json` gains an optional
   `placement_layer` field (see `framed-psd` example above) naming the PSD layer whose
-  bounds mark where the artwork goes — defaults to `"artwork"` if the field is omitted.
-  This replaces the PNG convention's "transparent window" for PSD templates specifically:
-  the artwork is smart-cropped/resized to *that layer's* pixel bounds (not the full
-  document canvas), then every visible PSD layer is rendered in its original stacking
-  order onto a canvas the size of the full document, substituting the artwork bitmap in
-  for the placement layer's own pixel data. Aspect-ratio mismatch handling (above) is
-  unchanged in principle — `targetWidth`/`targetHeight` for the smart-crop step just come
-  from the placement layer's bounds instead of the template's overall canvas size.
+  bounds mark where the artwork goes — defaults to `"artwork"` if the field is omitted
+  (`DEFAULT_PLACEMENT_LAYER` in `psd-template.js`). This replaces the PNG convention's
+  "transparent window" for PSD templates specifically: the artwork is smart-cropped/
+  resized to *that layer's* pixel bounds (not the full document canvas), then every
+  visible PSD layer is rendered in its original stacking order onto a canvas the size of
+  the full document, substituting the artwork bitmap in for the placement layer's own
+  pixel data. Layer/group `hidden` flags and per-layer `opacity` are respected during this
+  render (a hidden group hides its children regardless of their own `hidden` flag);
+  blend modes beyond default source-over are not re-implemented — see the known limitation
+  below. Aspect-ratio mismatch handling (above) is unchanged in principle —
+  `targetWidth`/`targetHeight` for the smart-crop step just come from the placement
+  layer's bounds instead of the template's overall canvas size. The placement layer is
+  found via a recursive, case-sensitive search (`findPlacementLayer()`) so it can sit
+  inside nested layer groups, not just at the document's top level.
 - **Known, accepted limitation — flag prominently rather than silently degrade quality:**
   `ag-psd` reads pixel data and layer bounds/effect descriptors; it does not re-evaluate
   Photoshop smart-object warp/perspective transforms or fully re-render most layer
@@ -401,7 +433,7 @@ SQLite (matches the local-first, local-DB decision above). `pipeline_config` and
 - `mockups` — id, job_id (FK), product_size_id (FK), file_path, status. `UNIQUE(job_id, product_size_id)` — re-running Module 3 for a size replaces the file reference, not a duplicate row.
 
 **Config-as-data**
-- `product_sizes` — id, size_key, dimensions, dpi, orientation, mockup_template_path, placement_layer (nullable — only meaningful for `.psd` templates; names the layer whose bounds the artwork is placed into, see Module 3 -> "Template formats") (shared source of truth for Modules 2 & 3)
+- `product_sizes` — id, size_key, dimensions, dpi, orientation, mockup_template_path, placement_layer (nullable — only meaningful for `.psd` templates; names the layer whose bounds the artwork is placed into, see Module 3 -> "Template formats") (shared source of truth for Modules 2 & 3). **✅ implemented** (`backend/db/schema.sql`, plus a defensive `ALTER TABLE` in `backend/db/init.js` so pre-existing dev DBs pick up the column).
 - `tags` — id, tag_text, category, source (the tag library Module 2 matches against)
 - `settings` — key, value (default price, delivery text, shop conventions)
 
@@ -442,7 +474,7 @@ SQLite (matches the local-first, local-DB decision above). `pipeline_config` and
 
 1. **Local skeleton** — ✅ done: React frontend + Node backend running locally, DB schema in place, pipeline config wired up (modules currently stubbed), plus the three provider-layer interfaces (`lib/llm/`, `lib/trends/`, `lib/tags/`) scaffolded with their v1 implementations
 2. **Module 2** (Listing Generator) — core, get this solid first, matches original Phase 1. **✅ backend core done:** generation (`backend/lib/listing-generator/index.js`), shop-convention enforcement (`validate.js`), tags-provider integration, and the LLM provider layer's key×model cascade plus request-spacing/cooldown/escalation hardening (see LLM Provider Layer status note above). **Not yet done:** dashboard review/edit UI for generated listings (Module 6 territory) and automated tests for this module.
-3. **Module 3** (Mockup Composer with own templates) — no external mockup API needed, so this can move up earlier than the original plan's Phase 2. **✅ core + smart-crop done** (see Module 3 status note above). **Not yet done:** AI-outpainting fallback for large mismatches, PSD (layered/smart-object) template support via `ag-psd` (see Module 3 -> "Template formats"), dashboard review UI, automated tests.
+3. **Module 3** (Mockup Composer with own templates) — no external mockup API needed, so this can move up earlier than the original plan's Phase 2. **✅ core + smart-crop + PSD template support done** (see Module 3 status note above). **Not yet done:** AI-outpainting fallback for large mismatches, dashboard review UI, and integration/idempotency tests for `composeMockup`/`generateMockupForJob` (the pure PSD/mismatch-ratio helpers are unit-tested; the DB-writing and file-IO paths aren't yet).
 4. **Module 4** (manual-trend prompt helper) — low complexity now that trend-pulling is removed
 5. **Local persistent deployment** — running the finished app as an always-on local process (own machine or a small home server); not a cloud/serverless deployment (see Stack section)
 6. **Electron packaging (Windows exe)** — once the app is fully working as a normal local web app (steps 1-5), wrap it with `electron-builder` into a Windows installer/exe. Electron's window points at the existing React frontend and spawns the existing Node backend as a child process inside the packaged app. This is a packaging step at the end, not an architectural change — nothing upstream needs to be built "Electron-aware" except the JS-only CLIP decision (Module 7) already made for exactly this reason, avoiding a bundled Python runtime.
