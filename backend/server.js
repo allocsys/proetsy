@@ -155,6 +155,40 @@ app.get('/api/jobs/:id/mockups', (req, res) => {
   res.json(rows);
 });
 
+// Module 3 -> "AI-outpainting fallback" step 6: lets the user pick between the smart-crop
+// and AI-extended mockup variants (step 7's dashboard review UI is the eventual caller;
+// this route stands on its own regardless). Syncs `file_path` to whichever variant's
+// stored path was chosen -- `smart_crop_path` and `ai_extended_path` are both preserved
+// independently, so switching back and forth always has both files available, not just
+// whichever one `file_path` last pointed at.
+app.patch('/api/jobs/:id/mockups/:mockupId/variant', (req, res) => {
+  const jobId = Number(req.params.id);
+  const mockupId = Number(req.params.mockupId);
+  const { variant } = req.body || {};
+
+  if (variant !== 'smart_crop' && variant !== 'ai_extended') {
+    return res.status(400).json({ error: "variant must be 'smart_crop' or 'ai_extended'" });
+  }
+
+  const db = getDb();
+  const mockup = db
+    .prepare('SELECT * FROM mockups WHERE id = ? AND job_id = ?')
+    .get(mockupId, jobId);
+  if (!mockup) return res.status(404).json({ error: 'Mockup not found for this job' });
+
+  if (variant === 'ai_extended' && !mockup.ai_extended_path) {
+    return res.status(422).json({ error: 'No AI-extended variant exists for this mockup' });
+  }
+
+  const targetPath = variant === 'ai_extended' ? mockup.ai_extended_path : mockup.smart_crop_path;
+
+  db.prepare(
+    `UPDATE mockups SET file_path = ?, selected_variant = ?, needs_review = 0 WHERE id = ?`
+  ).run(targetPath, variant, mockupId);
+
+  res.json(db.prepare('SELECT * FROM mockups WHERE id = ?').get(mockupId));
+});
+
 app.listen(PORT, () => {
   console.log(`ProEtsy backend listening on http://localhost:${PORT}`);
 });
