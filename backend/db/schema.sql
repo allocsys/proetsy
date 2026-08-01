@@ -117,3 +117,20 @@ CREATE TABLE IF NOT EXISTS prompt_terms (
   discarded_count INTEGER NOT NULL DEFAULT 0,
   updated_at TEXT DEFAULT (datetime('now'))
 );
+
+-- Durable backing store for the LLM provider layer's in-process cooldown cache. See
+-- ARCHITECTURE.md -> LLM Provider Layer -> "Rate-limit cooldown tracking" / "Cooldown
+-- escalation instead". Rows are keyed by a key's positional index in GEMINI_API_KEYS
+-- (key_index), never the raw key string, plus the model. Rehydrated into the in-memory
+-- Map on backend startup; written to on every 429; cleared (limited_until = NULL,
+-- consecutive_hits = 0) on a successful call to that pair.
+CREATE TABLE IF NOT EXISTS llm_rate_limits (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  key_index INTEGER NOT NULL,
+  model TEXT NOT NULL,
+  limited_until TEXT,
+  consecutive_hits INTEGER NOT NULL DEFAULT 0,
+  reason TEXT,
+  updated_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(key_index, model)
+);
