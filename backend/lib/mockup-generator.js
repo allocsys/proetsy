@@ -460,12 +460,13 @@ export async function generateMockupForJob(jobId, sizeKey) {
   const productSizeRow = db.prepare('SELECT id FROM product_sizes WHERE size_key = ?').get(sizeKey);
 
   const upsertMockup = db.prepare(`
-    INSERT INTO mockups (job_id, product_size_id, file_path, status, ai_extended_path, needs_review, selected_variant)
-    VALUES (@job_id, @product_size_id, @file_path, 'success', @ai_extended_path, @needs_review, 'smart_crop')
+    INSERT INTO mockups (job_id, product_size_id, file_path, status, ai_extended_path, smart_crop_path, needs_review, selected_variant)
+    VALUES (@job_id, @product_size_id, @file_path, 'success', @ai_extended_path, @smart_crop_path, @needs_review, 'smart_crop')
     ON CONFLICT(job_id, product_size_id) DO UPDATE SET
       file_path = excluded.file_path,
       status = excluded.status,
       ai_extended_path = excluded.ai_extended_path,
+      smart_crop_path = excluded.smart_crop_path,
       needs_review = excluded.needs_review,
       selected_variant = 'smart_crop'
   `);
@@ -474,6 +475,10 @@ export async function generateMockupForJob(jobId, sizeKey) {
     product_size_id: productSizeRow.id,
     file_path: outputPath,
     ai_extended_path: aiExtendedPath,
+    // Same value as file_path at generation time (both point at the smart-crop output) —
+    // stored separately so it survives file_path later being synced to ai_extended_path
+    // by the PATCH variant route. See schema.sql for the full rationale.
+    smart_crop_path: outputPath,
     needs_review: aiExtendedPath ? 1 : 0,
   });
 
