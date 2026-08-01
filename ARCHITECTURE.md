@@ -121,11 +121,20 @@ independently-committable sub-steps, each testable before the next depends on it
      dashboard (not a blog) before step 4 wires this into the real pipeline, since it
      changes how urgent the multi-key pool is for this specific call.
    Blocked step 2 only; step 2 itself is not started.
-2. **Add `generateImage()` to the LLM provider layer** (`backend/lib/llm/gemini.js`,
-   stubbed in `claude.js`, re-exported from `llm/index.js`) — reuses the existing key×model
-   cascade, queue, and cooldown machinery (see LLM Provider Layer above); the only new part
-   is extracting `inlineData` (image bytes) from the response instead of `.text`.
-   Testable in isolation, no mockup-generator involvement yet.
+2. **Add `generateImage()` to the LLM provider layer — ✅ done.** Implemented in
+   `backend/lib/llm/gemini.js`: `sendGenerateContentRequest()` factors out the fetch/error
+   handling shared with `callGenerateContent()`; `callGenerateImage()` sets
+   `generationConfig.responseModalities` and extracts the `inlineData` part instead of text;
+   `generateImage(prompt, imagePath, options)` mirrors `generateVision()`'s shape (imagePath
+   optional, for pure text-to-image), pins `DEFAULT_IMAGE_MODEL` (`gemini-3.1-flash-image`,
+   overridable via `GEMINI_IMAGE_MODEL` — see step 1's model-choice findings) instead of
+   walking the text-oriented `GEMINI_MODELS` cascade, but still cascades across the key pool
+   for that pinned model, reusing the existing queue/cooldown machinery unchanged. Stubbed in
+   `claude.js` for interface symmetry only (always throws — Claude has no comparable
+   endpoint); `llm/index.js`'s `generateImage()` deliberately bypasses the `LLM_PROVIDER`
+   switch and calls `gemini.js` directly, so it keeps working even when `LLM_PROVIDER=claude`
+   is set for text/vision calls. Not yet tested (no test file touched this pass) and not yet
+   called from anywhere — that's step 3.
 3. **A standalone outpaint-call helper in `mockup-generator.js`** — takes the artwork +
    target dimensions, builds the outpaint prompt, calls `generateImage()`, returns the
    extended image or throws. Not wired into `composeMockup` yet; testable on its own.
