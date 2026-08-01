@@ -92,6 +92,9 @@ Etsy publishing is manual by design — no auto-uploader module. The app's job e
 **Never auto-discards:** consistent with the rest of the pipeline's human-in-the-loop principle — this only ranks and flags, the user always confirms
 **Can be skipped if:** the user is hand-picking Midjourney output already and doesn't want the extra step
 
+**Future (planned, not built yet): auto-import via watched folder.**
+Once Midjourney generates and downloads images to a local folder, a lightweight file-watcher can detect new files and automatically pull them into Module 7's queue — no manual drag-and-drop needed for the *import* step. This is pure local file-system watching (chokidar or similar), no API call, no network dependency, no Midjourney ToS exposure at all, since it never touches Midjourney's systems. Safe to build whenever it's prioritized.
+
 ### Module 5 — Etsy Uploader
 **Removed.** Etsy publishing is manual — the user copies the approved listing text and mockups into Etsy themselves. No Etsy API v3 integration, no OAuth, no bulk-publish. This removes the biggest external-account risk from the whole build (Etsy developer approval, bulk-publish bugs, API changes) and the module entirely.
 
@@ -222,3 +225,14 @@ Every pipeline run is tracked as a **job**, and every module within a job has it
 
 - **AI-disclosure content policy** (Module 2 hardcodes "no AI disclosure in descriptions") — reviewed and accepted; no change needed.
 - **Multi-key Gemini ToS risk** (rotating a pool of free-tier keys) — reviewed; not a current concern. May move to a paid Gemini Pro key later, decision deferred until then.
+
+---
+
+## Future Consideration — Full Midjourney Submission Automation (not planned)
+
+Two separate things get conflated under "automate Midjourney":
+
+1. **Exporting generated images into the dashboard** — safe, covered above (watched-folder auto-import). No ToS exposure, since it never interacts with Midjourney at all.
+2. **Auto-submitting prompts to Midjourney itself** (clicking/typing into its Discord bot or web app, whether via a custom script or an AI browser agent like Claude in Chrome or a GPT-based computer-use agent) — this is a materially different thing. As of 2026 there is no official public Midjourney API; the only way to submit prompts programmatically is by automating its Discord/web interface. Midjourney's terms of service prohibit this kind of automation regardless of what drives the clicking — a hand-rolled script and an AI agent clicking the same buttons carry the same account-ban risk, since it's the interface automation itself that violates the terms, not the tool doing it.
+
+**Decision: not building #2.** The safe, ToS-clean piece (folder-watch auto-import) is the one being built. Prompt submission stays manual — the user pastes Module 4's generated prompts into Midjourney themselves. Revisit only if Midjourney ever ships an official public API, or if the user explicitly decides to accept the account-ban risk of an unofficial automation route.
