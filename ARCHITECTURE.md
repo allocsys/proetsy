@@ -168,11 +168,24 @@ independently-committable sub-steps, each testable before the next depends on it
    no new error handling was needed. **Not yet used anywhere** — nothing in
    `mockup-generator.js` writes these columns yet (step 4's `resolveArtworkForTarget` still
    only produces one final image per run); that's step 6's job.
-6. **Persist both variants + a new route.** `generateMockupForJob` writes both
-   `file_path` (smart-crop) and `ai_extended_path` (when outpainting succeeded) and sets
-   `needs_review`; a new `PATCH /api/jobs/:id/mockups/:mockupId/variant` route
-   (body `{ variant: 'smart_crop' | 'ai_extended' }`) sets `selected_variant`, syncs
-   `file_path` to the chosen variant, clears `needs_review`.
+6. **Persist both variants + a new route — ✅ done.** `generateMockupForJob` writes
+   `file_path` and `ai_extended_path` (when outpainting succeeded) as before, plus a new
+   `smart_crop_path` column (schema addition beyond the original step-5 scope — see below)
+   holding the smart-crop output's path independently of `file_path`, and sets
+   `needs_review`. A new `PATCH /api/jobs/:id/mockups/:mockupId/variant` route in
+   `backend/server.js` (body `{ variant: 'smart_crop' | 'ai_extended' }`) sets
+   `selected_variant`, syncs `file_path` to the chosen variant's stored path, and clears
+   `needs_review`.
+   **Why `smart_crop_path` was added (not in step 5's original schema):** `file_path` is
+   documented as holding "whichever variant is currently selected," which means the route
+   overwrites it on every switch. Without a separate durable place for the smart-crop
+   path, switching to `ai_extended` and then back to `smart_crop` would have nothing to
+   restore `file_path` to — `ai_extended_path` is preserved, but the original smart-crop
+   value wasn't, once overwritten. `smart_crop_path` closes that gap; it's always
+   populated (`composeMockup()` always produces a smart-crop variant) and never mutated
+   after the generation run that created it, so both variants' files remain independently
+   recoverable no matter how many times `selected_variant` is toggled.
+   **Not yet used anywhere:** no dashboard UI calls this route yet (that's step 7).
 7. **Dashboard review UI** — a minimal `JobMockupReview` component (smart-crop vs
    AI-extended side by side, select buttons when `needs_review` is true), wired minimally
    into `App.jsx` (Module 6 itself is still just a skeleton — don't build the rest of it
