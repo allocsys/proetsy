@@ -351,7 +351,7 @@ SQLite (matches the local-first, local-DB decision above). `pipeline_config` and
 
 ## Suggested build order
 
-1. **Local skeleton**: React frontend + Node backend running locally, DB schema in place, pipeline config wired up (even if most modules are stubs), plus the three provider-layer interfaces (`lib/llm/`, `lib/trends/`, `lib/tags/`) scaffolded with their v1 (manual) implementations
+1. **Local skeleton** — ✅ done: React frontend + Node backend running locally, DB schema in place, pipeline config wired up (modules currently stubbed), plus the three provider-layer interfaces (`lib/llm/`, `lib/trends/`, `lib/tags/`) scaffolded with their v1 implementations
 2. **Module 2** (Listing Generator) — core, get this solid first, matches original Phase 1
 3. **Module 3** (Mockup Composer with own templates) — no external mockup API needed, so this can move up earlier than the original plan's Phase 2
 4. **Module 4** (manual-trend prompt helper) — low complexity now that trend-pulling is removed
