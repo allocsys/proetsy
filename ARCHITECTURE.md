@@ -206,14 +206,19 @@ Module 4 (and Module 2, for trend-aware listing angles) calls a shared interface
 lib/trends/
   index.js         -> exports getTrends(), chosen by config
   manual.js         -> reads trends.json / dashboard-entered list (v1 implementation)
-  etsy-scraper.js   -> future: pulls live Etsy trend data (not built)
+  etsy-api.js       -> pulls a lightweight signal from Etsy's official Open API v3 (built)
+  etsy-scraper.js   -> future: scraping a tool's site directly (not built, rejected — see below)
 ```
 
-**v1 implementation: manual (informed by external research tools).** Trends are entered/edited by the user in the dashboard (or `trends.json` directly) — no scraping, no automated integration. There's no public API for Etsy trend/keyword data: Etsy's own API doesn't expose search-volume or trend analytics, and the popular third-party research tools (eRank, Marmalead, Alura, EverBee, EtsyHunt, Sale Samurai) are closed dashboards/browser extensions built for a human to browse, not developer APIs — none of them offer programmatic access. The realistic workflow: the user checks a tool like eRank or EverBee's free tier themselves, then manually enters what's actually trending into `trends.json`/the dashboard. Same manual entry point as before, just informed by real external data instead of guesswork. Not automation — no new code needed for this.
+**v1 implementation: manual (informed by external research tools), plus an Etsy Open API v3 signal.** There's no public API for real trend/search-volume analytics: Etsy's own API doesn't expose that, and the popular third-party research tools (eRank, Marmalead, Alura, EverBee, EtsyHunt, Sale Samurai) are closed dashboards/browser extensions built for a human to browse, not developer APIs.
 
-`etsy-scraper.js` (an actual scraper hitting Etsy's or a tool's site directly) stays undocumented/unbuilt for the same reason as the Midjourney auto-prompt decision above: it would mean automating a site's interface against likely ToS terms, carrying account/IP-block risk. Revisit only if one of these tools ever ships a public developer API, or if the user explicitly decides to accept that risk.
+Two complementary, ToS-clean pieces instead of pure hand-typing:
+- **`etsy-api.js`** calls Etsy's official, sanctioned Open API v3 public listing-search endpoint (API key only, no OAuth needed for public search) for a chosen keyword/category, and computes a rough self-generated signal — which tags/words show up most often across recently-active, highly-favorited listings. This is not real trend/search-volume data, just a lightweight proxy, but it's built on an endpoint Etsy explicitly wants developers to use, unlike scraping its site or a third-party tool's interface.
+- **CSV import in `manual.js`.** The user still checks a tool like eRank or EverBee's free tier themselves, but instead of hand-typing findings into `trends.json`, they export that tool's own list as CSV and import it via a button in the dashboard. Same manual, ToS-clean entry point as before — the tool's own export feature, not automation against its interface — just less tedious.
 
-Flipping to a real API-backed provider later (if one ever exists) is a config change (`TRENDS_PROVIDER=etsy-scraper`), not a rewrite of Module 4.
+`etsy-scraper.js` (an actual scraper hitting Etsy's or a tool's site directly, as opposed to `etsy-api.js`'s sanctioned endpoint) stays undocumented/unbuilt for the same reason as the Midjourney auto-prompt decision above: it would mean automating a site's interface against likely ToS terms, carrying account/IP-block risk. Revisit only if one of these tools ever ships a public developer API, or if the user explicitly decides to accept that risk.
+
+Flipping providers, or combining `etsy-api.js`'s signal with the manual/CSV list, is a config change (`TRENDS_PROVIDER=etsy-api`), not a rewrite of Module 4.
 
 ---
 
