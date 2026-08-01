@@ -26,10 +26,10 @@ This document defines the modular version of the original build plan. It superse
       ↓
 [Review / Edit] (human-in-the-loop, always available)
       ↓
-[Module 5: Etsy Uploader]         (optional — draft or publish)
+[Done — publish to Etsy manually]
 ```
 
-Every arrow above is a toggle point. A run can go straight from upload → listing generator → manual copy-paste, skipping mockups and auto-upload entirely (this is Phase 1 / the "quick win").
+Etsy publishing is manual by design — no auto-uploader module. The app's job ends at producing an approved, ready-to-copy listing (and mockups); the user pastes it into Etsy themselves. Every arrow above the final step is a toggle point. A run can go straight from upload → listing generator → manual copy-paste, skipping mockups entirely (this is Phase 1 / the "quick win").
 
 ---
 
@@ -68,11 +68,8 @@ Every arrow above is a toggle point. A run can go straight from upload → listi
 **Output:** ready-to-paste Midjourney prompts using shop conventions (`--v 7`, `--style raw`, aspect ratio per category, `--s 50–150`)
 **Tech:** Gemini API via the LLM provider layer, no Etsy API dependency. (This module only *writes* Midjourney-formatted prompt text — it never calls a Midjourney API.)
 
-### Module 5 — Etsy Uploader (optional)
-**Input:** approved listing data + mockup files
-**Output:** new Etsy listing (draft or published), single or bulk
-**Tech:** Etsy API v3, OAuth
-**Can be skipped if:** user wants manual copy-paste to Etsy (this is the Phase 1 / Phase 3 boundary)
+### Module 5 — Etsy Uploader
+**Removed.** Etsy publishing is manual — the user copies the approved listing text and mockups into Etsy themselves. No Etsy API v3 integration, no OAuth, no bulk-publish. This removes the biggest external-account risk from the whole build (Etsy developer approval, bulk-publish bugs, API changes) and the module entirely.
 
 ### Module 6 — Control Dashboard (core, not a pipeline step)
 React frontend that:
@@ -82,6 +79,7 @@ React frontend that:
 - Supports bulk mode (multiple artworks through the pipeline at once)
 - Keeps a listing history log
 - Settings panel: default price, delivery text, shop style conventions, tag library, trend list, mockup template config
+- Provides an easy **copy-to-clipboard / export** view per listing (title, description, tags, mockup files) so pasting into Etsy manually is fast
 
 ---
 
@@ -98,11 +96,12 @@ Example shape:
   "pipeline": [
     { "module": "image_analyzer", "enabled": true },
     { "module": "listing_generator", "enabled": true, "required": true },
-    { "module": "mockup_composer", "enabled": true },
-    { "module": "etsy_uploader", "enabled": false }
+    { "module": "mockup_composer", "enabled": true }
   ]
 }
 ```
+
+(No `etsy_uploader` entry — that module has been removed. Publishing is manual.)
 
 ---
 
@@ -153,6 +152,7 @@ Gemini's free tier is rate-limited per project/key (as low as 5-15 requests/minu
 | Fixed phase order, all-or-nothing | Modular: any step can be enabled/disabled per run |
 | Implicit "must deploy" | Local-first; deployment is a later, separate decision |
 | Tags freely generated | Tags chosen from a pre-made list, matched to image content |
+| Etsy API auto-upload (Module 5) | Removed. Publishing to Etsy is manual — no Etsy API integration, no OAuth |
 
 ---
 
@@ -162,5 +162,6 @@ Gemini's free tier is rate-limited per project/key (as low as 5-15 requests/minu
 2. **Module 2** (Listing Generator) — core, get this solid first, matches original Phase 1
 3. **Module 3** (Mockup Composer with own templates) — no external mockup API needed, so this can move up earlier than the original plan's Phase 2
 4. **Module 4** (manual-trend prompt helper) — low complexity now that trend-pulling is removed
-5. **Module 5** (Etsy Uploader) — last, since it's the only module touching a live external account
-6. **Deployment** — separate discussion once the local app works end-to-end
+5. **Deployment** — separate discussion once the local app works end-to-end
+
+(Etsy Uploader is no longer part of the build — publishing is manual.)
