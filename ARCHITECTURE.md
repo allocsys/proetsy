@@ -61,6 +61,10 @@ Etsy publishing is manual by design — no auto-uploader module. The app's job e
 **Input:** artwork file + product type (e.g. "8x10 print", "square canvas")
 **Output:** composited mockup image(s), in the shop's defined display order
 **Tech:** a single `mockup-generator.js` file. No Canvas/Pillow/Canva API.
+**Aspect-ratio mismatch handling:** when the artwork's aspect ratio doesn't match the target template, the composer picks between two approaches based on how large the mismatch is — never a blind center-crop, never letterbox/pad:
+- **Small mismatch → content-aware smart crop.** Uses `smartcrop.js` (pure JS, no native deps — works on Termux) to detect the actual subject/focal region and crop around it, instead of blindly cutting from center.
+- **Large mismatch → AI outpainting via Gemini.** When a crop would lose meaningful content, the artwork is sent to Gemini's image model (2.5/3 Flash Image, "Nano Banana") to generatively extend the canvas to the target aspect ratio — the model fills in plausible, stylistically-matched content around the original rather than cropping it away or padding with blank space. Same Gemini provider layer already used by Modules 1/2/4; free tier covers this (~500 requests/day as of early 2026).
+- **Review step:** when both approaches are viable, the dashboard shows the smart-crop and AI-extended versions side by side and the user picks — consistent with the pipeline's human-in-the-loop principle. Smart-crop is always the fallback if an outpaint attempt looks wrong, so a bad AI result never blocks the pipeline.
 - Reads the shared **`product-sizes.json` config** — one entry per size, e.g.:
   ```json
   {
