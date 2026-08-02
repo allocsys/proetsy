@@ -34,6 +34,7 @@ function App() {
   const [tagsSavedMessage, setTagsSavedMessage] = useState('');
   const [tagsCsvMessage, setTagsCsvMessage] = useState('');
   const [watchStatus, setWatchStatus] = useState(null);
+  const [rateLimits, setRateLimits] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [dragActive, setDragActive] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
@@ -72,6 +73,18 @@ function App() {
       .catch(() => {});
   }
 
+  // LLM Provider Layer -> "Rate-limit cooldown tracking": read-only view of the durable
+  // llm_rate_limits table (previously only visible by inspecting the DB directly). Polled
+  // on load and whenever the Settings panel is opened, since cooldowns change in the
+  // background as pipeline jobs make LLM calls -- there's no push mechanism for this yet,
+  // so a fresh fetch on panel-open is the cheap way to avoid showing stale state.
+  function refreshRateLimits() {
+    fetch('/api/llm/rate-limits')
+      .then((r) => r.json())
+      .then(setRateLimits)
+      .catch(() => {});
+  }
+
   useEffect(() => {
     fetch('/api/health')
       .then((r) => r.json())
@@ -93,6 +106,7 @@ function App() {
     refreshJobs();
     refreshTrends();
     refreshWatchStatus();
+    refreshRateLimits();
   }, []);
 
   const sizeKeys = useMemo(() => Object.keys(productSizes || {}), [productSizes]);
@@ -273,7 +287,13 @@ function App() {
           <span className="text-muted" style={{ fontSize: '13px' }}>
             Backend: <strong style={{ color: health?.status === 'unreachable' ? 'var(--state-danger)' : 'var(--state-success)' }}>{health ? health.status : 'checking...'}</strong>
           </span>
-          <button className="btn-secondary" onClick={() => setShowSettings((s) => !s)}>
+          <button
+            className="btn-secondary"
+            onClick={() => {
+              setShowSettings((s) => !s);
+              if (!showSettings) refreshRateLimits();
+            }}
+          >
             {showSettings ? 'Close settings' : '⚙ Settings'}
           </button>
         </div>
@@ -466,6 +486,37 @@ function App() {
                   {watchStatus.pendingCount ? ` — ${watchStatus.pendingCount} pending` : ''}
                   {watchStatus.lastError ? ` — ${watchStatus.lastError}` : ''}
                 </p>
+              )}
+
+              <h3>LLM rate-limit status</h3>
+              <p className="text-muted" style={{ marginTop: 0 }}>
+                Which Gemini key × model pairs are currently in cooldown (see ARCHITECTURE.md, LLM Provider Layer). Read-only — key index only, never the actual API key.
+              </p>
+              {rateLimits.length ? (
+                <table className="data-table" style={{ marginBottom: '1rem' }}>
+                  <thead>
+                    <tr>
+                      <th>Key #</th>
+                      <th>Model</th>
+                      <th>Status</th>
+                      <th>Consecutive hits</th>
+                      <th>Limited until</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rateLimits.map((r) => (
+                      <tr key={`${r.keyIndex}-${r.model}`}>
+                        <td className="mono">{r.keyIndex}</td>
+                        <td className="mono">{r.model}</td>
+                        <td>{r.currentlyLimited ? '⚠️ Cooling down' : '✅ OK'}</td>
+                        <td>{r.consecutiveHits}</td>
+                        <td className="text-muted mono" style={{ fontSize: '13px' }}>{r.currentlyLimited ? r.limitedUntil : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="empty-state">No key/model pair has hit a rate limit yet.</p>
               )}
             </section>
           )}
