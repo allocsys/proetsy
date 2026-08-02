@@ -44,6 +44,7 @@ function App() {
   const [settings, setSettings] = useState({});
   const [tagsText, setTagsText] = useState('');
   const [tagsSavedMessage, setTagsSavedMessage] = useState('');
+  const [tagsCsvMessage, setTagsCsvMessage] = useState('');
   const [jobs, setJobs] = useState([]);
   const [dragActive, setDragActive] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
@@ -163,6 +164,28 @@ function App() {
     refreshSetupStatus();
   }
 
+  // CSV tag import (ARCHITECTURE.md -> Module 6 -> Settings panel). Reads the picked
+  // file as plain text client-side (no upload/multipart route needed for this — it's a
+  // small text file) and posts its contents to POST /api/tags/csv, which expects a
+  // header row with a tag_text/tag/text/keyword column and an optional category column.
+  async function importTagsCsv(file) {
+    if (!file) return;
+    setTagsCsvMessage(`Importing ${file.name}…`);
+    try {
+      const csv = await file.text();
+      const res = await fetch('/api/tags/csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csv }),
+      });
+      const data = await res.json();
+      setTagsCsvMessage(res.ok ? `Imported ${data.inserted} new tag(s) from ${file.name}.` : data.error);
+    } catch (err) {
+      setTagsCsvMessage(`Import failed: ${err.message}`);
+    }
+    refreshSetupStatus();
+  }
+
   async function saveSettings(updates) {
     const res = await fetch('/api/settings', {
       method: 'PATCH',
@@ -207,6 +230,12 @@ function App() {
           <div>
             <button onClick={saveTags} disabled={!tagsText.trim()}>Save tags</button>
             {tagsSavedMessage && <span style={{ marginLeft: '0.75rem', color: '#666' }}>{tagsSavedMessage}</span>}
+          </div>
+
+          <p style={{ color: '#888', marginBottom: '0.25rem' }}>Or import a CSV export from a tag-research tool (needs a <code>tag_text</code>/<code>tag</code>/<code>text</code>/<code>keyword</code> column, and an optional <code>category</code> column):</p>
+          <div>
+            <input type="file" accept=".csv,text/csv" onChange={(e) => importTagsCsv(e.target.files?.[0])} />
+            {tagsCsvMessage && <span style={{ marginLeft: '0.75rem', color: '#666' }}>{tagsCsvMessage}</span>}
           </div>
 
           <h3>Shop defaults</h3>
