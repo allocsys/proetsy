@@ -19,7 +19,13 @@ const mockBrowserWindowInstance = {
   loadURL: vi.fn().mockResolvedValue(undefined),
   on: vi.fn(),
 };
-const MockBrowserWindow = vi.fn(() => mockBrowserWindowInstance);
+// A plain function expression, not an arrow function -- arrow functions are never
+// constructible, and vi.fn's `construct` trap (used when this mock is invoked via
+// `new BrowserWindow(...)`) calls the implementation via Reflect.construct, which
+// throws "X is not a constructor" on an arrow function regardless of mocking.
+const MockBrowserWindow = vi.fn(function BrowserWindowMock() {
+  return mockBrowserWindowInstance;
+});
 MockBrowserWindow.getAllWindows = vi.fn(() => []);
 
 vi.mock('electron', () => ({
