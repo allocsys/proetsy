@@ -33,6 +33,7 @@ function App() {
   const [tagsText, setTagsText] = useState('');
   const [tagsSavedMessage, setTagsSavedMessage] = useState('');
   const [tagsCsvMessage, setTagsCsvMessage] = useState('');
+  const [watchStatus, setWatchStatus] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [dragActive, setDragActive] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
@@ -61,6 +62,16 @@ function App() {
       .catch(() => {});
   }
 
+  // Module 7 -> "Auto-import via watched folder" (step 7) -> "Activation": read-only
+  // status (active/folder/category/pending count/last error) for the Settings panel,
+  // driven entirely by the taste_filter_watch_* keys below.
+  function refreshWatchStatus() {
+    fetch('/api/taste-filter/watch-status')
+      .then((r) => r.json())
+      .then(setWatchStatus)
+      .catch(() => {});
+  }
+
   useEffect(() => {
     fetch('/api/health')
       .then((r) => r.json())
@@ -81,6 +92,7 @@ function App() {
     refreshSetupStatus();
     refreshJobs();
     refreshTrends();
+    refreshWatchStatus();
   }, []);
 
   const sizeKeys = useMemo(() => Object.keys(productSizes || {}), [productSizes]);
@@ -221,6 +233,14 @@ function App() {
       body: JSON.stringify(updates),
     });
     setSettings(await res.json());
+  }
+
+  // Module 7 -> "Activation": toggling/editing any of the watch settings takes effect
+  // immediately server-side (syncWatcherFromSettings runs on every PATCH /api/settings),
+  // so re-fetching status right after a save reflects it without a page reload.
+  async function saveWatchSetting(updates) {
+    await saveSettings(updates);
+    refreshWatchStatus();
   }
 
   // Trend-list management, consolidated into Settings (Module 4's own PromptHelper.jsx
@@ -402,6 +422,50 @@ function App() {
                 </ul>
               ) : (
                 <p className="empty-state">None configured yet — edit <code>backend/config/product-sizes.json</code>.</p>
+              )}
+
+              <h3>Auto-import from folder (Module 7)</h3>
+              <p className="text-muted" style={{ marginTop: 0 }}>
+                Watches a local folder for new Midjourney downloads and pulls them into the Taste Filter queue automatically, without a manual drag-and-drop. Off by default.
+              </p>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0.5rem 0' }}>
+                <input
+                  type="checkbox"
+                  checked={settings.taste_filter_watch_enabled === 'true'}
+                  onChange={(e) => {
+                    const enabled = e.target.checked;
+                    setSettings((s) => ({ ...s, taste_filter_watch_enabled: String(enabled) }));
+                    saveWatchSetting({ taste_filter_watch_enabled: enabled });
+                  }}
+                />
+                Auto-import from folder
+              </label>
+              <label style={{ display: 'block', margin: '0.5rem 0' }}>
+                Watched folder path:{' '}
+                <input
+                  style={{ width: '100%', maxWidth: '500px' }}
+                  value={settings.taste_filter_watch_folder || ''}
+                  onChange={(e) => setSettings((s) => ({ ...s, taste_filter_watch_folder: e.target.value }))}
+                  onBlur={(e) => saveWatchSetting({ taste_filter_watch_folder: e.target.value })}
+                  placeholder="/home/you/midjourney-downloads"
+                />
+              </label>
+              <label style={{ display: 'block', margin: '0.5rem 0' }}>
+                Category (optional):{' '}
+                <input
+                  value={settings.taste_filter_watch_category || ''}
+                  onChange={(e) => setSettings((s) => ({ ...s, taste_filter_watch_category: e.target.value }))}
+                  onBlur={(e) => saveWatchSetting({ taste_filter_watch_category: e.target.value })}
+                  placeholder="e.g. square-canvas"
+                />
+              </label>
+              {watchStatus && (
+                <p className="text-muted" style={{ fontSize: '13px' }}>
+                  {watchStatus.active ? `✅ Watching ${watchStatus.folder}` : '⚠️ Not currently watching'}
+                  {watchStatus.category ? ` (category: ${watchStatus.category})` : ''}
+                  {watchStatus.pendingCount ? ` — ${watchStatus.pendingCount} pending` : ''}
+                  {watchStatus.lastError ? ` — ${watchStatus.lastError}` : ''}
+                </p>
               )}
             </section>
           )}
