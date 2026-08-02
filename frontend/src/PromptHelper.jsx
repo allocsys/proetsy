@@ -36,6 +36,7 @@ export default function PromptHelper() {
   const [loadingTrends, setLoadingTrends] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [addingTrend, setAddingTrend] = useState(false);
+  const [csvMessage, setCsvMessage] = useState('');
   const [error, setError] = useState(null);
 
   async function loadTrends() {
@@ -83,6 +84,29 @@ export default function PromptHelper() {
       setError(err.message);
     } finally {
       setAddingTrend(false);
+    }
+  }
+
+  // CSV trend import (ARCHITECTURE.md -> Trends Provider Layer -> "CSV import in
+  // manual.js"). Reads the picked file as plain text client-side and posts it to
+  // POST /api/trends/csv, which expects a header row with a term/keyword/trend column
+  // and an optional category column -- the tool's own export feature, not automation
+  // against its site, same ToS-clean framing as the rest of this provider layer.
+  async function importTrendsCsv(file) {
+    if (!file) return;
+    setCsvMessage(`Importing ${file.name}…`);
+    try {
+      const csv = await file.text();
+      const res = await fetch('/api/trends/csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csv }),
+      });
+      const data = await res.json();
+      setCsvMessage(res.ok ? `Imported ${data.imported} trend(s) from ${file.name}.` : data.error);
+      if (res.ok) await loadTrends();
+    } catch (err) {
+      setCsvMessage(`Import failed: ${err.message}`);
     }
   }
 
@@ -150,6 +174,14 @@ export default function PromptHelper() {
         <button onClick={addTrend} disabled={addingTrend || !newTrendTerm.trim()}>
           {addingTrend ? 'Adding…' : 'Add trend'}
         </button>
+      </div>
+
+      <div style={{ marginBottom: '0.75rem' }}>
+        <label>
+          Or import a CSV export (<code>term</code>/<code>keyword</code>/<code>trend</code> column, optional <code>category</code>):{' '}
+          <input type="file" accept=".csv,text/csv" onChange={(e) => importTrendsCsv(e.target.files?.[0])} />
+        </label>
+        {csvMessage && <span style={{ marginLeft: '0.75rem', color: '#666' }}>{csvMessage}</span>}
       </div>
 
       <button onClick={generate} disabled={generating}>
