@@ -6,6 +6,7 @@
 
 import { getDb } from '../../db/init.js';
 import { computeAllCentroidPairs } from './centroids.js';
+import { extractPromptTerms } from './prompt-terms.js';
 
 const VALID_LABELS = new Set(['keep', 'discard']);
 
@@ -170,4 +171,41 @@ export function getCentroids(category = null) {
     keptCount: row.kept_count,
     discardedCount: row.discarded_count,
   };
+}
+
+/**
+ * Write side of the Module 7 -> Module 4 prompt-feedback link (ARCHITECTURE.md ->
+ * Module 7 -> "Prompt-feedback link to Module 4", build sequence step 6). Looks up the
+ * prompt that generated a just-labeled candidate, extracts its terms via
+ * extractPromptTerms() (prompt-terms.js), and bumps each term's kept_count/
+ * discarded_count in `prompt_terms` -- the same counts Module 4's getStyleHints()
+ * (prompt-helper/index.js) reads back later as "terms that have worked well".
+ *
+ * No-op (not an error) when `promptId` is null/missing or the prompt no longer exists --
+ * this link is optional/opt-in per the architecture doc, so a missing or unlinked prompt
+ * should never block the label itself from saving (addImagePreference() above always
+ * succeeds independently of this).
+ * @param {number | null} promptId
+ * @param {'keep' | 'discard'} label
+ */
+export function tallyPromptTermsForLabel(promptId, label) {
+  if (!promptId) return;
+  const db = getDb();
+  const prompt = db.prepare('SELECT prompt_text FROM prompts WHERE id = ?').get(promptId);
+  if (!prompt) return;
+
+  const terms = extractPromptTerms(prompt.prompt_text);
+  if (!terms.size) return;
+
+  // Column name is interpolated from a fixed two-value ternary (never user input), so
+  // this is safe -- not a dynamic/user-controlled SQL fragment.
+  const column = label === 'keep' ? 'kept_count' : 'discarded_count';
+  const upsert = db.prepare(
+    `INSERT INTO prompt_terms (term, ${column}, updated_at) VALUES (?, 1, datetime('now'))
+     ON CONFLICT(term) DO UPDATE SET ${column} = ${column} + 1, updated_at = datetime('now')`
+  );
+  const run = db.transaction((termList) => {
+    for (const term of termList) upsert.run(term);
+  });
+  run(Array.from(terms));
 }
