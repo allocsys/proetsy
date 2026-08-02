@@ -14,6 +14,7 @@ let addImagePreference;
 let listImagePreferences;
 let recomputeCentroids;
 let getCentroids;
+let tallyPromptTermsForLabel;
 let tmpRoot;
 
 beforeAll(async () => {
@@ -21,7 +22,7 @@ beforeAll(async () => {
   process.env.DB_PATH = path.join(tmpRoot, 'test.db');
 
   ({ getDb } = await import('../../db/init.js'));
-  ({ addImagePreference, listImagePreferences, recomputeCentroids, getCentroids } = await import('./store.js'));
+  ({ addImagePreference, listImagePreferences, recomputeCentroids, getCentroids, tallyPromptTermsForLabel } = await import('./store.js'));
 });
 
 afterAll(() => {
@@ -106,5 +107,59 @@ describe('recomputeCentroids / getCentroids', () => {
     const afterSecond = db.prepare('SELECT COUNT(*) as count FROM taste_centroids').get().count;
 
     expect(afterSecond).toBe(afterFirst);
+  });
+});
+
+describe('tallyPromptTermsForLabel (Module 7 -> Module 4 prompt-feedback link, write side)', () => {
+  it("bumps kept_count for each of a prompt's terms on a 'keep' label", () => {
+    const db = getDb();
+    const { lastInsertRowid: promptId } = db
+      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square', 'a lone fox in a snowy field --v 7 --ar 1:1')`)
+      .run();
+
+    tallyPromptTermsForLabel(promptId, 'keep');
+
+    const fox = db.prepare('SELECT * FROM prompt_terms WHERE term = ?').get('fox');
+    expect(fox.kept_count).toBe(1);
+    expect(fox.discarded_count).toBe(0);
+    const snowy = db.prepare('SELECT * FROM prompt_terms WHERE term = ?').get('snowy');
+    expect(snowy.kept_count).toBe(1);
+  });
+
+  it("bumps discarded_count on a 'discard' label, accumulating across repeated calls", () => {
+    const db = getDb();
+    const { lastInsertRowid: promptId } = db
+      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square', 'a moody forest scene --ar 1:1')`)
+      .run();
+
+    tallyPromptTermsForLabel(promptId, 'discard');
+    tallyPromptTermsForLabel(promptId, 'discard');
+
+    const moody = db.prepare('SELECT * FROM prompt_terms WHERE term = ?').get('moody');
+    expect(moody.discarded_count).toBe(2);
+    expect(moody.kept_count).toBe(0);
+  });
+
+  it('is a no-op (does not throw) for a null promptId or one that does not exist', () => {
+    expect(() => tallyPromptTermsForLabel(null, 'keep')).not.toThrow();
+    expect(() => tallyPromptTermsForLabel(999999, 'keep')).not.toThrow();
+  });
+
+  it("the fed-back terms are exactly what Module 4's getStyleHints() query would surface", () => {
+    const db = getDb();
+    const { lastInsertRowid: promptId } = db
+      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square', 'a radiant sunrise over mountains --ar 1:1')`)
+      .run();
+
+    // Label it 'keep' five times so it clearly skews kept vs discarded (mirrors
+    // prompt-helper/index.js's getStyleHints() ordering by (kept_count - discarded_count)).
+    for (let i = 0; i < 5; i += 1) tallyPromptTermsForLabel(promptId, 'keep');
+
+    const top = db
+      .prepare('SELECT term FROM prompt_terms WHERE kept_count > discarded_count ORDER BY (kept_count - discarded_count) DESC LIMIT 5')
+      .all()
+      .map((r) => r.term);
+    expect(top).toContain('radiant');
+    expect(top).toContain('sunrise');
   });
 });
