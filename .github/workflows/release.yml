@@ -27,6 +27,7 @@ on:
   # having no `dependencies` field) without cutting a real tagged release. The
   # release-publish steps below are gated to `refs/tags/*` so a workflow_dispatch run
   # builds and inspects the installer but never publishes it.
+  workflow_dispatch: {}
 
 env:
   NODE_VERSION: '24'
