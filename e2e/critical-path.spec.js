@@ -42,8 +42,11 @@ test.describe('critical path: upload → generate listing → review → copy-to
     const artworkPath = writeTestArtwork();
     // Drives the dropzone's plain file-input fallback (Module 6 -> "A drop zone (plus a
     // plain file input fallback)") — far more reliable from Playwright than simulating
-    // an actual HTML5 drag-and-drop event sequence.
-    await page.locator('input[type="file"][accept="image/*"]').setInputFiles(artworkPath);
+    // an actual HTML5 drag-and-drop event sequence. Scoped to #section-pipeline: Module
+    // 7's TasteFilter importer (frontend/src/TasteFilter.jsx) also renders an
+    // `input[type="file"][accept="image/*"]`, so the bare selector is ambiguous
+    // (2 matches) now that both exist on the page at once.
+    await page.locator('#section-pipeline input[type="file"][accept="image/*"]').setInputFiles(artworkPath);
 
     // Upload -> job creation -> the full server-side pipeline run (image_analyzer ->
     // listing_generator -> mockup_composer, see backend/lib/pipeline-runner.js) all
