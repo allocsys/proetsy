@@ -19,7 +19,7 @@ import { addManualTrend } from './lib/trends/manual.js';
 import { generatePromptsForTrend, listPrompts } from './lib/prompt-helper/index.js';
 import { embedImage } from './lib/taste-filter/embeddings.js';
 import { scoreCandidate } from './lib/taste-filter/scoring.js';
-import { getCentroids, addImagePreference, recomputeCentroids } from './lib/taste-filter/store.js';
+import { getCentroids, addImagePreference, recomputeCentroids, tallyPromptTermsForLabel } from './lib/taste-filter/store.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -591,14 +591,20 @@ app.post('/api/taste-filter/label', (req, res) => {
   }
 
   try {
+    const resolvedPromptId = prompt_id ? Number(prompt_id) : null;
     const id = addImagePreference({
       imagePath: image_path,
       embedding: Float32Array.from(embedding),
       label,
       category: category || null,
-      promptId: prompt_id ? Number(prompt_id) : null,
+      promptId: resolvedPromptId,
     });
     const counts = recomputeCentroids();
+    // Module 7 -> Module 4 prompt-feedback link, write side (step 6): tallies this
+    // label's prompt's terms into prompt_terms.kept_count/discarded_count. A no-op when
+    // no prompt_id was given or it doesn't resolve to a real prompt -- optional/opt-in,
+    // never blocks the label above from having already saved.
+    tallyPromptTermsForLabel(resolvedPromptId, label);
     res.status(201).json({
       id,
       counts: Object.fromEntries(Array.from(counts.entries()).map(([k, v]) => [k === null ? 'global' : k, v])),
