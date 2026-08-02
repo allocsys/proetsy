@@ -37,7 +37,6 @@ describe('TasteFilter', () => {
     const user = userEvent.setup();
     render(<TasteFilter />);
 
-    const fileInput = screen.getByLabelText(/./, { selector: 'input[type="file"]' }) || null;
     // The file input has no associated <label htmlFor>, so query by type instead.
     const input = document.querySelector('input[type="file"]');
     await user.upload(input, makeFile());
