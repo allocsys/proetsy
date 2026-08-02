@@ -21,7 +21,9 @@ CREATE TABLE IF NOT EXISTS jobs (
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
-CREATE INDEX IF NOT EXISTS idx_jobs_batch_id ON jobs(batch_id);
+-- idx_jobs_batch_id is created in db/init.js's defensive migrations, not here — on a
+-- pre-existing dev DB the ALTER TABLE adding batch_id hasn't run yet at the point this
+-- schema.sql is executed, so an index reference to that column here would fail.
 
 CREATE TABLE IF NOT EXISTS job_modules (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
