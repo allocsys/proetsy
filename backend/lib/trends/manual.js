@@ -12,15 +12,26 @@ export async function getTrends(category) {
   return db.prepare('SELECT * FROM trends ORDER BY added_at DESC').all();
 }
 
-// Bulk-inserts rows parsed from an imported CSV export, tagging their source as 'csv'
-// so it's distinguishable from hand-typed ('manual') entries later.
+// Bulk-inserts rows parsed from an imported CSV export, tagging their source as 'csv' so
+// it's distinguishable from hand-typed ('manual') entries later. Dedupes against terms
+// already in the table (mirrors tags/user-list.js's importTagsFromCsvRows), so
+// re-importing the same export twice doesn't create duplicate trend rows. Returns the
+// number of rows actually inserted.
 export function importFromCsvRows(rows) {
   const db = getDb();
+  const existing = new Set(db.prepare('SELECT term FROM trends').all().map((r) => r.term));
   const insert = db.prepare('INSERT INTO trends (term, category, source) VALUES (?, ?, ?)');
   const insertMany = db.transaction((items) => {
-    for (const item of items) insert.run(item.term, item.category ?? null, 'csv');
+    let inserted = 0;
+    for (const item of items) {
+      if (existing.has(item.term)) continue;
+      insert.run(item.term, item.category ?? null, 'csv');
+      existing.add(item.term);
+      inserted += 1;
+    }
+    return inserted;
   });
-  insertMany(rows);
+  return insertMany(rows);
 }
 
 // Turns raw CSV text (e.g. an eRank/EverBee export, or a hand-made spreadsheet export)
