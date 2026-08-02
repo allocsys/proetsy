@@ -558,7 +558,7 @@ app.get('/api/trends', async (req, res) => {
 });
 
 // Single-entry manual trend creation (the dashboard's one-at-a-time path — CSV import is
-// a separate, not-yet-wired route using trends/manual.js's importFromCsvRows). Writes
+// a separate route, POST /api/trends/csv below, using trends/manual.js's importFromCsvRows). Writes
 // directly via trends/manual.js rather than through the provider-layer abstraction,
 // since only the *manual* implementation has a concept of "add one" — swapping
 // TRENDS_PROVIDER later wouldn't give this write path a different meaning.
