@@ -32,6 +32,9 @@ test.describe('critical path: upload → generate listing → review → copy-to
   test('uploads artwork, runs the pipeline, reviews the generated listing, and copies it for Etsy', async ({
     page,
   }) => {
+    page.on('console', (msg) => console.log(`[browser console] ${msg.type()}: ${msg.text()}`));
+    page.on('pageerror', (err) => console.log(`[browser pageerror] ${err.message}`));
+
     await page.goto('/');
 
     // Confirm the backend is actually reachable before doing anything real — a much
