@@ -144,6 +144,38 @@ app.get('/api/config/shop-conventions', (req, res) => {
   res.json({ listing: SHOP_CONVENTIONS, midjourney: MIDJOURNEY_CONVENTIONS });
 });
 
+// LLM Provider Layer -> "Rate-limit cooldown tracking": previously no dashboard/API
+// surface existed for this at all -- the durable `llm_rate_limits` table and the
+// in-process cooldown cache (backend/lib/llm/rate-limits.js) were both fully built, but
+// invisible outside the DB itself. Read-only, mirroring the /api/taste-filter/watch-status
+// pattern. `key_index` only, never the raw API key, per the existing "identified by key
+// index, not the raw key" rule -- see ARCHITECTURE.md -> LLM Provider Layer. Rows with a
+// null `limited_until` (a pair that's fully recovered -- recordSuccess() clears it back
+// to NULL rather than deleting the row) are included with `currentlyLimited: false` so the
+// dashboard can show full key x model history, not just active cooldowns.
+app.get('/api/llm/rate-limits', (req, res) => {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT key_index, model, limited_until, consecutive_hits, reason, updated_at
+       FROM llm_rate_limits
+       ORDER BY key_index, model`
+    )
+    .all();
+  const now = Date.now();
+  res.json(
+    rows.map((r) => ({
+      keyIndex: r.key_index,
+      model: r.model,
+      limitedUntil: r.limited_until,
+      currentlyLimited: Boolean(r.limited_until && Date.parse(r.limited_until) > now),
+      consecutiveHits: r.consecutive_hits,
+      reason: r.reason,
+      updatedAt: r.updated_at,
+    }))
+  );
+});
+
 // Module 6 -> "Lets the user drag-and-drop artwork" / "Supports bulk mode (multiple
 // artworks through the pipeline at once)". Accepts one or many files under the `files`
 // field (a single drop and a bulk drop are the same request shape) and creates one
