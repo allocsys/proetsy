@@ -179,7 +179,7 @@ export default function PromptHelper() {
 
       {history.length > 0 && (
         <div style={{ marginTop: '1rem' }}>
-          <h4>History for "{category}"</h4>
+          <h4>History for &quot;{category}&quot;</h4>
           <ul style={{ fontSize: '0.9em', color: '#555' }}>
             {history.map((p) => (
               <li key={p.id}>
