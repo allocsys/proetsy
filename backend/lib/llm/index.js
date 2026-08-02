@@ -1,9 +1,15 @@
 import * as gemini from './gemini.js';
 import * as claude from './claude.js';
+import * as fixture from './fixture.js';
 
+// 'fixture' is a third selectable provider (see fixture.js) alongside gemini/claude,
+// used by the Playwright E2E suite (LLM_PROVIDER=fixture) to run the app end-to-end
+// without any real network call or API key.
 function getActiveProvider() {
   const provider = process.env.LLM_PROVIDER || 'gemini';
-  return provider === 'claude' ? claude : gemini;
+  if (provider === 'claude') return claude;
+  if (provider === 'fixture') return fixture;
+  return gemini;
 }
 
 export async function generateText(prompt, options = {}) {
