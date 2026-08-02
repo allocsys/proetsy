@@ -158,31 +158,53 @@ async function createWindow() {
   });
 }
 
-app.whenReady().then(async () => {
-  backendProcess = spawnBackend();
-  try {
-    await waitForBackend(`${BACKEND_URL}/api/health`);
-  } catch (err) {
-    console.error(`[electron] ${err.message}`);
-    app.quit();
-    return;
-  }
-  await createWindow();
+// Exported for unit testing (electron/main.test.js) -- see the require.main guard below
+// for why importing this module doesn't also trigger the app lifecycle it drives.
+module.exports = {
+  packagedBackendEnv,
+  backendExecutable,
+  waitForBackend,
+  spawnBackend,
+  createWindow,
+  BACKEND_PORT,
+  BACKEND_URL,
+  DEV_FRONTEND_URL,
+};
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+// Only run the actual Electron app lifecycle when this file is executed directly as the
+// app's entry point (`electron electron/main.js`, or via package.json's `main` field) --
+// not when a test file `require()`s it just to reach the exported helpers above.
+// `electron` sets `require.main` to this module the same way plain `node main.js`
+// would, so this guard doesn't change real app startup behavior at all -- it only stops
+// the side effects (spawning a real backend, opening a real window) from firing on a
+// bare `require()`.
+if (require.main === module) {
+  app.whenReady().then(async () => {
+    backendProcess = spawnBackend();
+    try {
+      await waitForBackend(`${BACKEND_URL}/api/health`);
+    } catch (err) {
+      console.error(`[electron] ${err.message}`);
+      app.quit();
+      return;
+    }
+    await createWindow();
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    });
   });
-});
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit();
+  });
 
-// Make sure the spawned backend doesn't outlive the Electron app -- without this, closing
-// the window/quitting would leave an orphaned `node server.js` process (and its bound
-// port) running in the background.
-app.on('before-quit', () => {
-  if (backendProcess && !backendProcess.killed) {
-    backendProcess.kill();
-  }
-});
+  // Make sure the spawned backend doesn't outlive the Electron app -- without this,
+  // closing the window/quitting would leave an orphaned `node server.js` process (and
+  // its bound port) running in the background.
+  app.on('before-quit', () => {
+    if (backendProcess && !backendProcess.killed) {
+      backendProcess.kill();
+    }
+  });
+}
