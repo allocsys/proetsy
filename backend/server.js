@@ -280,11 +280,14 @@ app.get('/api/artworks/:id', (req, res) => {
 // `pipeline_overrides` (optional): { [module_name]: boolean } — Module 6's per-run
 // pipeline-config-panel toggle (see ARCHITECTURE.md -> Step control model -> "UI
 // override"). Omit it to just use the saved default config as-is.
+// `batch_id` (optional): a client-generated string shared across every job created from
+// the same bulk drop, so the dashboard history log can group them into one batch row
+// (see ARCHITECTURE.md -> Module 6 -> "consolidated single-page 'bulk batch' view").
 app.post('/api/jobs', (req, res) => {
-  const { artwork_id, pipeline_overrides } = req.body || {};
+  const { artwork_id, pipeline_overrides, batch_id } = req.body || {};
   if (!artwork_id) return res.status(400).json({ error: 'artwork_id is required' });
   try {
-    const jobId = createJob(artwork_id, pipeline_overrides || {});
+    const jobId = createJob(artwork_id, pipeline_overrides || {}, batch_id || null);
     res.status(201).json(getJobWithModules(jobId));
   } catch (err) {
     res.status(400).json({ error: err.message });
