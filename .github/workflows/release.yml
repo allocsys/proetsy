@@ -104,6 +104,7 @@ jobs:
           tar -czf "$BUNDLE_DIR.tar.gz" "$BUNDLE_DIR"
 
       - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: proetsy-${{ github.ref_name }}.tar.gz
@@ -128,11 +129,20 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
+    env:
+      # Deliberately NOT env.NODE_VERSION (24) for this job -- see ARCHITECTURE.md
+      # "Electron packaging -- build sequence" for the finding: better-sqlite3 has no
+      # prebuilt binary for Node 24 on win32-x64 yet, so `npm ci` fell back to a
+      # from-source node-gyp compile, which then failed on windows-latest with
+      # "Could not find any Visual Studio installation to use". Pinning this job to a
+      # well-established LTS avoids the compile-from-source path entirely rather than
+      # fighting node-gyp's VS detection. Every other job keeps using env.NODE_VERSION.
+      ELECTRON_JOB_NODE_VERSION: '22'
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v7
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: ${{ env.ELECTRON_JOB_NODE_VERSION }}
           cache: npm
       - run: npm ci
       - name: Build Windows installer
