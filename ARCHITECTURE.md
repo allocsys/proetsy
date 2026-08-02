@@ -458,7 +458,7 @@ Nothing extra needs to be built to make this "self-improving" — every keep/dis
 **Removed.** Etsy publishing is manual — the user copies the approved listing text and mockups into Etsy themselves. No Etsy API v3 integration, no OAuth, no bulk-publish. This removes the biggest external-account risk from the whole build (Etsy developer approval, bulk-publish bugs, API changes) and the module entirely.
 
 ### Module 6 — Control Dashboard (core, not a pipeline step)
-**Status: upload + bulk mode + pipeline override panel + settings/tag-library panel + job history log — ✅ done. Trend-list/shop-style-conventions settings UI, CSV tag import, and a server-side job runner — not yet done.**
+**Status: upload + bulk mode + pipeline override panel + settings/tag-library panel + job history log + server-side job runner — ✅ done. Trend-list/shop-style-conventions settings UI consolidation and CSV tag import — not yet done.**
 Implemented directly in `frontend/src/App.jsx` (no longer just the bare job-ID-input
 skeleton the earlier pass left behind), against three new/changed backend routes in
 `backend/server.js`: `POST /api/artworks/upload` (multer, disk storage under
@@ -474,14 +474,21 @@ setup-status banner per the First-Run Setup section below.
 
 - **Drag-and-drop + bulk artwork upload — ✅ done.** A drop zone (plus a plain file input
   fallback) posts to the new upload route, creates one `artworks` row per file, then
-  creates and runs a job per artwork. Each job's module calls happen independently
-  (`Promise.all` over per-job pipelines) so one artwork's failure doesn't block the rest
-  of a bulk batch, matching Partial Failure Handling's bulk-mode rule — though note this
-  orchestration currently lives client-side in `App.jsx`, not as a server-side job queue;
-  closing the browser tab mid-run would leave later modules un-triggered for that job
-  (already-completed modules and their DB rows are unaffected, and any module can still
-  be retried manually via the per-job review screens). A proper server-side runner is a
-  reasonable next hardening step, not yet built.
+  creates a job per artwork and runs its full pipeline via the server-side runner below —
+  each job proceeds independently, so one artwork's failure doesn't block the rest of a
+  bulk batch, matching Partial Failure Handling's bulk-mode rule.
+- **Server-side job runner — ✅ done.** `backend/lib/pipeline-runner.js`
+  (`runPendingModulesForJob`, `runPendingModulesForJobs`) runs every currently pending/
+  retryable module for a job, in pipeline order, from a single call — wired up via
+  `POST /api/jobs/:id/run` (one job) and `POST /api/jobs/run-batch` (body `{ job_ids }`,
+  the bulk-mode counterpart, each job still proceeding independently) in `backend/server.js`.
+  Unlike the earlier client-side sequencing this replaces, the run isn't tied to the
+  browser tab staying open — once the request lands, the async chain keeps going
+  server-side even if the tab that triggered it closes; already-completed modules and
+  their DB rows are unaffected either way, and any module can still be retried
+  individually via the existing per-module `/run/<module>` routes. `App.jsx`'s upload flow
+  now calls `POST /api/jobs/run-batch` instead of sequencing module calls itself. Tested
+  in `backend/server.pipeline-runner-routes.test.js`.
 - **Pipeline config panel (per-run override) — ✅ done.** Checkboxes seeded from
   `GET /api/config/pipeline`'s defaults; toggling one only affects artwork uploaded next
   in the same browser session, never rewrites `pipeline.config.json` on disk, per Step
@@ -760,6 +767,7 @@ SQLite (matches the local-first, local-DB decision above). `pipeline_config` and
 2. **Module 2** (Listing Generator) — core, get this solid first, matches original Phase 1. **✅ done:** generation (`backend/lib/listing-generator/index.js`), shop-convention enforcement (`validate.js`), tags-provider integration, the LLM provider layer's key×model cascade plus request-spacing/cooldown/escalation hardening (see LLM Provider Layer status note above), a dashboard review/edit UI (`JobListingReview.jsx`), and automated tests (unit, idempotency, and route-level integration — see Module 2 status note above).
 3. **Module 3** (Mockup Composer with own templates) — no external mockup API needed, so this can move up earlier than the original plan's Phase 2. **✅ core + smart-crop + PSD template support + AI-outpainting fallback + dashboard review UI done** (see Module 3 status note above). **Not yet done:** a committed real PSD test fixture, and integration/idempotency tests for the PSD-specific compositing path's own file-IO (the flat-template path's upsert idempotency is covered; PSD's isn't yet).
 4. **Module 4** (manual-trend prompt helper) — ✅ done (see Module 4 status note above)
+4a. **Module 7** (Taste Filter, pre-pipeline curation gate) — ✅ core build sequence done: embeddings, centroids, scoring, routes, dashboard UI, and the Module 4 prompt-feedback write side (see Module 7 status note above). **Not yet done:** auto-import via watched folder (deferred, future).
 5. **Local persistent deployment** — running the finished app as an always-on local process (own machine or a small home server); not a cloud/serverless deployment (see Stack section)
 6. **Electron packaging (Windows exe)** — once the app is fully working as a normal local web app (steps 1-5), wrap it with `electron-builder` into a Windows installer/exe. Electron's window points at the existing React frontend and spawns the existing Node backend as a child process inside the packaged app. This is a packaging step at the end, not an architectural change — nothing upstream needs to be built "Electron-aware" except the JS-only CLIP decision (Module 7) already made for exactly this reason, avoiding a bundled Python runtime.
 
@@ -771,7 +779,7 @@ SQLite (matches the local-first, local-DB decision above). `pipeline_config` and
 
 **Test suite:**
 - Unit tests (Vitest) for the swappable provider layers (`lib/llm/`, `lib/trends/`, `lib/tags/`) and for pipeline logic that's easy to silently break — partial failure handling, retry behavior, idempotency on re-running a module.
-- Integration tests (Supertest) against the Node backend's API routes, run against a throwaway test DB (in-memory or temp-file SQLite) so tests never touch the real local DB. **In place for Module 2's listing routes** (`backend/server.listing-routes.test.js`), **Module 4's trend/prompt routes** (`backend/server.prompt-routes.test.js`), and **Module 3's PSD compositing path** (`backend/lib/mockup-generator.psd.test.js`); Module 3's flat-template routes (mockup-composer run + variant PATCH) don't have route-level coverage yet, only the underlying generator functions.
+- Integration tests (Supertest) against the Node backend's API routes, run against a throwaway test DB (in-memory or temp-file SQLite) so tests never touch the real local DB. **In place for Module 2's listing routes** (`backend/server.listing-routes.test.js`), **Module 4's trend/prompt routes** (`backend/server.prompt-routes.test.js`), **Module 3's PSD compositing path** (`backend/lib/mockup-generator.psd.test.js`), **the server-side pipeline runner** (`backend/server.pipeline-runner-routes.test.js`), and **Module 7's taste-filter routes** (`backend/server.taste-filter-routes.test.js`); Module 3's flat-template routes (mockup-composer run + variant PATCH) don't have route-level coverage yet, only the underlying generator functions.
 - A small set of Playwright end-to-end tests covering the critical path only (upload artwork → generate listing → review → copy-to-clipboard) rather than exhaustive UI coverage.
 
 **CI (GitHub Actions) — ✅ done.** `.github/workflows/ci.yml`: on every push (any branch) and every PR into `main`, a single job runs `npm ci` at the repo root (installs both workspaces via the root `package.json`'s `workspaces` field), `npm run lint` (flat-config ESLint — `eslint.config.js` — added alongside this workflow, since none existed before; backend rules target Node/ESM globals, frontend rules target browser + JSX/React), `npm run test -w backend` (the Vitest unit + Supertest integration suites described throughout this doc's per-module status notes), and `npm run build -w frontend` (no frontend test suite exists yet, so a production build at least catches syntax errors, broken imports, and JSX mistakes on every push). Runs are cancelled/superseded via a concurrency group keyed on branch/PR ref, so pushing a fixup doesn't leave a stale run queued behind it. E2E (Playwright) is correctly NOT wired into this workflow — per this doc, those should run on a schedule/on-demand instead, and no Playwright suite exists yet regardless (see above, still planned).
