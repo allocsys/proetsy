@@ -13,14 +13,21 @@
 // mockup-generator.js uses at runtime) and confirming every layer's name, bounds, and
 // pixel data decode correctly — not just that the write call succeeded.
 //
-// Document layout (120x100px canvas):
-//   - 'background'   — full-canvas opaque layer (0,0)-(120,100)
+// Document layout (12x10px canvas — deliberately tiny, see below):
+//   - 'background'   — full-canvas opaque layer (0,0)-(12,10)
 //   - 'artwork'      — the placement layer product-sizes.json's DEFAULT_PLACEMENT_LAYER
-//                       ('artwork') expects by default: (20,15)-(100,85), i.e. 80x70px
-//   - 'frame group'  — a nested group containing 'top border' (0,0)-(120,10), exercising
+//                       ('artwork') expects by default: (2,2)-(10,8), i.e. 8x6px
+//   - 'frame group'  — a nested group containing 'top border' (0,0)-(12,2), exercising
 //                       findPlacementLayer()/flattenPaintOrder()'s group-recursion paths
 //                       against a real decoded PSD, not just hand-built plain objects
 //                       (already covered separately in psd-template.test.js).
+//
+// Kept intentionally tiny (not, say, a more realistic 800x1000px template): the base64
+// text has to be transcribed exactly through this repo's file-editing tooling, and a
+// larger fixture proved too easy to silently corrupt in transit (an earlier ~6KB/5900-
+// char version landed with a single corrupted byte and failed every PSD-fixture test
+// with ag-psd's "incorrect header check" zlib error). Every layer's pixel content is
+// still exercised end-to-end; only the pixel counts are trivial.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -32,9 +39,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  * matching-aspect-ratio source artwork (keeping computeMismatchRatio() at 0 so a test
  * doesn't accidentally trigger a real outpaint/Gemini call). */
 export const PSD_FIXTURE = {
-  documentWidth: 120,
-  documentHeight: 100,
-  placementLayerBounds: { left: 20, top: 15, width: 80, height: 70 },
+  documentWidth: 12,
+  documentHeight: 10,
+  placementLayerBounds: { left: 2, top: 2, width: 8, height: 6 },
 };
 
 /**
