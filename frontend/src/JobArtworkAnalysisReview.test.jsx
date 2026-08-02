@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import JobArtworkAnalysisReview from '../JobArtworkAnalysisReview.jsx';
+import JobArtworkAnalysisReview from './JobArtworkAnalysisReview.jsx';
 
 const JOB = { id: 42, artwork_id: 7, manual_notes: '' };
 const ANALYSIS = {
