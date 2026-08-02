@@ -99,8 +99,14 @@ test.describe('critical path: upload → generate listing → review → copy-to
     await expect(fineArtCard.getByLabel('Title')).toHaveValue('fine art fixture title');
 
     // Copy-to-clipboard: click the first "Copy for Etsy" button and confirm both the
-    // button's own visual feedback and the real clipboard contents.
-    const copyButton = page.getByRole('button', { name: 'Copy for Etsy' }).first();
+    // button's own visual feedback and the real clipboard contents. Located by
+    // data-testid rather than accessible name/role text -- a name-based locator re-queries
+    // the DOM for an element matching that name every time it's used, and this button's
+    // own name/text changes to "Copied!" the instant the click's state update lands, so
+    // asserting on the same name-based locator afterward was racing against the very
+    // change it was trying to observe (it would intermittently find no match at all).
+    // A stable data-testid isn't affected by the button's text changing.
+    const copyButton = page.getByTestId('copy-for-etsy').first();
     await copyButton.click();
     await expect(copyButton).toHaveText('Copied!');
 
