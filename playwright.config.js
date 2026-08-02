@@ -1,18 +1,18 @@
-// playwright.config.js (CommonJS — root package.json has no "type": "module", so plain
-// .js files at the repo root default to CJS; the actual test files live under e2e/,
-// which has its own package.json scoping them to ESM).
+// playwright.config.js (ESM — root package.json sets "type": "module", so a plain .js
+// file at the repo root parses as ESM; the actual test files live under e2e/, which has
+// its own package.json scoping them to ESM too).
 //
 // See ARCHITECTURE.md -> Testing & CI/CD -> "A small set of Playwright end-to-end tests
 // covering the critical path only". Spins up both the backend and frontend exactly the
 // way `npm run dev` does (same commands, same ports), so there's no separate "test mode"
 // server setup to keep in sync with real dev usage — the only difference is the backend
 // env below (a throwaway DB file + LLM_PROVIDER=fixture instead of a real Gemini key).
-const { defineConfig } = require('@playwright/test');
+import { defineConfig } from '@playwright/test';
 
 const BACKEND_PORT = 4000;
 const FRONTEND_PORT = 5173;
 
-module.exports = defineConfig({
+export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
   // The backend runs a single SQLite file and both webServers are singletons for the
