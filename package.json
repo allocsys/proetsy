@@ -1,6 +1,7 @@
 {
   "name": "proetsy",
   "private": true,
+  "type": "module",
   "main": "electron/main.js",
   "workspaces": ["backend", "frontend"],
   "scripts": {
