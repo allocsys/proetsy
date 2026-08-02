@@ -43,4 +43,13 @@ export default [
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     },
   },
+  // Vitest/jsdom component tests: same browser globals as the rest of frontend/src,
+  // plus Node's `global` (used as `global.fetch = vi.fn()` throughout these files --
+  // vitest's jsdom environment polyfills it, but it isn't part of `globals.browser`).
+  {
+    files: ['frontend/src/**/*.test.{js,jsx}'],
+    languageOptions: {
+      globals: { ...globals.browser, global: 'writable' },
+    },
+  },
 ];
