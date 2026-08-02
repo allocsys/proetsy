@@ -15,6 +15,21 @@ afterEach(() => {
 // every clipboard assertion fails with "not a spy or a call to a spy". Redefined
 // fresh before each test so a writeText call in one test doesn't leak call history
 // into the next.
+// jsdom 25's File implementation doesn't have .text(), a real standard browser API
+// that App.jsx's CSV-import flow relies on (file.text()). Polyfill it via FileReader,
+// which jsdom does implement, so the production code doesn't need any special-casing
+// for the test environment.
+if (!('text' in File.prototype)) {
+  File.prototype.text = function () {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(this);
+    });
+  };
+}
+
 beforeEach(() => {
   if (navigator.clipboard) {
     navigator.clipboard.writeText = vi.fn();
