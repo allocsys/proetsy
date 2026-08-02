@@ -114,12 +114,13 @@ export function recomputeCentroids() {
   // some categories updated and others not if it fails partway through.
   const findExisting = db.prepare('SELECT id FROM taste_centroids WHERE category IS ?');
   const update = db.prepare(
-    `UPDATE taste_centroids SET kept_centroid = @kept_centroid, discarded_centroid = @discarded_centroid, updated_at = datetime('now')
+    `UPDATE taste_centroids SET kept_centroid = @kept_centroid, discarded_centroid = @discarded_centroid,
+       kept_count = @kept_count, discarded_count = @discarded_count, updated_at = datetime('now')
      WHERE id = @id`
   );
   const insert = db.prepare(
-    `INSERT INTO taste_centroids (category, kept_centroid, discarded_centroid, updated_at)
-     VALUES (@category, @kept_centroid, @discarded_centroid, datetime('now'))`
+    `INSERT INTO taste_centroids (category, kept_centroid, discarded_centroid, kept_count, discarded_count, updated_at)
+     VALUES (@category, @kept_centroid, @discarded_centroid, @kept_count, @discarded_count, datetime('now'))`
   );
 
   const counts = new Map();
@@ -129,6 +130,8 @@ export function recomputeCentroids() {
         category,
         kept_centroid: pair.kept ? vectorToBlob(pair.kept) : null,
         discarded_centroid: pair.discarded ? vectorToBlob(pair.discarded) : null,
+        kept_count: pair.keptCount,
+        discarded_count: pair.discardedCount,
       };
       const existing = findExisting.get(category);
       if (existing) {
@@ -157,12 +160,14 @@ export function recomputeCentroids() {
 export function getCentroids(category = null) {
   const db = getDb();
   const row = db
-    .prepare('SELECT kept_centroid, discarded_centroid FROM taste_centroids WHERE category IS ?')
+    .prepare('SELECT kept_centroid, discarded_centroid, kept_count, discarded_count FROM taste_centroids WHERE category IS ?')
     .get(category);
 
-  if (!row) return { kept: null, discarded: null };
+  if (!row) return { kept: null, discarded: null, keptCount: 0, discardedCount: 0 };
   return {
     kept: blobToVector(row.kept_centroid),
     discarded: blobToVector(row.discarded_centroid),
+    keptCount: row.kept_count,
+    discardedCount: row.discarded_count,
   };
 }
