@@ -49,6 +49,7 @@
       "**/node_modules/better-sqlite3/**/*"
     ],
     "npmRebuild": true,
+    "publish": null,
     "win": {
       "target": "nsis"
     },
