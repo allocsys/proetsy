@@ -15,7 +15,8 @@ import { generateMockupForJob, OUTPUT_DIR } from './lib/mockup-generator.js';
 import { runPendingModulesForJob, runPendingModulesForJobs } from './lib/pipeline-runner.js';
 import { initRateLimitCache } from './lib/llm/rate-limits.js';
 import { getTrends } from './lib/trends/index.js';
-import { addManualTrend } from './lib/trends/manual.js';
+import { addManualTrend, importFromCsvRows, rowsFromCsvText } from './lib/trends/manual.js';
+import { importTagsFromCsvRows, tagRowsFromCsvText } from './lib/tags/user-list.js';
 import { generatePromptsForTrend, listPrompts } from './lib/prompt-helper/index.js';
 import { embedImage } from './lib/taste-filter/embeddings.js';
 import { scoreCandidate } from './lib/taste-filter/scoring.js';
@@ -214,6 +215,22 @@ app.post('/api/tags/bulk', (req, res) => {
   });
   const inserted = run();
   res.status(201).json({ inserted, total: existing.size, tags: db.prepare('SELECT * FROM tags ORDER BY tag_text').all() });
+});
+
+// CSV tag import (ARCHITECTURE.md -> Module 6 -> Settings panel: previously "not yet
+// done" -- "the backend already has importFromCsvRows in trends/manual.js for trends,
+// but no analogous CSV path for tags"). Body: { csv: "<raw CSV text>" }. Mirrors
+// POST /api/trends/csv's shape and dedupe-against-existing behavior (see
+// tags/user-list.js's importTagsFromCsvRows), so a CSV overlapping the current library
+// doesn't create duplicate tag rows.
+app.post('/api/tags/csv', (req, res) => {
+  const { csv } = req.body || {};
+  if (!csv) return res.status(400).json({ error: 'csv is required (raw CSV text)' });
+  const rows = tagRowsFromCsvText(csv);
+  if (!rows.length) return res.status(400).json({ error: 'No usable rows found (expected a tag_text/tag/text/keyword column)' });
+  const inserted = importTagsFromCsvRows(rows);
+  const db = getDb();
+  res.status(201).json({ inserted, tags: db.prepare('SELECT * FROM tags ORDER BY tag_text').all() });
 });
 
 app.get('/api/jobs', (req, res) => {
@@ -494,6 +511,22 @@ app.post('/api/trends', (req, res) => {
   if (!term) return res.status(400).json({ error: 'term is required' });
   const trend = addManualTrend(term, category || null);
   res.status(201).json(trend);
+});
+
+// CSV import (ARCHITECTURE.md -> Trends Provider Layer -> "CSV import in manual.js").
+// Body: { csv: "<raw CSV text>" }, expected to have come from the user re-exporting a
+// research tool's own results (eRank/EverBee free tier, etc.) as CSV, not scraped --
+// same ToS-clean framing as the rest of that section. Accepts a `term`/`keyword`/`trend`
+// header for the term column and an optional `category`/`cat` column; rows missing a
+// usable term column are silently skipped rather than rejecting the whole file over one
+// bad row.
+app.post('/api/trends/csv', (req, res) => {
+  const { csv } = req.body || {};
+  if (!csv) return res.status(400).json({ error: 'csv is required (raw CSV text)' });
+  const rows = rowsFromCsvText(csv);
+  if (!rows.length) return res.status(400).json({ error: 'No usable rows found (expected a term/keyword/trend column)' });
+  importFromCsvRows(rows);
+  res.status(201).json({ imported: rows.length });
 });
 
 // Runs Module 4: generates a fresh batch of ready-to-paste Midjourney prompts for an
