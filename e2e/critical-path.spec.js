@@ -88,6 +88,7 @@ test.describe('critical path: upload → generate listing → review → copy-to
     // button's own visual feedback and the real clipboard contents.
     const copyButton = page.getByRole('button', { name: 'Copy for Etsy' }).first();
     await copyButton.click();
+    await page.waitForTimeout(500);
     // DEBUG (temporary): surface JobListingReview.jsx's on-page error text ("Clipboard
     // copy failed — select and copy manually.") if the click didn't flip to "Copied!",
     // since copyForEtsy()'s catch block swallows the real error without logging it.
