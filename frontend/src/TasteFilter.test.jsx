@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import TasteFilter from '../TasteFilter.jsx';
+import TasteFilter from './TasteFilter.jsx';
 
 const CANDIDATE = {
   imagePath: '/data/candidates/img1.png',
