@@ -4,7 +4,12 @@ import { getPipelineConfig } from '../config/index.js';
 // Creates a job for an artwork and seeds a job_modules row per module in the current
 // pipeline config — 'pending' if enabled for this run, 'skipped' if disabled. See
 // ARCHITECTURE.md -> Step control model.
-export function createJob(artworkId) {
+//
+// `overrides` (optional): { [module_name]: boolean }. Per ARCHITECTURE.md's Step control
+// model, this is the "UI override" layer — it applies only to this one job, never
+// rewrites pipeline.config.json. A required module (e.g. listing_generator) ignores an
+// attempt to disable it, so a bad request can't produce a job that can never succeed.
+export function createJob(artworkId, overrides = {}) {
   const db = getDb();
   const artwork = db.prepare('SELECT id FROM artworks WHERE id = ?').get(artworkId);
   if (!artwork) throw new Error(`Artwork ${artworkId} not found`);
@@ -15,8 +20,10 @@ export function createJob(artworkId) {
   const run = db.transaction(() => {
     const { lastInsertRowid: jobId } = insertJob.run(artworkId);
     const { pipeline } = getPipelineConfig();
-    for (const { module, enabled } of pipeline) {
-      insertModule.run(jobId, module, enabled ? 'pending' : 'skipped');
+    for (const { module, enabled, required } of pipeline) {
+      const override = overrides[module];
+      const effectiveEnabled = required ? true : override !== undefined ? Boolean(override) : enabled;
+      insertModule.run(jobId, module, effectiveEnabled ? 'pending' : 'skipped');
     }
     return jobId;
   });
