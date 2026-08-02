@@ -30,7 +30,7 @@ beforeAll(async () => {
   writePsdFixtureTo(path.join(templateDir, 'framed-wall-test.psd'));
 
   // Sized to exactly match the fixture's 'artwork' placement layer's own aspect ratio
-  // (80x70), so computeMismatchRatio() stays at 0 — well under the default
+  // (8x6), so computeMismatchRatio() stays at 0 — well under the default
   // LARGE_MISMATCH_RATIO (0.35). This test is about the PSD compositing path's file-IO
   // and DB upsert, not the outpainting path (already covered in mockup-generator.test.js
   // for the pure decision logic, and in mockup-generator.idempotency.test.js for the flat-
@@ -93,8 +93,8 @@ describe('composeMockup against a real, committed PSD template fixture (ARCHITEC
     expect(aiExtendedPath).toBeNull(); // matched aspect ratio -> outpainting never attempted
     expect(warnings).toEqual([]);
 
-    // The output must be the PSD document's full canvas size (120x100), not just the
-    // placement layer's own bounds (80x70) — confirms the non-placement layers
+    // The output must be the PSD document's full canvas size (12x10), not just the
+    // placement layer's own bounds (8x6) — confirms the non-placement layers
     // ('background', the nested 'frame group' -> 'top border') were painted onto the
     // full-size canvas too, not just the substituted artwork region.
     const composited = await Jimp.read(outputPath);
