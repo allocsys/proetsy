@@ -353,10 +353,43 @@ rejected as a quality regression for exactly the templates most likely to be use
   not a replacement.
 
 ### Module 4 — Trend/Prompt Helper (optional, manual-trend version)
-**What changed from the original plan:** no live Etsy trend-pulling API call. Module 4 calls the **trends provider layer** (see below), currently backed by a manually maintained/selected list (e.g. a `trends.json` or a dropdown in Settings) that the user updates themselves.
+**Status: backend generation — ✅ done. Dashboard surface — ✅ done. Automated tests — ✅ done.**
+**What changed from the original plan:** no live Etsy trend-pulling API call. Module 4 calls the **trends provider layer** (see below), currently backed by a manually maintained/selected list (a dashboard-entered/browsed list via the `trends` table, not a static `trends.json`) that the user updates themselves.
 **Input:** selected trend + desired category
 **Output:** ready-to-paste Midjourney prompts using shop conventions (`--v 7`, `--style raw`, aspect ratio per category, `--s 50–150`)
 **Tech:** Gemini API via the LLM provider layer, no Etsy API dependency. (This module only *writes* Midjourney-formatted prompt text — it never calls a Midjourney API.)
+
+Generation lives in `backend/lib/prompt-helper/index.js` (`generatePromptsForTrend` +
+`listPrompts`), prompt building in `prompt.js` (`buildPromptHelperPrompt`), convention
+enforcement in `validate.js` (`enforceMidjourneyConventions` — the `--v 7`/`--style
+raw`/`--ar`/`--s` backstop, mirroring `listing-generator/validate.js`'s pattern), and the
+new Midjourney conventions themselves in `backend/config/shop-conventions.js`
+(`MIDJOURNEY_CONVENTIONS`). Wired up via `POST /api/prompts/generate`, `GET
+/api/prompts`, plus `GET /api/trends` and `POST /api/trends` (single-entry manual trend
+creation — CSV import via `trends/manual.js`'s existing `importFromCsvRows` isn't wired to
+a route yet) in `backend/server.js`. **Deliberately NOT job-scoped**, per this module's
+isolation from the main pipeline (see Partial Failure Handling): no `job_modules` row, no
+`jobId` parameter anywhere in its code path — a generation run is keyed only by an
+optional `trend_id` + a target `category`. Each call **inserts a new batch of `prompts`
+rows rather than upserting one row per (trend, category)** — unlike listings/mockups,
+the point is a browsable history of generated batches, not one current value per key, so
+re-running with the same trend/category is expected behavior, not a duplicate to guard
+against. Also implements Module 7's optional prompt-feedback link on the read side (see
+Module 7 -> "Prompt-feedback link to Module 4"): pulls up to 5 terms from `prompt_terms`
+where `kept_count > discarded_count`, ordered by that gap, and includes them in the LLM
+prompt as a non-overriding style hint — naturally empty (and so a no-op) until Module 7
+exists and has real labeled data, rather than a separate feature flag. **Dashboard
+surface:** `frontend/src/PromptHelper.jsx` (not job-scoped, so it doesn't take a `jobId`
+prop the way `JobListingReview`/`JobMockupReview`/`JobArtworkAnalysisReview` do) —
+category selector, a trend picker sourced from `GET /api/trends` plus an inline
+add-a-trend form, a Generate button, copy-to-clipboard on each result, and a
+category-filtered history list. Wired into `App.jsx` outside the job-scoped block, always
+visible regardless of whether a job ID has been entered. Test coverage: unit tests for
+the prompt builder (`prompt-helper/prompt.test.js`) and the conventions backstop
+(`prompt-helper/validate.test.js`), a persistence suite covering the append-not-upsert
+batch semantics, trend association, the not-found-trend error path, and the style-hints
+link (`prompt-helper/index.test.js`), and a route-level Supertest suite
+(`backend/server.prompt-routes.test.js`) for all four new endpoints.
 
 ### Module 7 — Taste Filter (Curation) (optional, pre-pipeline)
 **What it does:** Ranks a batch of raw Midjourney-generated candidates against a learned taste profile, so obvious "slop" gets flagged before it ever becomes a listing candidate.
@@ -666,7 +699,7 @@ SQLite (matches the local-first, local-DB decision above). `pipeline_config` and
 1. **Local skeleton** — ✅ done: React frontend + Node backend running locally, DB schema in place, pipeline config wired up (modules currently stubbed), plus the three provider-layer interfaces (`lib/llm/`, `lib/trends/`, `lib/tags/`) scaffolded with their v1 implementations
 2. **Module 2** (Listing Generator) — core, get this solid first, matches original Phase 1. **✅ done:** generation (`backend/lib/listing-generator/index.js`), shop-convention enforcement (`validate.js`), tags-provider integration, the LLM provider layer's key×model cascade plus request-spacing/cooldown/escalation hardening (see LLM Provider Layer status note above), a dashboard review/edit UI (`JobListingReview.jsx`), and automated tests (unit, idempotency, and route-level integration — see Module 2 status note above).
 3. **Module 3** (Mockup Composer with own templates) — no external mockup API needed, so this can move up earlier than the original plan's Phase 2. **✅ core + smart-crop + PSD template support + AI-outpainting fallback + dashboard review UI done** (see Module 3 status note above). **Not yet done:** a committed real PSD test fixture, and integration/idempotency tests for the PSD-specific compositing path's own file-IO (the flat-template path's upsert idempotency is covered; PSD's isn't yet).
-4. **Module 4** (manual-trend prompt helper) — low complexity now that trend-pulling is removed
+4. **Module 4** (manual-trend prompt helper) — ✅ done (see Module 4 status note above)
 5. **Local persistent deployment** — running the finished app as an always-on local process (own machine or a small home server); not a cloud/serverless deployment (see Stack section)
 6. **Electron packaging (Windows exe)** — once the app is fully working as a normal local web app (steps 1-5), wrap it with `electron-builder` into a Windows installer/exe. Electron's window points at the existing React frontend and spawns the existing Node backend as a child process inside the packaged app. This is a packaging step at the end, not an architectural change — nothing upstream needs to be built "Electron-aware" except the JS-only CLIP decision (Module 7) already made for exactly this reason, avoiding a bundled Python runtime.
 
@@ -678,7 +711,7 @@ SQLite (matches the local-first, local-DB decision above). `pipeline_config` and
 
 **Test suite:**
 - Unit tests (Vitest) for the swappable provider layers (`lib/llm/`, `lib/trends/`, `lib/tags/`) and for pipeline logic that's easy to silently break — partial failure handling, retry behavior, idempotency on re-running a module.
-- Integration tests (Supertest) against the Node backend's API routes, run against a throwaway test DB (in-memory or temp-file SQLite) so tests never touch the real local DB. **In place for Module 2's listing routes** (`backend/server.listing-routes.test.js`); Module 3's routes (mockup-composer run + variant PATCH) don't have this level of coverage yet — see that module's status note.
+- Integration tests (Supertest) against the Node backend's API routes, run against a throwaway test DB (in-memory or temp-file SQLite) so tests never touch the real local DB. **In place for Module 2's listing routes** (`backend/server.listing-routes.test.js`), **Module 4's trend/prompt routes** (`backend/server.prompt-routes.test.js`), and **Module 3's PSD compositing path** (`backend/lib/mockup-generator.psd.test.js`); Module 3's flat-template routes (mockup-composer run + variant PATCH) don't have route-level coverage yet, only the underlying generator functions.
 - A small set of Playwright end-to-end tests covering the critical path only (upload artwork → generate listing → review → copy-to-clipboard) rather than exhaustive UI coverage.
 
 **CI (GitHub Actions) — ✅ done.** `.github/workflows/ci.yml`: on every push (any branch) and every PR into `main`, a single job runs `npm ci` at the repo root (installs both workspaces via the root `package.json`'s `workspaces` field), `npm run lint` (flat-config ESLint — `eslint.config.js` — added alongside this workflow, since none existed before; backend rules target Node/ESM globals, frontend rules target browser + JSX/React), `npm run test -w backend` (the Vitest unit + Supertest integration suites described throughout this doc's per-module status notes), and `npm run build -w frontend` (no frontend test suite exists yet, so a production build at least catches syntax errors, broken imports, and JSX mistakes on every push). Runs are cancelled/superseded via a concurrency group keyed on branch/PR ref, so pushing a fixup doesn't leave a stale run queued behind it. E2E (Playwright) is correctly NOT wired into this workflow — per this doc, those should run on a schedule/on-demand instead, and no Playwright suite exists yet regardless (see above, still planned).
