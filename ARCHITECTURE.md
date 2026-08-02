@@ -392,6 +392,7 @@ link (`prompt-helper/index.test.js`), and a route-level Supertest suite
 (`backend/server.prompt-routes.test.js`) for all four new endpoints.
 
 ### Module 7 — Taste Filter (Curation) (optional, pre-pipeline)
+**Status: embeddings, centroids, scoring, routes, dashboard UI, and the Module 4 prompt-feedback write side — ✅ done (see "Build sequence" below). Not yet done: auto-import via watched folder (deferred, future).**
 **What it does:** Ranks a batch of raw Midjourney-generated candidates against a learned taste profile, so obvious "slop" gets flagged before it ever becomes a listing candidate.
 **Input:** a batch of candidate images (generated manually in Midjourney, dragged into the dashboard)
 **Output:** each candidate gets **two taste scores** — a global score and a per-category score — plus a suggested label (likely-keep / likely-discard / uncertain). Nothing is auto-deleted — the user confirms keep/discard, and that confirmation is the training signal.
