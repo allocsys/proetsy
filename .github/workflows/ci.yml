@@ -114,12 +114,33 @@ jobs:
             backend/node_modules
             frontend/node_modules
           key: ${{ needs.install.outputs.node-modules-key }}
-      # Only the backend has an automated test suite today (Vitest — unit +
-      # Supertest integration tests, per ARCHITECTURE.md's Module 1/2/3 status notes).
-      # better-sqlite3 (backend/db) needs no external service or Gemini key: every test
-      # touching the LLM provider layer mocks lib/llm/index.js, and DB tests point
-      # DB_PATH at a throwaway temp-file SQLite DB instead of the real local one.
+      # Vitest — unit + Supertest integration tests, per ARCHITECTURE.md's Module 1/2/3
+      # status notes. better-sqlite3 (backend/db) needs no external service or Gemini
+      # key: every test touching the LLM provider layer mocks lib/llm/index.js, and DB
+      # tests point DB_PATH at a throwaway temp-file SQLite DB instead of the real local
+      # one.
       - run: npm run test -w backend
+
+  electron-test:
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Restore node_modules cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            backend/node_modules
+            frontend/node_modules
+          key: ${{ needs.install.outputs.node-modules-key }}
+      # electron/main.test.js — root-scoped Vitest (vitest.config.js), 'electron' /
+      # node:child_process / node:http mocked throughout, so this needs no real Electron
+      # runtime, display, or backend process.
+      - run: npm run test:electron
 
   frontend-build:
     needs: install
