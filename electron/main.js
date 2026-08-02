@@ -26,7 +26,7 @@
 import { app, BrowserWindow } from 'electron';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
-import http from 'node:http';
+import { get } from 'node:http';
 import { fileURLToPath } from 'node:url';
 
 // ESM has no CJS-style __dirname/__filename globals.
@@ -122,7 +122,7 @@ export function waitForBackend(url, { timeoutMs = 20000, intervalMs = 250 } = {}
   const deadline = Date.now() + timeoutMs;
   return new Promise((resolve, reject) => {
     const attempt = () => {
-      const req = http.get(url, (res) => {
+      const req = get(url, (res) => {
         res.resume();
         if (res.statusCode === 200) return resolve();
         retry();
