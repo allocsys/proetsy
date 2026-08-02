@@ -12,6 +12,7 @@ import { analyzeArtworkForJob } from './lib/image-analyzer/index.js';
 import { generateListingsForJob } from './lib/listing-generator/index.js';
 import { enforceConventions } from './lib/listing-generator/validate.js';
 import { generateMockupForJob, OUTPUT_DIR } from './lib/mockup-generator.js';
+import { runPendingModulesForJob, runPendingModulesForJobs } from './lib/pipeline-runner.js';
 import { initRateLimitCache } from './lib/llm/rate-limits.js';
 import { getTrends } from './lib/trends/index.js';
 import { addManualTrend } from './lib/trends/manual.js';
@@ -245,6 +246,35 @@ app.get('/api/jobs/:id', (req, res) => {
   const job = getJobWithModules(Number(req.params.id));
   if (!job) return res.status(404).json({ error: 'Job not found' });
   res.json(job);
+});
+
+// Server-side pipeline runner (see backend/lib/pipeline-runner.js) — runs every
+// currently pending/retryable module for this job, in pipeline order, from a single
+// request. Unlike the dashboard sequencing individual /run/<module> calls itself, the
+// work here isn't tied to the client staying connected: once this request lands, the
+// async chain keeps running server-side even if the browser tab that triggered it
+// closes. Existing single-module routes (/run/image-analyzer etc.) are unchanged and
+// still the right tool for a targeted manual retry of just one module.
+app.post('/api/jobs/:id/run', async (req, res) => {
+  const jobId = Number(req.params.id);
+  try {
+    const { job, results } = await runPendingModulesForJob(jobId);
+    res.json({ job, results });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Bulk-mode counterpart: runs the full pipeline for several jobs at once, each
+// independently (see ARCHITECTURE.md -> Partial Failure Handling -> Bulk mode). Body:
+// { job_ids: number[] }.
+app.post('/api/jobs/run-batch', async (req, res) => {
+  const { job_ids } = req.body || {};
+  if (!Array.isArray(job_ids) || !job_ids.length) {
+    return res.status(400).json({ error: 'job_ids is required and must be a non-empty array' });
+  }
+  const outcomes = await runPendingModulesForJobs(job_ids.map(Number));
+  res.json({ outcomes });
 });
 
 // Fallback input for Module 2 when Module 1 (Image Analyzer) is skipped or fails.
