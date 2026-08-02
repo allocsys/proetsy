@@ -59,22 +59,37 @@ function packagedBackendEnv() {
   };
 }
 
-// Known gap (packaged-mode, build-sequence sub-step 3/4, not solved here): a packaged
-// app can't assume a system-wide `node` binary is on the target machine's PATH, and
-// better-sqlite3 (backend/package.json) is a native module that must be built against
-// Electron's own Node ABI when it's required from inside an Electron-spawned process --
-// neither of those is solved here. Spawning via the system `node` binary is the right
-// approach for local dev, where the backend already runs this exact same way via
-// `npm run dev -w backend` / `npm start -w backend`, and is deliberately NOT yet the
-// packaged-app strategy. The standard fix when sub-steps 3/4 land is spawning via
-// `process.execPath` with `ELECTRON_RUN_AS_NODE=1` (Electron's own bundled Node) instead
-// of relying on a system `node`, plus rebuilding better-sqlite3 against Electron's ABI
-// via `@electron/rebuild` as part of the electron-builder packaging step.
+// Packaged-mode process strategy (sub-step 4). Dev mode spawns the backend via the
+// system `node` binary -- simplest, and matches how the backend already runs under
+// `npm run dev -w backend` / `npm start -w backend` outside Electron entirely, so no
+// native-module rebuild is needed there (better-sqlite3 just runs against whatever
+// system Node ABI is already on the dev machine). A packaged app can't assume a
+// system-wide `node` binary exists on the target machine's PATH, so packaged mode
+// instead spawns Electron's OWN bundled Node binary (`process.execPath`) with
+// `ELECTRON_RUN_AS_NODE=1` set, which makes that child process behave like a plain Node
+// process (no BrowserWindow/app APIs) running against Electron's bundled Node runtime --
+// no external Node dependency for the end user. The tradeoff: better-sqlite3
+// (backend/package.json) is a native module, and a native module must be compiled
+// against the exact Node ABI that loads it, so it has to be rebuilt against *Electron's*
+// ABI rather than left at whatever ABI a plain `npm install` originally built it
+// against. package.json's `build.npmRebuild` (electron-builder config) handles this
+// automatically via `@electron/rebuild` during packaging; `npm run electron:rebuild`
+// (`electron-builder install-app-deps`) does the same rebuild on demand -- e.g. after
+// changing backend dependencies -- without doing a full package build.
+// NOT YET VERIFIED end-to-end on a real packaged build -- this is the standard,
+// documented fix for this exact situation, wired up per electron-builder's own guidance,
+// but nothing here has actually been packaged and run on a real machine yet.
+function backendExecutable() {
+  if (!app.isPackaged) return { command: 'node', extraEnv: {} };
+  return { command: process.execPath, extraEnv: { ELECTRON_RUN_AS_NODE: '1' } };
+}
+
 function spawnBackend() {
   const backendDir = path.join(__dirname, '..', 'backend');
-  const child = spawn('node', ['server.js'], {
+  const { command, extraEnv } = backendExecutable();
+  const child = spawn(command, ['server.js'], {
     cwd: backendDir,
-    env: { ...process.env, PORT: String(BACKEND_PORT), ...packagedBackendEnv() },
+    env: { ...process.env, PORT: String(BACKEND_PORT), ...packagedBackendEnv(), ...extraEnv },
     stdio: 'inherit',
   });
   child.on('exit', (code, signal) => {
