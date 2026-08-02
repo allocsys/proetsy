@@ -1,4 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+// How often to poll for whatever the watched-folder auto-importer (see
+// backend/lib/taste-filter/watcher.js) has detected + scored since the last poll.
+// ARCHITECTURE.md -> Module 7 -> "Auto-import via watched folder" doesn't specify a
+// cadence -- a few seconds is frequent enough to feel responsive for a single-user local
+// app without hammering the backend while a batch of Midjourney downloads trickles in.
+const PENDING_POLL_INTERVAL_MS = 5000;
 
 const LABEL_CLASS = {
   'likely-keep': 'success',
@@ -27,6 +34,35 @@ function TasteFilter() {
   const [promptId, setPromptId] = useState('');
   const [candidates, setCandidates] = useState([]);
   const [status, setStatus] = useState('');
+  // Tracks every imagePath already shown (imported manually, polled in from the
+  // watcher, or already labeled-and-removed) so a re-poll of /pending doesn't re-add a
+  // candidate that's already on screen or was just labeled a moment ago -- the pending
+  // queue on the server only forgets a candidate once removePendingCandidate() runs,
+  // which happens right after the label POST resolves, not before.
+  const seenPathsRef = useRef(new Set());
+
+  // Module 7 -> "Auto-import via watched folder" (step 7): merges whatever the backend
+  // watcher has queued into the same grid a manual drag-and-drop import populates.
+  // Interval-only (no fetch on mount) so this never fires before the watcher itself has
+  // had a chance to be configured, and so it doesn't collide with an in-flight manual
+  // import/label call in tests or real usage.
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/taste-filter/pending');
+        if (!res.ok) return;
+        const data = await res.json();
+        const fresh = (data.candidates || []).filter((c) => !seenPathsRef.current.has(c.imagePath));
+        if (!fresh.length) return;
+        fresh.forEach((c) => seenPathsRef.current.add(c.imagePath));
+        setCandidates((prev) => [...fresh, ...prev]);
+      } catch {
+        // Silent -- a missed poll just gets picked up on the next tick, no need to
+        // surface a transient network error for a background refresh.
+      }
+    }, PENDING_POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, []);
 
   async function handleImport(fileList) {
     const files = Array.from(fileList || []);
@@ -42,6 +78,7 @@ function TasteFilter() {
       const res = await fetch('/api/taste-filter/import', { method: 'POST', body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Import failed');
+      data.candidates.forEach((c) => seenPathsRef.current.add(c.imagePath));
       setCandidates((prev) => [...data.candidates, ...prev]);
       setStatus(`Scored ${data.candidates.length} image${data.candidates.length > 1 ? 's' : ''}.`);
     } catch (err) {
