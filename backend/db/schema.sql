@@ -127,6 +127,13 @@ CREATE TABLE IF NOT EXISTS taste_centroids (
   category TEXT,
   kept_centroid BLOB,
   discarded_centroid BLOB,
+  -- How many labeled examples went into each side of this pair at the last recompute.
+  -- Not derivable from the centroid BLOB itself, and re-querying image_preferences on
+  -- every score lookup would be wasteful — stored alongside the centroids so scoring
+  -- (ARCHITECTURE.md -> Module 7 -> "Build sequence" step 3) can check cold-start
+  -- confidence without a second query. See backend/lib/taste-filter/store.js.
+  kept_count INTEGER NOT NULL DEFAULT 0,
+  discarded_count INTEGER NOT NULL DEFAULT 0,
   updated_at TEXT DEFAULT (datetime('now'))
 );
 
