@@ -1,0 +1,121 @@
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+// Complements server.pipeline-runner-routes.test.js (which exercises the runner through
+// the HTTP layer). This file calls runPendingModulesForJob/runPendingModulesForJobs
+// directly so it can exercise two paths the route suite doesn't:
+//   1. Module 3's "success if at least one configured size composited, failed only if
+//      every size threw" rule, including the zero-configured-sizes edge case.
+//   2. runPendingModulesForJobs' own try/catch "last-resort guard" around a job that
+//      throws something runPendingModulesForJob itself wasn't supposed to let escape.
+//
+// Same dynamic-import-after-setting-DB_PATH pattern as the other DB-touching suites.
+let getDb;
+let createJob;
+let runPendingModulesForJob;
+let runPendingModulesForJobs;
+let tmpRoot;
+let artworkId;
+
+function fixtureListingText() {
+  return JSON.stringify({
+    variations: ['fine_art', 'aesthetic', 'gift'].map((angle) => ({
+      angle,
+      title: `${angle} sample title`,
+      description: `${angle} sample description, no forbidden phrases here.`,
+      tags: Array.from({ length: 13 }, (_, i) => `${angle}tag${i}`),
+      tag_alternates: Array.from({ length: 5 }, (_, i) => `${angle}alt${i}`),
+    })),
+  });
+}
+
+beforeAll(async () => {
+  tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'proetsy-pipeline-runner-direct-'));
+  process.env.DB_PATH = path.join(tmpRoot, 'test.db');
+
+  vi.doMock('./llm/index.js', () => ({
+    generateText: vi.fn(async () => ({ text: fixtureListingText() })),
+    generateVision: vi.fn(async () => ({
+      text: JSON.stringify({ subject: 'a fox', style: 'watercolor', palette: ['orange'], mood: 'calm' }),
+    })),
+    generateImage: vi.fn(),
+  }));
+
+  // Two configured sizes: one always succeeds, one always throws — exercises the
+  // "at least one size succeeded" partial-success branch.
+  vi.doMock('../config/index.js', () => ({
+    getProductSizes: vi.fn(() => ({ 'size-ok': {}, 'size-bad': {} })),
+    getPipelineConfig: vi.fn(() => ({
+      pipeline: [
+        { module: 'image_analyzer', enabled: true },
+        { module: 'listing_generator', enabled: true, required: true },
+        { module: 'mockup_composer', enabled: true },
+      ],
+    })),
+  }));
+
+  vi.doMock('./mockup-generator.js', () => ({
+    generateMockupForJob: vi.fn(async (jobId, sizeKey) => {
+      if (sizeKey === 'size-bad') throw new Error(`no template configured for ${sizeKey}`);
+      return { outputPath: `/tmp/fake-${sizeKey}.png`, warnings: [] };
+    }),
+    OUTPUT_DIR: tmpRoot,
+  }));
+
+  ({ getDb } = await import('../db/init.js'));
+  ({ createJob } = await import('./jobs.js'));
+  ({ runPendingModulesForJob, runPendingModulesForJobs } = await import('./pipeline-runner.js'));
+
+  const db = getDb();
+  const { lastInsertRowid } = db.prepare('INSERT INTO artworks (file_path) VALUES (?)').run('artwork.png');
+  artworkId = lastInsertRowid;
+});
+
+afterAll(() => {
+  vi.doUnmock('./llm/index.js');
+  vi.doUnmock('../config/index.js');
+  vi.doUnmock('./mockup-generator.js');
+  fs.rmSync(tmpRoot, { recursive: true, force: true });
+});
+
+describe('runPendingModulesForJob - mockup_composer partial-success rule', () => {
+  it('reports mockup_composer success overall when only some configured sizes succeed, and flags the failing size in perSize', async () => {
+    const jobId = createJob(artworkId);
+    const { job, results } = await runPendingModulesForJob(jobId);
+
+    const mockupStatus = job.modules.find((m) => m.module_name === 'mockup_composer').status;
+    expect(mockupStatus).toBe('success');
+    expect(results.mockup_composer.status).toBe('success');
+    expect(results.mockup_composer.perSize['size-ok'].status).toBe('success');
+    expect(results.mockup_composer.perSize['size-bad'].status).toBe('failed');
+    expect(results.mockup_composer.perSize['size-bad'].error).toMatch(/no template configured/);
+  });
+});
+
+describe('runPendingModulesForJobs - per-job isolation (last-resort guard)', () => {
+  it('reports ok:false with an error message for a job id that does not exist, without affecting other jobs in the same batch', async () => {
+    const healthyJobId = createJob(artworkId);
+
+    const outcomes = await runPendingModulesForJobs([999999, healthyJobId]);
+
+    const byJobId = Object.fromEntries(outcomes.map((o) => [o.jobId, o]));
+    expect(byJobId[999999].ok).toBe(false);
+    expect(byJobId[999999].error).toMatch(/not found/i);
+    expect(byJobId[healthyJobId].ok).toBe(true);
+    expect(byJobId[healthyJobId].job.overall_status).not.toBe('failed');
+  });
+
+  it('returns outcomes in the same order as the input job_ids', async () => {
+    const jobA = createJob(artworkId);
+    const jobB = createJob(artworkId);
+
+    const outcomes = await runPendingModulesForJobs([jobB, jobA]);
+    expect(outcomes.map((o) => o.jobId)).toEqual([jobB, jobA]);
+  });
+
+  it('resolves an empty array for an empty job_ids input', async () => {
+    expect(await runPendingModulesForJobs([])).toEqual([]);
+  });
+});
