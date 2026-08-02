@@ -83,7 +83,6 @@ describe('recordFailure', () => {
 
   it('caps escalation at LLM_RATE_LIMIT_MAX_COOLDOWN_MS rather than doubling indefinitely', async () => {
     const { recordFailure } = await freshRateLimits({ defaultCooldownMs: 1000, maxCooldownMs: 3000 });
-    const before = Date.now();
 
     // retryDelayMs of 1000, doubling each consecutive hit: 1000, 2000, 4000(->capped 3000),
     // 8000(->capped 3000)... every hit here happens well within the prior cooldown window
@@ -92,8 +91,14 @@ describe('recordFailure', () => {
     for (let i = 0; i < 6; i += 1) {
       last = recordFailure(0, 'gemini-2.5-flash', { retryDelayMs: 1000 });
     }
+    // Measured right after the loop, not before it -- 6 synchronous DB writes can take
+    // much longer than a tight tolerance on a loaded/slow CI runner, and that setup time
+    // isn't what this assertion cares about. What matters is that the cap (3000ms) is
+    // being applied at all, not exactly how many ms have elapsed since the loop started.
+    const after = Date.now();
 
-    expect(last.limitedUntil).toBeLessThanOrEqual(before + 3000 + 50);
+    expect(last.limitedUntil).toBeLessThanOrEqual(after + 3000 + 50);
+    expect(last.limitedUntil).toBeGreaterThan(after); // still a real cooldown, not zeroed out
   });
 
   it('starts the escalation count over if hit again only after the previous cooldown fully expired', async () => {
