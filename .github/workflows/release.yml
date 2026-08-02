@@ -61,6 +61,8 @@ jobs:
         run: npm ci
       - run: npm run lint
       - run: npm run test -w backend
+      - run: npm run test:electron
+      - run: npm run test -w frontend
       - run: npm run build -w frontend
 
   package-local-bundle:
