@@ -98,15 +98,18 @@ test.describe('critical path: upload → generate listing → review → copy-to
     const fineArtCard = page.locator('div.dark-panel').filter({ hasText: 'fine art' });
     await expect(fineArtCard.getByLabel('Title')).toHaveValue('fine art fixture title');
 
-    // Copy-to-clipboard: click the first "Copy for Etsy" button and confirm both the
-    // button's own visual feedback and the real clipboard contents. Located by
+    // Copy-to-clipboard: click the fine-art card's own "Copy for Etsy" button and confirm
+    // both the button's own visual feedback and the real clipboard contents. Located by
     // data-testid rather than accessible name/role text -- a name-based locator re-queries
     // the DOM for an element matching that name every time it's used, and this button's
     // own name/text changes to "Copied!" the instant the click's state update lands, so
     // asserting on the same name-based locator afterward was racing against the very
     // change it was trying to observe (it would intermittently find no match at all).
-    // A stable data-testid isn't affected by the button's text changing.
-    const copyButton = page.getByTestId('copy-for-etsy').first();
+    // A stable data-testid isn't affected by the button's text changing. Scoped to
+    // fineArtCard (not .first() over the whole page) since the three variation cards'
+    // DOM order isn't guaranteed to put fine_art first -- the assertion below expects
+    // fine-art-specific content, so it needs the fine-art-specific button.
+    const copyButton = fineArtCard.getByTestId('copy-for-etsy');
     await copyButton.click();
     await expect(copyButton).toHaveText('Copied!');
 
