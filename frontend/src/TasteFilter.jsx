@@ -1,15 +1,16 @@
 import { useState } from 'react';
 
-const LABEL_COLORS = {
-  'likely-keep': '#2f855a',
-  'likely-discard': '#c53030',
-  uncertain: '#a0a0a0',
+const LABEL_CLASS = {
+  'likely-keep': 'success',
+  'likely-discard': 'danger',
+  uncertain: 'pending',
 };
 
 function ScoreBadge({ label, score, confident }) {
-  if (score === null || score === undefined) return <span style={{ color: '#aaa' }}>—</span>;
+  if (score === null || score === undefined) return <span className="text-muted mono">—</span>;
   return (
-    <span style={{ color: LABEL_COLORS[label] || '#666' }}>
+    <span className={`status-pill ${LABEL_CLASS[label] || 'skipped'}`}>
+      <span className="status-dot" />
       {label} ({score.toFixed(3)}){confident === false ? ' · cold start' : ''}
     </span>
   );
@@ -80,54 +81,57 @@ function TasteFilter() {
   }
 
   return (
-    <div>
-      <p style={{ color: '#888', marginTop: 0 }}>
+    <div className="dark-panel">
+      <p className="text-muted" style={{ marginTop: 0 }}>
         Drop a raw Midjourney batch to rank it against your taste model before it enters the
         main pipeline. Nothing is auto-discarded — confirm each one below.
       </p>
 
-      <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
-        <label>
+      <div className="flex-row flex-wrap" style={{ marginBottom: '1rem' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           Category:{' '}
-          <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. square-canvas" />
+          <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. square-canvas" style={{ width: 'auto' }} />
         </label>
-        <label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           Prompt ID (optional):{' '}
-          <input value={promptId} onChange={(e) => setPromptId(e.target.value)} placeholder="links to Module 4" />
+          <input value={promptId} onChange={(e) => setPromptId(e.target.value)} placeholder="links to Module 4" style={{ width: 'auto' }} />
         </label>
-        <button onClick={handleRecompute}>Recompute now</button>
+        <button className="btn-secondary" onClick={handleRecompute}>Recompute now</button>
       </div>
 
       <div
-        style={{ border: '2px dashed #ccc', borderRadius: 8, padding: '1.5rem', textAlign: 'center', marginBottom: '1rem' }}
+        className="dropzone crop-frame"
+        style={{ marginBottom: '1rem' }}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => { e.preventDefault(); handleImport(e.dataTransfer.files); }}
       >
-        <p>Drag and drop a batch of candidate images here</p>
-        <input type="file" multiple accept="image/*" onChange={(e) => handleImport(e.target.files)} />
+        <p style={{ fontWeight: 600, fontSize: '15px', color: 'var(--ink)' }}>Drag and drop a batch of candidate images here</p>
+        <input type="file" multiple accept="image/*" onChange={(e) => handleImport(e.target.files)} style={{ width: 'auto', marginTop: '0.5rem' }} />
       </div>
-      {status && <p style={{ color: '#666' }}>{status}</p>}
+      {status && <p className="mono" style={{ color: 'var(--accent)' }}>{status}</p>}
 
       {candidates.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
+        <div className="taste-grid">
           {candidates.map((c) => (
-            <div key={c.imagePath} style={{ border: '1px solid #eee', borderRadius: 8, padding: '0.5rem' }}>
+            <div key={c.imagePath} className="taste-card">
               {c.error ? (
-                <p style={{ color: '#c53030', fontSize: '0.85rem' }}>{c.error}</p>
+                <p style={{ color: 'var(--state-danger)', fontSize: '13px' }}>{c.error}</p>
               ) : (
                 <>
-                  <img src={c.imageUrl} alt="" style={{ width: '100%', borderRadius: 4, display: 'block' }} />
-                  <p style={{ fontSize: '0.8rem', margin: '0.4rem 0' }}>
+                  <div className="crop-frame" style={{ marginBottom: '0.5rem' }}>
+                    <img src={c.imageUrl} alt="" />
+                  </div>
+                  <p style={{ fontSize: '13px', margin: '0.4rem 0', color: 'var(--ink)' }}>
                     Global: <ScoreBadge label={c.globalLabel} score={c.globalScore} confident={c.globalConfident} />
                   </p>
                   {c.category && (
-                    <p style={{ fontSize: '0.8rem', margin: '0.4rem 0' }}>
+                    <p style={{ fontSize: '13px', margin: '0.4rem 0', color: 'var(--ink)' }}>
                       {c.category}: <ScoreBadge label={c.categoryLabel} score={c.categoryScore} confident={c.categoryConfident} />
                     </p>
                   )}
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div className="flex-row" style={{ gap: '0.5rem', marginTop: '0.5rem' }}>
                     <button onClick={() => handleLabel(c, 'keep')} style={{ flex: 1 }}>Keep</button>
-                    <button onClick={() => handleLabel(c, 'discard')} style={{ flex: 1 }}>Discard</button>
+                    <button className="btn-secondary" onClick={() => handleLabel(c, 'discard')} style={{ flex: 1 }}>Discard</button>
                   </div>
                 </>
               )}

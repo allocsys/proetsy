@@ -1,13 +1,6 @@
 import { useState } from 'react';
 
-const cardStyle = {
-  border: '1px solid #ccc',
-  borderRadius: 8,
-  padding: '1rem',
-  marginBottom: '1rem',
-};
-
-const fieldStyle = { display: 'block', width: '100%', marginBottom: '0.5rem' };
+// No styles here, using CSS classes.
 
 function tagsToText(tags) {
   return Array.isArray(tags) ? tags.join(', ') : '';
@@ -81,46 +74,48 @@ function ListingCard({ listing, onSaved }) {
   }
 
   return (
-    <div style={cardStyle}>
-      <h4 style={{ marginTop: 0, textTransform: 'capitalize' }}>{listing.variation?.replace('_', ' ')}</h4>
+    <div className="dark-panel" style={{ marginBottom: '1rem' }}>
+      <h4 style={{ marginTop: 0, textTransform: 'capitalize', color: 'var(--cream)' }}>{listing.variation?.replace('_', ' ')}</h4>
 
-      <label>
+      <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--cream-dim)', fontSize: '13px' }}>
         Title
-        <input style={fieldStyle} value={title} onChange={(e) => setTitle(e.target.value)} />
+        <input value={title} onChange={(e) => setTitle(e.target.value)} />
       </label>
 
-      <label>
+      <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--cream-dim)', fontSize: '13px' }}>
         Description
         <textarea
-          style={{ ...fieldStyle, minHeight: '4rem' }}
+          style={{ minHeight: '4rem', marginTop: '0.25rem' }}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
       </label>
 
-      <label>
+      <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--cream-dim)', fontSize: '13px' }}>
         Tags (comma-separated)
-        <input style={fieldStyle} value={tagsText} onChange={(e) => setTagsText(e.target.value)} />
+        <input value={tagsText} onChange={(e) => setTagsText(e.target.value)} />
       </label>
 
-      <label>
+      <label style={{ display: 'block', marginBottom: '1rem', color: 'var(--cream-dim)', fontSize: '13px' }}>
         Alternate tags (comma-separated)
-        <input style={fieldStyle} value={tagAltText} onChange={(e) => setTagAltText(e.target.value)} />
+        <input value={tagAltText} onChange={(e) => setTagAltText(e.target.value)} />
       </label>
 
-      <button onClick={save} disabled={saving}>
-        {saving ? 'Saving…' : 'Save'}
-      </button>{' '}
-      <button onClick={copyForEtsy}>{copied ? 'Copied!' : 'Copy for Etsy'}</button>
+      <div className="flex-row">
+        <button onClick={save} disabled={saving}>
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+        <button className="btn-secondary" onClick={copyForEtsy}>{copied ? 'Copied!' : 'Copy for Etsy'}</button>
+      </div>
 
       {warnings.length > 0 && (
-        <ul style={{ color: '#b45309' }}>
+        <ul style={{ color: 'var(--state-pending)', fontSize: '13px', marginTop: '0.75rem', paddingLeft: '1.25rem' }}>
           {warnings.map((w, i) => (
             <li key={i}>{w}</li>
           ))}
         </ul>
       )}
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
+      {error && <p style={{ color: 'var(--state-danger)', fontSize: '13px', marginTop: '0.5rem' }}>{error}</p>}
     </div>
   );
 }

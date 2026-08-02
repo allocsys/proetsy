@@ -1,12 +1,5 @@
 import { useEffect, useState } from 'react';
 
-const cardStyle = {
-  border: '1px solid #ccc',
-  borderRadius: 8,
-  padding: '1rem',
-  marginBottom: '1rem',
-};
-
 const CATEGORIES = ['portrait', 'landscape', 'square'];
 
 function copyToClipboard(text) {
@@ -134,74 +127,69 @@ export default function PromptHelper() {
   }
 
   return (
-    <div style={cardStyle}>
-      <div style={{ marginBottom: '0.75rem' }}>
-        <label>
-          Category:{' '}
+    <div className="dark-panel">
+      <div className="flex-row flex-wrap" style={{ marginBottom: '1rem', gap: '1rem' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          Category:
           <select value={category} onChange={(e) => setCategory(e.target.value)}>
             {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
+              <option key={c} value={c}>{c}</option>
             ))}
           </select>
-        </label>{' '}
-        <label>
-          Trend:{' '}
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          Trend:
           <select value={selectedTrendId} onChange={(e) => setSelectedTrendId(e.target.value)} disabled={loadingTrends}>
             <option value="">(none)</option>
             {trends.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.term}
-                {t.category ? ` (${t.category})` : ''}
-              </option>
+              <option key={t.id} value={t.id}>{t.term}{t.category ? ` (${t.category})` : ''}</option>
             ))}
           </select>
         </label>
       </div>
 
-      <div style={{ marginBottom: '0.75rem' }}>
+      <div className="flex-row flex-wrap" style={{ marginBottom: '1rem', gap: '0.5rem' }}>
         <input
+          style={{ flex: 1, minWidth: '150px' }}
           placeholder="Add a new trend"
           value={newTrendTerm}
           onChange={(e) => setNewTrendTerm(e.target.value)}
         />
         <input
-          placeholder="Trend category (optional)"
+          style={{ flex: 1, minWidth: '150px' }}
+          placeholder="Trend category"
           value={newTrendCategory}
           onChange={(e) => setNewTrendCategory(e.target.value)}
         />
-        <button onClick={addTrend} disabled={addingTrend || !newTrendTerm.trim()}>
+        <button className="btn-secondary" onClick={addTrend} disabled={addingTrend || !newTrendTerm.trim()}>
           {addingTrend ? 'Adding…' : 'Add trend'}
         </button>
       </div>
 
-      <div style={{ marginBottom: '0.75rem' }}>
-        <label>
-          Or import a CSV export (<code>term</code>/<code>keyword</code>/<code>trend</code> column, optional <code>category</code>):{' '}
+      <div style={{ marginBottom: '1rem' }}>
+        <label style={{ fontSize: '13px', color: 'var(--cream-dim)' }}>
+          Or import a CSV export (<code>term</code> column, optional <code>category</code>):{' '}
           <input type="file" accept=".csv,text/csv" onChange={(e) => importTrendsCsv(e.target.files?.[0])} />
         </label>
-        {csvMessage && <span style={{ marginLeft: '0.75rem', color: '#666' }}>{csvMessage}</span>}
+        {csvMessage && <span style={{ marginLeft: '0.75rem', fontSize: '13px', color: 'var(--cream-dim)' }}>{csvMessage}</span>}
       </div>
 
       <button onClick={generate} disabled={generating}>
         {generating ? 'Generating…' : 'Generate prompts'}
       </button>
 
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
+      {error && <p style={{ color: 'var(--state-danger)', marginTop: '0.5rem' }}>{error}</p>}
 
       {generated.length > 0 && (
-        <div style={{ marginTop: '1rem' }}>
-          <h4>Generated prompts</h4>
+        <div style={{ marginTop: '1.5rem' }}>
+          <h4 style={{ color: 'var(--cream)' }}>Generated prompts</h4>
           {generated.map((p) => (
-            <div key={p.id} style={{ marginBottom: '0.5rem' }}>
-              <code>{p.prompt_text}</code>{' '}
-              <button onClick={() => copyToClipboard(p.prompt_text)}>Copy</button>
+            <div key={p.id} style={{ marginBottom: '0.75rem', padding: '0.5rem', background: 'rgba(0,0,0,0.2)', borderRadius: '4px' }}>
+              <code style={{ fontSize: '13px', display: 'block', marginBottom: '0.5rem' }}>{p.prompt_text}</code>
+              <button className="btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '12px' }} onClick={() => copyToClipboard(p.prompt_text)}>Copy</button>
               {p.warnings.length > 0 && (
-                <ul style={{ color: '#888', fontSize: '0.85em' }}>
-                  {p.warnings.map((w, i) => (
-                    <li key={i}>{w}</li>
-                  ))}
+                <ul style={{ color: 'var(--state-pending)', fontSize: '12px', marginTop: '0.5rem', paddingLeft: '1.25rem' }}>
+                  {p.warnings.map((w, i) => <li key={i}>{w}</li>)}
                 </ul>
               )}
             </div>
@@ -210,12 +198,12 @@ export default function PromptHelper() {
       )}
 
       {history.length > 0 && (
-        <div style={{ marginTop: '1rem' }}>
-          <h4>History for &quot;{category}&quot;</h4>
-          <ul style={{ fontSize: '0.9em', color: '#555' }}>
+        <div style={{ marginTop: '1.5rem' }}>
+          <h4 style={{ color: 'var(--cream)' }}>History for &quot;{category}&quot;</h4>
+          <ul style={{ fontSize: '13px', color: 'var(--cream-dim)', paddingLeft: '1.25rem' }}>
             {history.map((p) => (
-              <li key={p.id}>
-                <code>{p.prompt_text}</code> <button onClick={() => copyToClipboard(p.prompt_text)}>Copy</button>
+              <li key={p.id} style={{ marginBottom: '0.25rem' }}>
+                <code style={{ fontSize: '12px' }}>{p.prompt_text}</code> <button className="btn-secondary" style={{ padding: '0.1rem 0.4rem', fontSize: '11px' }} onClick={() => copyToClipboard(p.prompt_text)}>Copy</button>
               </li>
             ))}
           </ul>

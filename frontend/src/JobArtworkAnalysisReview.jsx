@@ -1,14 +1,5 @@
 import { useState } from 'react';
 
-const cardStyle = {
-  border: '1px solid #ccc',
-  borderRadius: 8,
-  padding: '1rem',
-  marginBottom: '1rem',
-};
-
-const fieldStyle = { display: 'block', width: '100%', marginBottom: '0.5rem' };
-
 function listOrDash(items) {
   return Array.isArray(items) && items.length > 0 ? items.join(', ') : '—';
 }
@@ -21,35 +12,21 @@ function listOrDash(items) {
  */
 function AnalysisSummary({ analysis }) {
   return (
-    <dl>
-      <dt>
-        <strong>Subject</strong>
-      </dt>
-      <dd>{analysis.subject || '—'}</dd>
-      <dt>
-        <strong>Style</strong>
-      </dt>
-      <dd>{analysis.style || '—'}</dd>
-      <dt>
-        <strong>Mood</strong>
-      </dt>
-      <dd>{analysis.mood || '—'}</dd>
-      <dt>
-        <strong>Palette</strong>
-      </dt>
-      <dd>{listOrDash(analysis.palette)}</dd>
-      <dt>
-        <strong>Themes</strong>
-      </dt>
-      <dd>{listOrDash(analysis.themes)}</dd>
-      <dt>
-        <strong>Notable elements</strong>
-      </dt>
-      <dd>{listOrDash(analysis.notable_elements)}</dd>
-      <dt>
-        <strong>Suggested categories</strong>
-      </dt>
-      <dd>{listOrDash(analysis.suggested_categories)}</dd>
+    <dl style={{ margin: '1rem 0', display: 'grid', gridTemplateColumns: '150px 1fr', gap: '0.5rem 1rem' }}>
+      <dt style={{ fontWeight: 600, color: 'var(--ink)' }}>Subject</dt>
+      <dd style={{ margin: 0, color: 'var(--ink-soft)' }}>{analysis.subject || '—'}</dd>
+      <dt style={{ fontWeight: 600, color: 'var(--ink)' }}>Style</dt>
+      <dd style={{ margin: 0, color: 'var(--ink-soft)' }}>{analysis.style || '—'}</dd>
+      <dt style={{ fontWeight: 600, color: 'var(--ink)' }}>Mood</dt>
+      <dd style={{ margin: 0, color: 'var(--ink-soft)' }}>{analysis.mood || '—'}</dd>
+      <dt style={{ fontWeight: 600, color: 'var(--ink)' }}>Palette</dt>
+      <dd style={{ margin: 0, color: 'var(--ink-soft)' }}>{listOrDash(analysis.palette)}</dd>
+      <dt style={{ fontWeight: 600, color: 'var(--ink)' }}>Themes</dt>
+      <dd style={{ margin: 0, color: 'var(--ink-soft)' }}>{listOrDash(analysis.themes)}</dd>
+      <dt style={{ fontWeight: 600, color: 'var(--ink)' }}>Notable elements</dt>
+      <dd style={{ margin: 0, color: 'var(--ink-soft)' }}>{listOrDash(analysis.notable_elements)}</dd>
+      <dt style={{ fontWeight: 600, color: 'var(--ink)' }}>Suggested categories</dt>
+      <dd style={{ margin: 0, color: 'var(--ink-soft)' }}>{listOrDash(analysis.suggested_categories)}</dd>
     </dl>
   );
 }
@@ -138,30 +115,30 @@ export default function JobArtworkAnalysisReview({ jobId }) {
   }
 
   return (
-    <div style={cardStyle}>
-      <div style={{ marginBottom: '0.75rem' }}>
+    <div style={{ background: 'var(--paper-dim)', border: '1px solid var(--hairline-paper)', borderRadius: '6px', padding: '1rem', marginTop: '0.75rem' }}>
+      <div className="flex-row mb-1">
         <button onClick={loadJobAndAnalysis} disabled={!jobId || loading}>
           {loading ? 'Loading…' : 'Load analysis'}
-        </button>{' '}
-        <button onClick={runAnalysis} disabled={!jobId || running}>
+        </button>
+        <button className="btn-secondary" onClick={runAnalysis} disabled={!jobId || running}>
           {running ? 'Analyzing…' : 'Run image analyzer'}
         </button>
       </div>
 
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
+      {error && <p style={{ color: 'var(--state-danger)' }}>{error}</p>}
 
       {analysis ? (
         <AnalysisSummary analysis={analysis} />
       ) : (
-        job && <p style={{ color: '#888' }}>No analysis yet for this artwork — run it, or use manual notes below.</p>
+        job && <p className="text-muted" style={{ margin: '0.5rem 0' }}>No analysis yet for this artwork — run it, or use manual notes below.</p>
       )}
 
       {job && (
-        <div>
-          <label>
+        <div style={{ marginTop: '1rem' }}>
+          <label style={{ display: 'block', fontWeight: 500, fontSize: '13px', color: 'var(--ink)' }}>
             Manual notes (fallback for Module 2 when analysis is skipped or fails)
             <textarea
-              style={{ ...fieldStyle, minHeight: '3rem' }}
+              style={{ display: 'block', width: '100%', minHeight: '3rem', marginTop: '0.25rem', marginBottom: '0.5rem' }}
               value={manualNotes}
               onChange={(e) => setManualNotes(e.target.value)}
             />
