@@ -99,6 +99,12 @@ getDb();
 // cooldown tracking".
 initRateLimitCache();
 
+// Module 7 -> "Auto-import via watched folder" (step 7). Off by default -- this only
+// actually starts watching if taste_filter_watch_enabled/taste_filter_watch_folder are
+// already saved in the settings table from a previous run (e.g. this is a restart, not a
+// fresh DB). See ARCHITECTURE.md -> Module 7 -> "Activation".
+syncWatcherFromSettings(CANDIDATES_DIR);
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
