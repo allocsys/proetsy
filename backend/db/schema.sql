@@ -13,9 +13,15 @@ CREATE TABLE IF NOT EXISTS jobs (
   artwork_id INTEGER NOT NULL REFERENCES artworks(id),
   overall_status TEXT NOT NULL DEFAULT 'pending',
   manual_notes TEXT,
+  -- Nullable. Set to a shared value (a client-generated UUID) for every job created from
+  -- the same bulk drop, so the dashboard history log can group them into one batch row
+  -- instead of N indistinguishable single-job rows. Null for a single-artwork upload —
+  -- see ARCHITECTURE.md -> Module 6 -> "consolidated single-page 'bulk batch' view".
+  batch_id TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
+CREATE INDEX IF NOT EXISTS idx_jobs_batch_id ON jobs(batch_id);
 
 CREATE TABLE IF NOT EXISTS job_modules (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
