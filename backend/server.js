@@ -191,6 +191,11 @@ app.patch('/api/settings', (req, res) => {
     }
   });
   run();
+  // Re-reconciles the taste-filter watcher against whatever just changed -- covers
+  // toggling taste_filter_watch_enabled, editing taste_filter_watch_folder/_category, or
+  // any other settings PATCH that happens to touch none of those (a no-op in that case,
+  // see syncWatcherFromSettings). Takes effect immediately, no server restart needed.
+  syncWatcherFromSettings(CANDIDATES_DIR);
   const rows = db.prepare('SELECT key, value FROM settings').all();
   res.json(Object.fromEntries(rows.map((r) => [r.key, r.value])));
 });
