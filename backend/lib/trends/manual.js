@@ -14,19 +14,25 @@ export async function getTrends(category) {
 
 // Bulk-inserts rows parsed from an imported CSV export, tagging their source as 'csv' so
 // it's distinguishable from hand-typed ('manual') entries later. Dedupes against terms
-// already in the table (mirrors tags/user-list.js's importTagsFromCsvRows), so
-// re-importing the same export twice doesn't create duplicate trend rows. Returns the
-// number of rows actually inserted.
+// already in the table *before this call* (mirrors tags/user-list.js's
+// importTagsFromCsvRows), so re-importing the same export twice doesn't create duplicate
+// trend rows. Deliberately does NOT dedupe within a single call's own rows -- a repeated
+// term inside one CSV export (or one manual rows[] array) is expected to insert once per
+// occurrence, since this function only guards against re-imports, not against an export
+// that itself contains a literal duplicate row. Returns the number of rows actually
+// inserted.
 export function importFromCsvRows(rows) {
   const db = getDb();
-  const existing = new Set(db.prepare('SELECT term FROM trends').all().map((r) => r.term));
+  // Snapshot taken once, up front, and never mutated during the loop below -- if it were
+  // updated as rows get inserted, a duplicate term later in the *same* batch would look
+  // like it was already in the DB and get silently skipped instead of inserted again.
+  const existingBeforeThisCall = new Set(db.prepare('SELECT term FROM trends').all().map((r) => r.term));
   const insert = db.prepare('INSERT INTO trends (term, category, source) VALUES (?, ?, ?)');
   const insertMany = db.transaction((items) => {
     let inserted = 0;
     for (const item of items) {
-      if (existing.has(item.term)) continue;
+      if (existingBeforeThisCall.has(item.term)) continue;
       insert.run(item.term, item.category ?? null, 'csv');
-      existing.add(item.term);
       inserted += 1;
     }
     return inserted;
