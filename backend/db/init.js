@@ -46,6 +46,9 @@ function runDefensiveMigrations(db) {
     // Module 7 -> "Build sequence" step 3 and schema.sql's taste_centroids comment.
     "ALTER TABLE taste_centroids ADD COLUMN kept_count INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE taste_centroids ADD COLUMN discarded_count INTEGER NOT NULL DEFAULT 0",
+    // Groups a bulk drop's jobs for the dashboard history view — see schema.sql's
+    // jobs.batch_id comment.
+    'ALTER TABLE jobs ADD COLUMN batch_id TEXT',
   ];
   for (const sql of migrations) {
     try {
