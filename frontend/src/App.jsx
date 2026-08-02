@@ -314,7 +314,7 @@ function App() {
           </div>
 
           <h3>Shop conventions</h3>
-          <p style={{ color: '#888', marginTop: 0 }}>Hardcoded (see ARCHITECTURE.md -> Module 2), shown here read-only for reference.</p>
+          <p style={{ color: '#888', marginTop: 0 }}>Hardcoded (see ARCHITECTURE.md, Module 2), shown here read-only for reference.</p>
           {shopConventions ? (
             <ul>
               <li>Title separator: <code>{shopConventions.listing.titleSeparator}</code></li>
