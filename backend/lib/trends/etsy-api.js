@@ -5,9 +5,7 @@
 // Provider Layer for why this is the sanctioned alternative to scraping.
 // TODO: implement the actual GET /listings/active call + frequency tally.
 
-const ETSY_API_BASE = 'https://openapi.etsy.com/v3/application';
-
-export async function getTrends(category) {
+export async function getTrends(_category) {
   if (!process.env.ETSY_API_KEY) {
     throw new Error('Etsy Open API is not configured. Set ETSY_API_KEY in backend/.env to enable it.');
   }
