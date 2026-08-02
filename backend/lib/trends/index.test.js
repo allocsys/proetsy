@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 
 // trends/index.js reads process.env.TRENDS_PROVIDER at CALL time (inside
 // getActiveProvider()), not at import time — same as llm/index.js's own
