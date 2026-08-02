@@ -22,6 +22,11 @@ name: Release
 on:
   push:
     tags: ['v*.*.*']
+  # Manual trigger for sanity-checking package-electron-win in isolation (e.g. the
+  # ARCHITECTURE.md "Sanity-check finding" re: hoisted node_modules / root package.json
+  # having no `dependencies` field) without cutting a real tagged release. The
+  # release-publish steps below are gated to `refs/tags/*` so a workflow_dispatch run
+  # builds and inspects the installer but never publishes it.
 
 env:
   NODE_VERSION: '24'
@@ -132,11 +137,44 @@ jobs:
       - name: Build Windows installer
         run: npm run electron:build
 
+      # Sanity-check step (see ARCHITECTURE.md "Sanity-check finding" under Electron
+      # packaging -- build sequence): confirms whether better-sqlite3 actually landed in
+      # the packaged asar, independent of whether npmRebuild successfully rebuilt it
+      # against Electron's ABI. `asar list` runs regardless of build success/failure
+      # (`if: always()`) so a failed `electron:build` still tells us whether the files
+      # step ran far enough to produce a partial output directory.
+      - name: Inspect asar for better-sqlite3
+        if: always()
+        shell: bash
+        run: |
+          set -x
+          find release-builds -maxdepth 2 -type d || echo "no release-builds dir"
+          ASAR=$(find release-builds -name app.asar | head -n1 || true)
+          if [ -z "$ASAR" ]; then
+            echo "NO app.asar FOUND -- build did not produce packaged output"
+            exit 0
+          fi
+          echo "--- app.asar contents matching better-sqlite3 ---"
+          npx asar list "$ASAR" | grep -i better-sqlite3 || echo "NOT FOUND in app.asar"
+          UNPACKED_DIR=$(dirname "$ASAR")/app.asar.unpacked
+          echo "--- app.asar.unpacked/node_modules/better-sqlite3 ---"
+          ls -la "$UNPACKED_DIR/node_modules/better-sqlite3/build/Release/" 2>/dev/null || echo "NOT FOUND -- native binary missing from unpacked dir"
+
+      - name: Upload packaged app for inspection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-package-debug
+          path: release-builds/
+          if-no-files-found: warn
+          retention-days: 7
+
       # electron-builder's own directories.output setting (root package.json's `build`
       # config: "release-builds") controls where this lands; the NSIS installer's exact
       # filename includes the version from package.json, so a glob picks it up without
       # hardcoding a version string here.
       - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: release-builds/*.exe
