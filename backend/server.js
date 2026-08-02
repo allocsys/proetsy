@@ -76,6 +76,25 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+// ARCHITECTURE.md -> First-Run Setup -> "Detection: on backend startup, check for (1) at
+// least one Gemini key in .env, (2) an initialized DB, (3) at least one entry in
+// product-sizes.json." Also reports the tag-library check ("Required for Module 2") so
+// the dashboard's persistent Settings-panel status list (not just a one-time modal) has
+// everything it needs in one call.
+app.get('/api/setup-status', (req, res) => {
+  const db = getDb();
+  const geminiKeyConfigured = (process.env.GEMINI_API_KEYS || '').split(',').map((k) => k.trim()).filter(Boolean).length > 0;
+  const hasProductSize = db.prepare('SELECT COUNT(*) AS n FROM product_sizes').get().n > 0;
+  const hasTagLibrary = db.prepare('SELECT COUNT(*) AS n FROM tags').get().n > 0;
+  res.json({
+    geminiKeyConfigured,
+    dbInitialized: true,
+    hasProductSize,
+    hasTagLibrary,
+    readyToRun: geminiKeyConfigured && hasTagLibrary,
+  });
+});
+
 app.get('/api/config/pipeline', (req, res) => {
   res.json(getPipelineConfig());
 });
