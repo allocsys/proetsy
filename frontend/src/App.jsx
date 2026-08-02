@@ -474,7 +474,7 @@ function App() {
             )}
           </section>
 
-          <section id="section-prompt-header" className="paper-card">
+          <section id="section-prompt-helper" className="paper-card">
             <h2 style={{ marginTop: 0 }}>04 Trend / Prompt Helper</h2>
             <PromptHelper />
           </section>
