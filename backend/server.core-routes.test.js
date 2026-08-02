@@ -185,6 +185,29 @@ describe('POST /api/jobs + GET /api/jobs/:id + GET /api/jobs', () => {
   });
 });
 
+describe('POST /api/jobs batch_id grouping', () => {
+  it('stores the given batch_id and omits it (null) when not provided', async () => {
+    const artA = await request(app).post('/api/artworks').send({ file_path: '/tmp/batch-a.png' });
+    const artB = await request(app).post('/api/artworks').send({ file_path: '/tmp/batch-b.png' });
+    const artC = await request(app).post('/api/artworks').send({ file_path: '/tmp/batch-c.png' });
+
+    const batchId = 'test-batch-123';
+    const jobA = await request(app).post('/api/jobs').send({ artwork_id: artA.body.id, batch_id: batchId });
+    const jobB = await request(app).post('/api/jobs').send({ artwork_id: artB.body.id, batch_id: batchId });
+    const jobC = await request(app).post('/api/jobs').send({ artwork_id: artC.body.id });
+
+    expect(jobA.body.batch_id).toBe(batchId);
+    expect(jobB.body.batch_id).toBe(batchId);
+    expect(jobC.body.batch_id).toBeNull();
+
+    const listRes = await request(app).get('/api/jobs');
+    const byId = Object.fromEntries(listRes.body.map((j) => [j.id, j]));
+    expect(byId[jobA.body.id].batch_id).toBe(batchId);
+    expect(byId[jobB.body.id].batch_id).toBe(batchId);
+    expect(byId[jobC.body.id].batch_id).toBeNull();
+  });
+});
+
 describe('PATCH /api/jobs/:id/manual-notes', () => {
   it("sets manual notes and returns the job with them applied (Module 2's fallback input)", async () => {
     const artworkRes = await request(app).post('/api/artworks').send({ file_path: '/tmp/notes-art.png' });
