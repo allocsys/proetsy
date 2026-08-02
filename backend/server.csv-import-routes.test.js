@@ -42,6 +42,20 @@ describe('POST /api/trends/csv', () => {
     expect(res.body.imported).toBe(1);
   });
 
+  it('dedupes against terms already in the table, including ones added via the single-entry route', async () => {
+    await request(app).post('/api/trends').send({ term: 'watercolor florals', category: 'art' });
+
+    const res = await request(app)
+      .post('/api/trends/csv')
+      .send({ csv: 'term,category\nwatercolor florals,art\nbrand new term,decor' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.imported).toBe(1);
+
+    const list = await request(app).get('/api/trends');
+    expect(list.body.filter((t) => t.term === 'watercolor florals')).toHaveLength(1);
+  });
+
   it('400s when csv is missing', async () => {
     const res = await request(app).post('/api/trends/csv').send({});
     expect(res.status).toBe(400);
