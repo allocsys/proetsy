@@ -1,0 +1,45 @@
+name: E2E (Playwright)
+
+# See ARCHITECTURE.md -> Testing & CI/CD: "E2E (Playwright) is correctly NOT wired into
+# this workflow [ci.yml] -- per this doc, those should run on a schedule/on-demand
+# instead." This is that separate schedule/on-demand workflow -- deliberately not part of
+# ci.yml's on every push/PR gate, since a real browser + two long-lived dev servers make
+# this slower and heavier than the unit/integration suite that runs on every push.
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    # Weekly, Monday 06:00 UTC -- catches drift between the dashboard and the backend
+    # routes it depends on without gating every push on a full browser run.
+    - cron: '0 6 * * 1'
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build -w frontend
+
+      - name: Install Playwright browsers
+        run: npm run test:e2e:install
+
+      - name: Run Playwright critical-path suite
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
