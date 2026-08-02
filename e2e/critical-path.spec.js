@@ -77,8 +77,12 @@ test.describe('critical path: upload → generate listing → review → copy-to
 
     // The fixture LLM provider's canned title for the fine_art angle — confirms actual
     // generated content made it all the way through the pipeline into the review UI,
-    // not just that *some* listing rows happen to exist.
-    await expect(page.getByDisplayValue('fine art fixture title')).toBeVisible();
+    // not just that *some* listing rows happen to exist. Scoped to the fine_art card
+    // itself (by its heading text) since all three variation cards share the same
+    // "Title" label, and page.getByDisplayValue() isn't a real Playwright API (it's a
+    // Testing Library method, not one Playwright's Page/Locator ever exposed).
+    const fineArtCard = page.locator('div.dark-panel').filter({ hasText: 'fine art' });
+    await expect(fineArtCard.getByLabel('Title')).toHaveValue('fine art fixture title');
 
     // Copy-to-clipboard: click the first "Copy for Etsy" button and confirm both the
     // button's own visual feedback and the real clipboard contents.
