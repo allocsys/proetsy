@@ -16,8 +16,12 @@ afterEach(() => {
 // fresh before each test so a writeText call in one test doesn't leak call history
 // into the next.
 beforeEach(() => {
-  Object.defineProperty(navigator, 'clipboard', {
-    value: { writeText: vi.fn() },
-    configurable: true,
-  });
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText = vi.fn();
+  } else {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: vi.fn() },
+      configurable: true,
+    });
+  }
 });
