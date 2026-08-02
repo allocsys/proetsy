@@ -7,6 +7,7 @@ import cors from 'cors';
 import multer from 'multer';
 import { getDb } from './db/init.js';
 import { getPipelineConfig, getProductSizes } from './config/index.js';
+import { SHOP_CONVENTIONS, MIDJOURNEY_CONVENTIONS } from './config/shop-conventions.js';
 import { createJob, getJobWithModules, setManualNotes, setModuleStatus } from './lib/jobs.js';
 import { analyzeArtworkForJob } from './lib/image-analyzer/index.js';
 import { generateListingsForJob } from './lib/listing-generator/index.js';
@@ -126,6 +127,14 @@ app.get('/api/config/pipeline', (req, res) => {
 
 app.get('/api/config/product-sizes', (req, res) => {
   res.json(getProductSizes());
+});
+
+// Module 6 -> Settings panel: previously "not yet done" -- "shop style conventions...
+// not consolidated into the Settings panel". These are intentionally hardcoded (see
+// ARCHITECTURE.md -> Module 2 -> "Must hardcode shop conventions"), so this is a
+// read-only view for the dashboard, not an editable-then-PATCH resource.
+app.get('/api/config/shop-conventions', (req, res) => {
+  res.json({ listing: SHOP_CONVENTIONS, midjourney: MIDJOURNEY_CONVENTIONS });
 });
 
 // Module 6 -> "Lets the user drag-and-drop artwork" / "Supports bulk mode (multiple

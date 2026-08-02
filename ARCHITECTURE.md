@@ -458,7 +458,7 @@ Nothing extra needs to be built to make this "self-improving" — every keep/dis
 **Removed.** Etsy publishing is manual — the user copies the approved listing text and mockups into Etsy themselves. No Etsy API v3 integration, no OAuth, no bulk-publish. This removes the biggest external-account risk from the whole build (Etsy developer approval, bulk-publish bugs, API changes) and the module entirely.
 
 ### Module 6 — Control Dashboard (core, not a pipeline step)
-**Status: upload + bulk mode + pipeline override panel + settings/tag-library panel + job history log + server-side job runner — ✅ done. Trend-list/shop-style-conventions settings UI consolidation and CSV tag import — not yet done.**
+**Status: upload + bulk mode + pipeline override panel + settings/tag-library panel + job history log + server-side job runner + CSV tag import + trend-list/shop-conventions settings consolidation — ✅ done.**
 Implemented directly in `frontend/src/App.jsx` (no longer just the bare job-ID-input
 skeleton the earlier pass left behind), against three new/changed backend routes in
 `backend/server.js`: `POST /api/artworks/upload` (multer, disk storage under
@@ -496,15 +496,22 @@ setup-status banner per the First-Run Setup section below.
 - **Listing/job history log — ✅ done.** A table sourced from the existing `GET /api/jobs`
   route (job id, artwork filename, `overall_status` badge, last-updated timestamp, a
   Review button that loads that job into the review section below).
-- **Settings panel — partially done.** Tag-library paste-and-save (textarea →
-  `POST /api/tags/bulk`) and default price / delivery text (→ `PATCH /api/settings`) are
-  wired; product-sizes are shown read-only (still config-file-edited, not dashboard-CRUD,
-  since `product-sizes.json`/DB round-tripping is a bigger change than this pass's scope).
-  **Not yet done:** shop style conventions, trend-list management (Module 4's own
-  `PromptHelper.jsx` already has its own add-a-trend form, so this isn't fully missing,
-  just not consolidated into the Settings panel), and CSV tag import (the backend already
-  has `importFromCsvRows` in `trends/manual.js` for trends, but no analogous CSV path for
-  tags — only the paste-a-list textarea).
+- **Settings panel — ✅ done.** Tag-library paste-and-save (textarea →
+  `POST /api/tags/bulk`), CSV tag import (`POST /api/tags/csv`, backed by
+  `tags/user-list.js`'s `tagRowsFromCsvText`/`importTagsFromCsvRows` — mirrors
+  `trends/manual.js`'s existing `importFromCsvRows` shape and dedupes against the
+  existing library the same way `POST /api/tags/bulk` already does), and default price /
+  delivery text (→ `PATCH /api/settings`) are wired. Trend-list management is
+  consolidated here too — a read-only list plus an add-a-trend form calling the same
+  `GET`/`POST /api/trends` routes Module 4's own `PromptHelper.jsx` already uses (that
+  component keeps its own trend picker/add-form too; this is an additional view, not a
+  replacement). Shop conventions (title separator, max lengths, tags-per-listing,
+  forbidden words, Midjourney `--v`/`--style`/stylize range) are shown read-only via the
+  new `GET /api/config/shop-conventions` route — read-only because these are
+  intentionally hardcoded (see Module 2 -> "Must hardcode shop conventions"), not
+  dashboard-editable config. Product-sizes are shown read-only (still
+  config-file-edited, not dashboard-CRUD, since `product-sizes.json`/DB round-tripping
+  is a bigger change than this pass's scope).
 - **Previews/edits generated fields, and copy-to-clipboard/export** — already covered by
   the existing `JobListingReview.jsx` (Copy-for-Etsy button, inline edit) and
   `JobMockupReview.jsx`, wired into the dashboard's "Review a specific job" section; no
@@ -788,7 +795,7 @@ SQLite (matches the local-first, local-DB decision above). `pipeline_config` and
 
 **Test suite:**
 - Unit tests (Vitest) for the swappable provider layers (`lib/llm/`, `lib/trends/`, `lib/tags/`) and for pipeline logic that's easy to silently break — partial failure handling, retry behavior, idempotency on re-running a module.
-- Integration tests (Supertest) against the Node backend's API routes, run against a throwaway test DB (in-memory or temp-file SQLite) so tests never touch the real local DB. **In place for Module 2's listing routes** (`backend/server.listing-routes.test.js`), **Module 4's trend/prompt routes** (`backend/server.prompt-routes.test.js`), **Module 3's PSD compositing path** (`backend/lib/mockup-generator.psd.test.js`), **the server-side pipeline runner** (`backend/server.pipeline-runner-routes.test.js`), and **Module 7's taste-filter routes** (`backend/server.taste-filter-routes.test.js`); Module 3's flat-template routes (mockup-composer run + variant PATCH) don't have route-level coverage yet, only the underlying generator functions.
+- Integration tests (Supertest) against the Node backend's API routes, run against a throwaway test DB (in-memory or temp-file SQLite) so tests never touch the real local DB. **In place for Module 2's listing routes** (`backend/server.listing-routes.test.js`), **Module 4's trend/prompt routes** (`backend/server.prompt-routes.test.js`), **Module 3's PSD compositing path** (`backend/lib/mockup-generator.psd.test.js`), **Module 3's flat-template mockup routes** (`backend/server.mockup-routes.test.js` — mockup-composer run success/failure/idempotency, the mockups list route's URL fields, and the variant-selection PATCH route including its 404/422 paths), **the server-side pipeline runner** (`backend/server.pipeline-runner-routes.test.js`), **Module 7's taste-filter routes** (`backend/server.taste-filter-routes.test.js`), **CSV tag/trend import** (`backend/server.csv-import-routes.test.js`), and **the read-only config routes** (`backend/server.config-routes.test.js`).
 - A small set of Playwright end-to-end tests covering the critical path only (upload artwork → generate listing → review → copy-to-clipboard) rather than exhaustive UI coverage.
 
 **CI (GitHub Actions) — ✅ done.** `.github/workflows/ci.yml`: on every push (any branch) and every PR into `main`, a single job runs `npm ci` at the repo root (installs both workspaces via the root `package.json`'s `workspaces` field), `npm run lint` (flat-config ESLint — `eslint.config.js` — added alongside this workflow, since none existed before; backend rules target Node/ESM globals, frontend rules target browser + JSX/React), `npm run test -w backend` (the Vitest unit + Supertest integration suites described throughout this doc's per-module status notes), and `npm run build -w frontend` (no frontend test suite exists yet, so a production build at least catches syntax errors, broken imports, and JSX mistakes on every push). Runs are cancelled/superseded via a concurrency group keyed on branch/PR ref, so pushing a fixup doesn't leave a stale run queued behind it. E2E (Playwright) is correctly NOT wired into this workflow — per this doc, those should run on a schedule/on-demand instead, and no Playwright suite exists yet regardless (see above, still planned).

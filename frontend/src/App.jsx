@@ -41,7 +41,11 @@ function App() {
   const [pipelineDefault, setPipelineDefault] = useState(null);
   const [overrides, setOverrides] = useState({});
   const [productSizes, setProductSizes] = useState({});
+  const [shopConventions, setShopConventions] = useState(null);
   const [settings, setSettings] = useState({});
+  const [trends, setTrends] = useState([]);
+  const [newTrendTerm, setNewTrendTerm] = useState('');
+  const [newTrendCategory, setNewTrendCategory] = useState('');
   const [tagsText, setTagsText] = useState('');
   const [tagsSavedMessage, setTagsSavedMessage] = useState('');
   const [tagsCsvMessage, setTagsCsvMessage] = useState('');
@@ -66,6 +70,13 @@ function App() {
       .catch(() => {});
   }
 
+  function refreshTrends() {
+    fetch('/api/trends')
+      .then((r) => r.json())
+      .then(setTrends)
+      .catch(() => {});
+  }
+
   useEffect(() => {
     fetch('/api/health')
       .then((r) => r.json())
@@ -81,9 +92,11 @@ function App() {
       .catch(() => {});
 
     fetch('/api/config/product-sizes').then((r) => r.json()).then(setProductSizes).catch(() => {});
+    fetch('/api/config/shop-conventions').then((r) => r.json()).then(setShopConventions).catch(() => {});
     fetch('/api/settings').then((r) => r.json()).then(setSettings).catch(() => {});
     refreshSetupStatus();
     refreshJobs();
+    refreshTrends();
   }, []);
 
   const sizeKeys = useMemo(() => Object.keys(productSizes || {}), [productSizes]);
@@ -195,6 +208,20 @@ function App() {
     setSettings(await res.json());
   }
 
+  // Trend-list management, consolidated into Settings (Module 4's own PromptHelper.jsx
+  // keeps its own add-a-trend form too — this is an additional view, not a replacement).
+  async function addTrendFromSettings() {
+    if (!newTrendTerm.trim()) return;
+    await fetch('/api/trends', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ term: newTrendTerm.trim(), category: newTrendCategory.trim() || null }),
+    });
+    setNewTrendTerm('');
+    setNewTrendCategory('');
+    refreshTrends();
+  }
+
   return (
     <div style={{ fontFamily: 'sans-serif', padding: '2rem', maxWidth: 900, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -258,6 +285,47 @@ function App() {
               placeholder="Digital file, no physical shipment"
             />
           </label>
+
+          <h3>Trend list</h3>
+          <p style={{ color: '#888', marginTop: 0 }}>Shared by Module 2 (trend-aware listing angles) and Module 4 (prompt helper).</p>
+          {trends.length ? (
+            <ul>
+              {trends.map((t) => (
+                <li key={t.id}>
+                  {t.term}{t.category ? ` (${t.category})` : ''}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p style={{ color: '#888' }}>No trends added yet.</p>
+          )}
+          <div>
+            <input
+              value={newTrendTerm}
+              onChange={(e) => setNewTrendTerm(e.target.value)}
+              placeholder="Trend term"
+            />{' '}
+            <input
+              value={newTrendCategory}
+              onChange={(e) => setNewTrendCategory(e.target.value)}
+              placeholder="Category (optional)"
+            />{' '}
+            <button onClick={addTrendFromSettings} disabled={!newTrendTerm.trim()}>Add trend</button>
+          </div>
+
+          <h3>Shop conventions</h3>
+          <p style={{ color: '#888', marginTop: 0 }}>Hardcoded (see ARCHITECTURE.md -> Module 2), shown here read-only for reference.</p>
+          {shopConventions ? (
+            <ul>
+              <li>Title separator: <code>{shopConventions.listing.titleSeparator}</code></li>
+              <li>Max title length: {shopConventions.listing.maxTitleLength}</li>
+              <li>Tags per listing: {shopConventions.listing.tagsPerListing} (+{shopConventions.listing.tagAlternates} alternates, max {shopConventions.listing.maxTagLength} chars)</li>
+              <li>Forbidden title words: {shopConventions.listing.forbiddenTitleWords.join(', ')}</li>
+              <li>Midjourney: {shopConventions.midjourney.version}, {shopConventions.midjourney.style}, stylize {shopConventions.midjourney.stylizeMin}–{shopConventions.midjourney.stylizeMax}</li>
+            </ul>
+          ) : (
+            <p style={{ color: '#888' }}>Loading…</p>
+          )}
 
           <h3>Product sizes / mockup templates</h3>
           {sizeKeys.length ? (
