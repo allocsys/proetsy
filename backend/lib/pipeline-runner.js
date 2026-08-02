@@ -13,7 +13,6 @@
 // failure mode: once the request lands, Node keeps executing the async chain regardless
 // of whether the client is still connected to read the eventual response.
 
-import { getDb } from '../db/init.js';
 import { getJobWithModules, setModuleStatus } from './jobs.js';
 import { analyzeArtworkForJob } from './image-analyzer/index.js';
 import { generateListingsForJob } from './listing-generator/index.js';
