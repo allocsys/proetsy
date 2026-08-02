@@ -8,6 +8,7 @@ export default defineConfig({
       '/api': 'http://localhost:4000',
       '/mockup-files': 'http://localhost:4000',
       '/artwork-files': 'http://localhost:4000',
+      '/taste-filter-files': 'http://localhost:4000',
     },
   },
 });
