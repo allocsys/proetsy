@@ -43,17 +43,21 @@ describe('POST /api/trends/csv', () => {
   });
 
   it('dedupes against terms already in the table, including ones added via the single-entry route', async () => {
-    await request(app).post('/api/trends').send({ term: 'watercolor florals', category: 'art' });
+    // Uses a term not touched by any earlier test in this file (the shared beforeAll's
+    // app/DB persists across tests here) -- 'watercolor florals' was already inserted via
+    // CSV in the first test above, so asserting a fresh single-row count against it would
+    // be asserting against stale state, not this test's own setup.
+    await request(app).post('/api/trends').send({ term: 'sunlit meadow', category: 'art' });
 
     const res = await request(app)
       .post('/api/trends/csv')
-      .send({ csv: 'term,category\nwatercolor florals,art\nbrand new term,decor' });
+      .send({ csv: 'term,category\nsunlit meadow,art\nbrand new term,decor' });
 
     expect(res.status).toBe(201);
     expect(res.body.imported).toBe(1);
 
     const list = await request(app).get('/api/trends');
-    expect(list.body.filter((t) => t.term === 'watercolor florals')).toHaveLength(1);
+    expect(list.body.filter((t) => t.term === 'sunlit meadow')).toHaveLength(1);
   });
 
   it('400s when csv is missing', async () => {
