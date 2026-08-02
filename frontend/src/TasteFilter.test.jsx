@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TasteFilter from './TasteFilter.jsx';
@@ -114,5 +114,43 @@ describe('TasteFilter', () => {
 
     expect(await screen.findByText('Not a valid image')).toBeInTheDocument();
     expect(screen.getByText('Keep')).toBeInTheDocument();
+  });
+});
+
+describe('TasteFilter — watched-folder auto-import polling (Module 7 -> "Auto-import via watched folder", step 7)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('does not poll before the interval elapses', () => {
+    render(<TasteFilter />);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('merges a watcher-detected candidate into the grid once the poll interval elapses', async () => {
+    const watched = { ...CANDIDATE, imagePath: '/data/taste-filter/from-watcher.png', imageUrl: '/taste-filter-files/from-watcher.png' };
+    fetch.mockResolvedValue({ ok: true, json: async () => ({ candidates: [watched] }) });
+
+    render(<TasteFilter />);
+    await vi.advanceTimersByTimeAsync(5000);
+
+    expect(fetch).toHaveBeenCalledWith('/api/taste-filter/pending');
+    expect(await screen.findByText('Keep')).toBeInTheDocument();
+  });
+
+  it('does not re-add a candidate already merged in from an earlier poll', async () => {
+    const watched = { ...CANDIDATE, imagePath: '/data/taste-filter/from-watcher.png', imageUrl: '/taste-filter-files/from-watcher.png' };
+    fetch.mockResolvedValue({ ok: true, json: async () => ({ candidates: [watched] }) });
+
+    render(<TasteFilter />);
+    await vi.advanceTimersByTimeAsync(5000);
+    await screen.findByText('Keep');
+    await vi.advanceTimersByTimeAsync(5000);
+
+    expect(screen.getAllByText('Keep')).toHaveLength(1);
   });
 });

@@ -185,3 +185,63 @@ describe('POST /api/taste-filter/label -> prompt-feedback link (Module 7 -> Modu
     expect(res.status).toBe(201);
   });
 });
+
+describe('GET /api/taste-filter/pending + /watch-status (Module 7 -> "Auto-import via watched folder", step 7)', () => {
+  it('watch-status reports inactive when nothing has been configured', async () => {
+    const res = await request(app).get('/api/taste-filter/watch-status');
+    expect(res.status).toBe(200);
+    expect(res.body.active).toBe(false);
+    expect(res.body.folder).toBeNull();
+  });
+
+  it('pending is an empty list when the watcher has nothing queued', async () => {
+    const res = await request(app).get('/api/taste-filter/pending');
+    expect(res.status).toBe(200);
+    expect(res.body.candidates).toEqual([]);
+  });
+
+  it('enabling the watcher via PATCH /api/settings picks up a dropped file, surfaced via GET /pending, and labeling it clears the queue', async () => {
+    const watchFolder = fs.mkdtempSync(path.join(tmpRoot, 'watch-'));
+
+    const patchRes = await request(app).patch('/api/settings').send({
+      taste_filter_watch_enabled: 'true',
+      taste_filter_watch_folder: watchFolder,
+      taste_filter_watch_category: 'square-canvas',
+    });
+    expect(patchRes.status).toBe(200);
+
+    const statusRes = await request(app).get('/api/taste-filter/watch-status');
+    expect(statusRes.body.active).toBe(true);
+    expect(statusRes.body.folder).toBe(watchFolder);
+
+    fs.writeFileSync(path.join(watchFolder, 'dropped.png'), 'fake-png-bytes');
+
+    let candidate;
+    const start = Date.now();
+    while (Date.now() - start < 4000) {
+      const pendingRes = await request(app).get('/api/taste-filter/pending');
+      if (pendingRes.body.candidates.length > 0) {
+        candidate = pendingRes.body.candidates[0];
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    expect(candidate).toBeDefined();
+    expect(candidate.category).toBe('square-canvas');
+    expect(candidate.imageUrl).toMatch(/^\/taste-filter-files\//);
+
+    const labelRes = await request(app).post('/api/taste-filter/label').send({
+      image_path: candidate.imagePath,
+      embedding: candidate.embedding,
+      label: 'keep',
+      category: candidate.category,
+    });
+    expect(labelRes.status).toBe(201);
+
+    const pendingAfterLabel = await request(app).get('/api/taste-filter/pending');
+    expect(pendingAfterLabel.body.candidates.find((c) => c.imagePath === candidate.imagePath)).toBeUndefined();
+
+    // Turn the watcher back off so it doesn't linger past this test.
+    await request(app).patch('/api/settings').send({ taste_filter_watch_enabled: 'false' });
+  });
+});
