@@ -109,6 +109,9 @@ describe('App', () => {
   it('shows the backend-unreachable banner when health fetch fails', async () => {
     global.fetch = vi.fn((url) => {
       if (url === '/api/health') return Promise.reject(new Error('network error'));
+      // Array-returning routes need an array back, or App's jobs.map()/trends.map()
+      // crashes on an object.
+      if (url === '/api/jobs' || url === '/api/trends') return Promise.resolve({ ok: true, json: async () => [] });
       return Promise.resolve({ ok: true, json: async () => ({}) });
     });
     render(<App />);
@@ -279,8 +282,9 @@ describe('App', () => {
     await screen.findByText('ok');
 
     await user.click(screen.getByText('⚙ Settings'));
-    const csvInput = await screen.findByLabelText(/import a CSV export/i, { selector: 'input[type="file"]' }).catch(() => null);
-    const input = csvInput || document.querySelector('input[type="file"][accept=".csv,text/csv"]');
+    // No <label htmlFor> associates this input with its description text, so query
+    // directly by its distinguishing accept attribute instead.
+    const input = document.querySelector('input[type="file"][accept=".csv,text/csv"]');
     const csvFile = new File(['tag_text\nboho decor'], 'tags.csv', { type: 'text/csv' });
     await user.upload(input, csvFile);
 
