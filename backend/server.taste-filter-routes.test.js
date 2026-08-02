@@ -152,3 +152,36 @@ describe('POST /api/taste-filter/recompute ("Recompute now" button)', () => {
     expect(res.body.counts.global.discardedCount).toBeGreaterThanOrEqual(1);
   });
 });
+
+describe('POST /api/taste-filter/label -> prompt-feedback link (Module 7 -> Module 4, write side)', () => {
+  it('labeling a candidate tagged with a prompt_id tallies that prompt\'s terms into prompt_terms', async () => {
+    const { getDb } = await import('./db/init.js');
+    const db = getDb();
+    const { lastInsertRowid: promptId } = db
+      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square-canvas', 'a serene lighthouse at dusk --ar 1:1')`)
+      .run();
+
+    const res = await request(app).post('/api/taste-filter/label').send({
+      image_path: '/tmp/lighthouse.png',
+      embedding: Array.from(KEEP_LEANING),
+      label: 'keep',
+      category: 'square-canvas',
+      prompt_id: promptId,
+    });
+    expect(res.status).toBe(201);
+
+    const lighthouse = db.prepare('SELECT * FROM prompt_terms WHERE term = ?').get('lighthouse');
+    expect(lighthouse.kept_count).toBeGreaterThanOrEqual(1);
+    const serene = db.prepare('SELECT * FROM prompt_terms WHERE term = ?').get('serene');
+    expect(serene.kept_count).toBeGreaterThanOrEqual(1);
+  });
+
+  it('labeling without a prompt_id does not throw and does not touch prompt_terms', async () => {
+    const res = await request(app).post('/api/taste-filter/label').send({
+      image_path: '/tmp/no-prompt.png',
+      embedding: Array.from(DISCARD_LEANING),
+      label: 'discard',
+    });
+    expect(res.status).toBe(201);
+  });
+});
