@@ -446,6 +446,54 @@ Nothing extra needs to be built to make this "self-improving" — every keep/dis
 **Removed.** Etsy publishing is manual — the user copies the approved listing text and mockups into Etsy themselves. No Etsy API v3 integration, no OAuth, no bulk-publish. This removes the biggest external-account risk from the whole build (Etsy developer approval, bulk-publish bugs, API changes) and the module entirely.
 
 ### Module 6 — Control Dashboard (core, not a pipeline step)
+**Status: upload + bulk mode + pipeline override panel + settings/tag-library panel + job history log — ✅ done. Trend-list/shop-style-conventions settings UI, CSV tag import, and a server-side job runner — not yet done.**
+Implemented directly in `frontend/src/App.jsx` (no longer just the bare job-ID-input
+skeleton the earlier pass left behind), against three new/changed backend routes in
+`backend/server.js`: `POST /api/artworks/upload` (multer, disk storage under
+`backend/data/uploads/`, accepts one-or-many files under a `files` field — a single drop
+and a bulk drop are the same request shape), `GET`/`PATCH /api/settings` (generic
+key/value store backed by the existing `settings` table), and `GET /api/tags` +
+`POST /api/tags/bulk` (paste-a-list tag-library import, dedupes against existing tag
+text). `POST /api/jobs` now accepts an optional `pipeline_overrides` object, threaded
+through to `createJob()` in `backend/lib/jobs.js` — a required module (Module 2) can't be
+overridden off. A new `GET /api/setup-status` route (Gemini key presence via
+`GEMINI_API_KEYS`, tag-library/product-size counts) backs the dashboard's persistent
+setup-status banner per the First-Run Setup section below.
+
+- **Drag-and-drop + bulk artwork upload — ✅ done.** A drop zone (plus a plain file input
+  fallback) posts to the new upload route, creates one `artworks` row per file, then
+  creates and runs a job per artwork. Each job's module calls happen independently
+  (`Promise.all` over per-job pipelines) so one artwork's failure doesn't block the rest
+  of a bulk batch, matching Partial Failure Handling's bulk-mode rule — though note this
+  orchestration currently lives client-side in `App.jsx`, not as a server-side job queue;
+  closing the browser tab mid-run would leave later modules un-triggered for that job
+  (already-completed modules and their DB rows are unaffected, and any module can still
+  be retried manually via the per-job review screens). A proper server-side runner is a
+  reasonable next hardening step, not yet built.
+- **Pipeline config panel (per-run override) — ✅ done.** Checkboxes seeded from
+  `GET /api/config/pipeline`'s defaults; toggling one only affects artwork uploaded next
+  in the same browser session, never rewrites `pipeline.config.json` on disk, per Step
+  control model's "UI override" layer. The required module is shown checked and disabled.
+- **Listing/job history log — ✅ done.** A table sourced from the existing `GET /api/jobs`
+  route (job id, artwork filename, `overall_status` badge, last-updated timestamp, a
+  Review button that loads that job into the review section below).
+- **Settings panel — partially done.** Tag-library paste-and-save (textarea →
+  `POST /api/tags/bulk`) and default price / delivery text (→ `PATCH /api/settings`) are
+  wired; product-sizes are shown read-only (still config-file-edited, not dashboard-CRUD,
+  since `product-sizes.json`/DB round-tripping is a bigger change than this pass's scope).
+  **Not yet done:** shop style conventions, trend-list management (Module 4's own
+  `PromptHelper.jsx` already has its own add-a-trend form, so this isn't fully missing,
+  just not consolidated into the Settings panel), and CSV tag import (the backend already
+  has `importFromCsvRows` in `trends/manual.js` for trends, but no analogous CSV path for
+  tags — only the paste-a-list textarea).
+- **Previews/edits generated fields, and copy-to-clipboard/export** — already covered by
+  the existing `JobListingReview.jsx` (Copy-for-Etsy button, inline edit) and
+  `JobMockupReview.jsx`, wired into the dashboard's "Review a specific job" section; no
+  change needed here.
+- **Not yet done:** a consolidated single-page "bulk batch" view showing per-item status
+  within one drop (today, a bulk drop's jobs show up as separate rows in the same history
+  table, distinguishable by upload-time proximity but not grouped as a batch).
+
 React frontend that:
 - Lets the user drag-and-drop artwork
 - Shows a **pipeline config panel**: toggle which modules run for this job (mirrors the config default, but overridable per run)
