@@ -40,15 +40,10 @@ test.describe('critical path: upload → generate listing → review → copy-to
     // code path, just against a stub that always resolves.
     await page.addInitScript(() => {
       let clipboardText = '';
-      Object.defineProperty(navigator, 'clipboard', {
-        configurable: true,
-        value: {
-          writeText: async (text) => {
-            clipboardText = text;
-          },
-          readText: async () => clipboardText,
-        },
-      });
+      navigator.clipboard.writeText = async (text) => {
+        clipboardText = text;
+      };
+      navigator.clipboard.readText = async () => clipboardText;
     });
 
     await page.goto('/');
