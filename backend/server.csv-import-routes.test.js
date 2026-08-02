@@ -1,0 +1,95 @@
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import request from 'supertest';
+
+// server.js reads DB_PATH at import time, so it must be set BEFORE the module is
+// imported — same pattern as server.prompt-routes.test.js / server.listing-routes.test.js.
+let app;
+let tmpRoot;
+
+beforeAll(async () => {
+  tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'proetsy-csv-routes-'));
+  process.env.DB_PATH = path.join(tmpRoot, 'test.db');
+  ({ default: app } = await import('./server.js'));
+});
+
+afterAll(() => {
+  fs.rmSync(tmpRoot, { recursive: true, force: true });
+});
+
+describe('POST /api/trends/csv', () => {
+  it('imports rows from CSV text and reports how many were inserted', async () => {
+    const csv = 'term,category\nwatercolor florals,art\nmoody botanical,decor';
+    const res = await request(app).post('/api/trends/csv').send({ csv });
+
+    expect(res.status).toBe(201);
+    expect(res.body.imported).toBe(2);
+
+    const list = await request(app).get('/api/trends');
+    const terms = list.body.map((t) => t.term);
+    expect(terms).toContain('watercolor florals');
+    expect(terms).toContain('moody botanical');
+    expect(list.body.find((t) => t.term === 'watercolor florals').source).toBe('csv');
+  });
+
+  it('recognizes an alternate header name for the term column', async () => {
+    const csv = 'keyword,category\ncottagecore,nursery';
+    const res = await request(app).post('/api/trends/csv').send({ csv });
+
+    expect(res.status).toBe(201);
+    expect(res.body.imported).toBe(1);
+  });
+
+  it('400s when csv is missing', async () => {
+    const res = await request(app).post('/api/trends/csv').send({});
+    expect(res.status).toBe(400);
+  });
+
+  it('400s when the CSV has no usable term/keyword/trend column', async () => {
+    const res = await request(app).post('/api/trends/csv').send({ csv: 'foo,bar\nx,y' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/No usable rows/);
+  });
+});
+
+describe('POST /api/tags/csv', () => {
+  it('imports rows from CSV text, tagging their source as csv', async () => {
+    const csv = 'tag_text,category\nboho wall art,decor\nminimalist print,art';
+    const res = await request(app).post('/api/tags/csv').send({ csv });
+
+    expect(res.status).toBe(201);
+    expect(res.body.inserted).toBe(2);
+    const boho = res.body.tags.find((t) => t.tag_text === 'boho wall art');
+    expect(boho.source).toBe('csv');
+    expect(boho.category).toBe('decor');
+  });
+
+  it('dedupes against tags already in the library, including ones added via the paste-a-list route', async () => {
+    await request(app).post('/api/tags/bulk').send({ tags: 'floral print' });
+
+    const res = await request(app).post('/api/tags/csv').send({ csv: 'tag,category\nfloral print,art\nnew unique tag,art' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.inserted).toBe(1);
+    expect(res.body.tags.filter((t) => t.tag_text === 'floral print')).toHaveLength(1);
+  });
+
+  it('recognizes alternate header names (tag / text / keyword) for the tag-text column', async () => {
+    const res = await request(app).post('/api/tags/csv').send({ csv: 'keyword\nabstract line art' });
+    expect(res.status).toBe(201);
+    expect(res.body.inserted).toBe(1);
+  });
+
+  it('400s when csv is missing', async () => {
+    const res = await request(app).post('/api/tags/csv').send({});
+    expect(res.status).toBe(400);
+  });
+
+  it('400s when the CSV has no usable tag-text column', async () => {
+    const res = await request(app).post('/api/tags/csv').send({ csv: 'foo,bar\nx,y' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/No usable rows/);
+  });
+});
