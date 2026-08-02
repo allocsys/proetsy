@@ -27,7 +27,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           # No `cache: npm` here — actions/setup-node's npm cache mode itself requires a
           # lock file to key the cache on, which is exactly what doesn't exist yet.
 
