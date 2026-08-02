@@ -32,9 +32,6 @@ test.describe('critical path: upload → generate listing → review → copy-to
   test('uploads artwork, runs the pipeline, reviews the generated listing, and copies it for Etsy', async ({
     page,
   }) => {
-    page.on('console', (msg) => console.log(`[browser console] ${msg.type()}: ${msg.text()}`));
-    page.on('pageerror', (err) => console.log(`[browser pageerror] ${err.message}`));
-
     await page.goto('/');
 
     // Confirm the backend is actually reachable before doing anything real — a much
@@ -91,6 +88,14 @@ test.describe('critical path: upload → generate listing → review → copy-to
     // button's own visual feedback and the real clipboard contents.
     const copyButton = page.getByRole('button', { name: 'Copy for Etsy' }).first();
     await copyButton.click();
+    // DEBUG (temporary): surface JobListingReview.jsx's on-page error text ("Clipboard
+    // copy failed — select and copy manually.") if the click didn't flip to "Copied!",
+    // since copyForEtsy()'s catch block swallows the real error without logging it.
+    const stillUncopied = await copyButton.textContent();
+    if (stillUncopied !== 'Copied!') {
+      const errorText = await fineArtCard.locator('p').last().textContent().catch(() => '(no error paragraph found)');
+      throw new Error(`Copy button never flipped to "Copied!" (was "${stillUncopied}"). On-page error: ${errorText}`);
+    }
     await expect(copyButton).toHaveText('Copied!');
 
     const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
