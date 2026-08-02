@@ -72,6 +72,7 @@ function mockFetchByUrl(overrides = {}) {
     '/api/setup-status': SETUP_STATUS_READY,
     '/api/jobs': [],
     '/api/trends': [],
+    '/api/taste-filter/watch-status': { active: false, folder: null, category: null, pendingCount: 0, lastError: null },
   };
   const responses = { ...defaults, ...overrides };
 
@@ -322,5 +323,38 @@ describe('App', () => {
 
     expect(await screen.findByText('|')).toBeInTheDocument();
     expect(screen.getByText(/Tags per listing: 13/)).toBeInTheDocument();
+  });
+
+  it('shows the watched-folder auto-import status in the settings panel (Module 7 -> step 7)', async () => {
+    mockFetchByUrl({
+      '/api/taste-filter/watch-status': { active: true, folder: '/home/you/midjourney', category: 'square-canvas', pendingCount: 2, lastError: null },
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('ok');
+
+    await user.click(screen.getByText('⚙ Settings'));
+
+    expect(await screen.findByText(/Watching \/home\/you\/midjourney/)).toBeInTheDocument();
+    expect(screen.getByText(/2 pending/)).toBeInTheDocument();
+  });
+
+  it('toggling auto-import on PATCHes settings and re-fetches watch status', async () => {
+    mockFetchByUrl({
+      '/api/settings': (url, options) => (options?.method === 'PATCH' ? { taste_filter_watch_enabled: 'true' } : {}),
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('ok');
+
+    await user.click(screen.getByText('⚙ Settings'));
+    await user.click(await screen.findByLabelText('Auto-import from folder'));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/settings',
+        expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ taste_filter_watch_enabled: true }) })
+      );
+    });
   });
 });
