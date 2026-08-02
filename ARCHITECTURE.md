@@ -458,7 +458,7 @@ Nothing extra needs to be built to make this "self-improving" — every keep/dis
 **Removed.** Etsy publishing is manual — the user copies the approved listing text and mockups into Etsy themselves. No Etsy API v3 integration, no OAuth, no bulk-publish. This removes the biggest external-account risk from the whole build (Etsy developer approval, bulk-publish bugs, API changes) and the module entirely.
 
 ### Module 6 — Control Dashboard (core, not a pipeline step)
-**Status: upload + bulk mode + pipeline override panel + settings/tag-library panel + job history log + server-side job runner + CSV tag import + trend-list/shop-conventions settings consolidation — ✅ done.**
+**Status: upload + bulk mode + pipeline override panel + settings/tag-library panel + job history log (now with grouped bulk-batch rows) + server-side job runner + CSV tag import + trend-list/shop-conventions settings consolidation — ✅ done.**
 Implemented directly in `frontend/src/App.jsx` (no longer just the bare job-ID-input
 skeleton the earlier pass left behind), against three new/changed backend routes in
 `backend/server.js`: `POST /api/artworks/upload` (multer, disk storage under
@@ -516,9 +516,16 @@ setup-status banner per the First-Run Setup section below.
   the existing `JobListingReview.jsx` (Copy-for-Etsy button, inline edit) and
   `JobMockupReview.jsx`, wired into the dashboard's "Review a specific job" section; no
   change needed here.
-- **Not yet done:** a consolidated single-page "bulk batch" view showing per-item status
-  within one drop (today, a bulk drop's jobs show up as separate rows in the same history
-  table, distinguishable by upload-time proximity but not grouped as a batch).
+- **Consolidated single-page "bulk batch" view — ✅ done.** A multi-file drop is given a
+  shared `batch_id` (a client-generated UUID, set on every job created from that same
+  drop) instead of relying on upload-time proximity to associate them. `jobs.batch_id`
+  (nullable — null for a single-artwork upload, which stays ungrouped) is set via an
+  optional `batch_id` field on `POST /api/jobs`, generated in `App.jsx`'s `handleFiles()`
+  only when more than one file is dropped. The history table's `groupedJobs` memo groups
+  jobs sharing a `batch_id` into one collapsible row (item count, a per-status badge
+  breakdown, most-recent-updated timestamp) while preserving `GET /api/jobs`'s
+  newest-first ordering; expanding it shows the same per-job rows a single upload would,
+  each still with its own Review button. Tested in `server.core-routes.test.js`.
 
 React frontend that:
 - Lets the user drag-and-drop artwork
