@@ -3,6 +3,7 @@ import JobArtworkAnalysisReview from './JobArtworkAnalysisReview.jsx';
 import JobListingReview from './JobListingReview.jsx';
 import JobMockupReview from './JobMockupReview.jsx';
 import PromptHelper from './PromptHelper.jsx';
+import TasteFilter from './TasteFilter.jsx';
 
 const STATUS_COLORS = {
   pending: '#999',
@@ -341,6 +342,9 @@ function App() {
 
       <h2>Trend / Prompt Helper (Module 4)</h2>
       <PromptHelper />
+
+      <h2>Taste Filter (Module 7)</h2>
+      <TasteFilter />
     </div>
   );
 }
