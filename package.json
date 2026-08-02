@@ -9,9 +9,12 @@
     "electron:rebuild": "electron-builder install-app-deps",
     "electron:build": "npm run build -w frontend && electron-builder --win",
     "lint": "eslint backend frontend/src",
-    "test": "npm run test -w backend"
+    "test": "npm run test -w backend",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install --with-deps chromium"
   },
   "devDependencies": {
+    "@playwright/test": "^1.48.0",
     "concurrently": "^9.0.0",
     "electron": "^33.0.0",
     "electron-builder": "^25.1.0",
