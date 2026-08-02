@@ -1,13 +1,6 @@
 import { useState } from 'react';
 
-const cardStyle = {
-  border: '1px solid #ccc',
-  borderRadius: 8,
-  padding: '1rem',
-  marginBottom: '1rem',
-};
-
-const variantColumnStyle = { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem' };
+// Using CSS classes.
 
 /**
  * One mockup's review card. When `needs_review` is set (see ARCHITECTURE.md -> Module 3
@@ -40,43 +33,43 @@ function MockupCard({ mockup, onVariantChange }) {
   }
 
   return (
-    <div style={cardStyle}>
-      <h4 style={{ marginTop: 0 }}>
+    <div className="dark-panel" style={{ marginBottom: '1rem' }}>
+      <h4 style={{ marginTop: 0, color: 'var(--cream)' }}>
         {mockup.size_key} {mockup.dimensions ? `(${mockup.dimensions})` : ''}
       </h4>
 
       {mockup.needs_review ? (
         <>
-          <p style={{ color: '#b45309', marginTop: 0 }}>Needs review — pick a variant:</p>
-          <div style={{ display: 'flex', gap: '1.5rem' }}>
-            <div style={variantColumnStyle}>
-              <strong>Smart crop</strong>
+          <p style={{ color: 'var(--state-pending)', marginTop: 0, fontSize: '13px' }}>Needs review — pick a variant:</p>
+          <div className="flex-row" style={{ gap: '1.5rem', alignItems: 'flex-start' }}>
+            <div className="flex-row" style={{ flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-start' }}>
+              <strong style={{ color: 'var(--cream-dim)', fontSize: '12px' }}>Smart crop</strong>
               {mockup.smart_crop_url && (
-                <img src={mockup.smart_crop_url} alt="Smart crop variant" width={200} />
+                <img src={mockup.smart_crop_url} alt="Smart crop variant" style={{ width: '200px', borderRadius: '4px' }} />
               )}
-              <button disabled={saving} onClick={() => selectVariant('smart_crop')}>
+              <button className="btn-secondary" disabled={saving} onClick={() => selectVariant('smart_crop')}>
                 Use smart crop
               </button>
             </div>
-            <div style={variantColumnStyle}>
-              <strong>AI extended</strong>
+            <div className="flex-row" style={{ flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-start' }}>
+              <strong style={{ color: 'var(--cream-dim)', fontSize: '12px' }}>AI extended</strong>
               {mockup.ai_extended_url && (
-                <img src={mockup.ai_extended_url} alt="AI-extended variant" width={200} />
+                <img src={mockup.ai_extended_url} alt="AI-extended variant" style={{ width: '200px', borderRadius: '4px' }} />
               )}
-              <button disabled={saving} onClick={() => selectVariant('ai_extended')}>
+              <button className="btn-secondary" disabled={saving} onClick={() => selectVariant('ai_extended')}>
                 Use AI extended
               </button>
             </div>
           </div>
         </>
       ) : (
-        <div style={variantColumnStyle}>
-          <span>Selected: {mockup.selected_variant}</span>
-          {mockup.file_url && <img src={mockup.file_url} alt="Selected mockup" width={200} />}
+        <div className="flex-row" style={{ flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-start' }}>
+          <span style={{ color: 'var(--cream-dim)', fontSize: '13px' }}>Selected: {mockup.selected_variant}</span>
+          {mockup.file_url && <img src={mockup.file_url} alt="Selected mockup" style={{ width: '200px', borderRadius: '4px' }} />}
         </div>
       )}
 
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
+      {error && <p style={{ color: 'var(--state-danger)', fontSize: '13px', marginTop: '0.5rem' }}>{error}</p>}
     </div>
   );
 }
