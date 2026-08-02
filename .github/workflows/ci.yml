@@ -142,6 +142,29 @@ jobs:
       # runtime, display, or backend process.
       - run: npm run test:electron
 
+  frontend-test:
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Restore node_modules cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            backend/node_modules
+            frontend/node_modules
+          key: ${{ needs.install.outputs.node-modules-key }}
+      # Vitest + Testing Library component suite (App.test.jsx, JobArtworkAnalysisReview/
+      # JobListingReview/JobMockupReview/PromptHelper/TasteFilter .test.jsx), backed by
+      # frontend/vitest.config.js (jsdom environment, src/test/setup.js). Previously only
+      # `vite build` ran here, which never executes a single test file — this job closes
+      # that gap so these suites actually gate pushes/PRs.
+      - run: npm run test -w frontend
+
   frontend-build:
     needs: install
     runs-on: ubuntu-latest
@@ -169,7 +192,8 @@ jobs:
           key: vite-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
           restore-keys: |
             vite-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
-      # No automated test suite for the frontend yet (ARCHITECTURE.md's Playwright
-      # critical-path suite is planned, not built) — `vite build` at least catches
-      # syntax errors, broken imports, and JSX mistakes on every push.
+      # `vite build` on top of frontend-test above — still worth keeping as its own job
+      # since a production build catches syntax errors, broken imports, and bundler-level
+      # issues that a jsdom test run alone wouldn't (e.g. import paths that only resolve
+      # under Vitest's module resolution, or build-only config problems).
       - run: npm run build -w frontend
