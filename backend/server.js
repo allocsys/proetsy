@@ -1,7 +1,10 @@
 import 'dotenv/config';
+import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import cors from 'cors';
+import multer from 'multer';
 import { getDb } from './db/init.js';
 import { getPipelineConfig, getProductSizes } from './config/index.js';
 import { createJob, getJobWithModules, setManualNotes, setModuleStatus } from './lib/jobs.js';
@@ -17,8 +20,29 @@ import { generatePromptsForTrend, listPrompts } from './lib/prompt-helper/index.
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Storage for artwork the user drags/uploads into the dashboard (Module 6 -> "Lets the
+// user drag-and-drop artwork"). Mirrors mockup-generator.js's MOCKUP_OUTPUT_DIR pattern:
+// env-overridable, otherwise resolved against the backend package root (not
+// process.cwd()) so behavior doesn't depend on where `node server.js` is launched from.
+const UPLOADS_DIR = process.env.ARTWORK_UPLOADS_DIR
+  ? path.resolve(process.cwd(), process.env.ARTWORK_UPLOADS_DIR)
+  : path.join(__dirname, 'data', 'uploads');
+fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+const uploadStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
+  filename: (req, file, cb) => {
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9_.-]/g, '_');
+    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}-${safeName}`);
+  },
+});
+const upload = multer({ storage: uploadStorage, limits: { fileSize: 25 * 1024 * 1024 } });
+
 app.use(cors());
 app.use(express.json());
+// Serves uploaded artwork files back to the dashboard (thumbnails, review screens).
+app.use('/artwork-files', express.static(UPLOADS_DIR));
 
 // Serves generated mockup images for the dashboard review UI (step 7). Files in
 // OUTPUT_DIR are flat (no subdirectories — see composeMockup's naming convention), so a
@@ -60,6 +84,95 @@ app.get('/api/config/product-sizes', (req, res) => {
   res.json(getProductSizes());
 });
 
+// Module 6 -> "Lets the user drag-and-drop artwork" / "Supports bulk mode (multiple
+// artworks through the pipeline at once)". Accepts one or many files under the `files`
+// field (a single drop and a bulk drop are the same request shape) and creates one
+// artwork row per file. Actual pipeline runs are still kicked off by POST /api/jobs —
+// this route only handles getting the files onto disk and into the artworks table.
+app.post('/api/artworks/upload', upload.array('files', 50), (req, res) => {
+  const files = req.files || [];
+  if (!files.length) return res.status(400).json({ error: 'No files uploaded (expected multipart field "files")' });
+
+  const db = getDb();
+  const insert = db.prepare('INSERT INTO artworks (file_path, original_filename) VALUES (?, ?)');
+  const artworks = files.map((file) => {
+    const { lastInsertRowid } = insert.run(file.path, file.originalname);
+    return {
+      ...db.prepare('SELECT * FROM artworks WHERE id = ?').get(lastInsertRowid),
+      file_url: `/artwork-files/${path.basename(file.path)}`,
+    };
+  });
+  res.status(201).json({ artworks });
+});
+
+// Module 6 -> Settings panel: default price, delivery text, and other free-form
+// shop-level settings. Backed by the generic `settings` key/value table (see
+// ARCHITECTURE.md -> Database Schema -> "Config-as-data") rather than dedicated columns,
+// since the set of settings fields is expected to grow without needing a migration each
+// time.
+app.get('/api/settings', (req, res) => {
+  const db = getDb();
+  const rows = db.prepare('SELECT key, value FROM settings').all();
+  const settings = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  res.json(settings);
+});
+
+// Body is a flat { key: value, ... } object; each key is upserted independently so a
+// partial update (e.g. just { default_price: '24.00' }) doesn't clobber other settings.
+app.patch('/api/settings', (req, res) => {
+  const updates = req.body || {};
+  const db = getDb();
+  const upsert = db.prepare(
+    'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+  );
+  const run = db.transaction(() => {
+    for (const [key, value] of Object.entries(updates)) {
+      upsert.run(key, value === null || value === undefined ? null : String(value));
+    }
+  });
+  run();
+  const rows = db.prepare('SELECT key, value FROM settings').all();
+  res.json(Object.fromEntries(rows.map((r) => [r.key, r.value])));
+});
+
+// Module 6 -> First-Run Setup -> "Required for Module 2 (core): a starter tag list —
+// paste a list or upload a CSV, not one-at-a-time entry." Also doubles as the ongoing
+// Settings-panel tag-library editor. Module 2's tags provider layer (lib/tags/user-list.js)
+// reads straight from this table.
+app.get('/api/tags', (req, res) => {
+  const db = getDb();
+  res.json(db.prepare('SELECT * FROM tags ORDER BY tag_text').all());
+});
+
+// Body: { tags: "one\nper\nline" or ["one", "two"], category?, source? }. Skips tags
+// already present (by exact text) so pasting the same list twice doesn't duplicate rows.
+app.post('/api/tags/bulk', (req, res) => {
+  const { tags, category, source } = req.body || {};
+  const list = Array.isArray(tags)
+    ? tags
+    : String(tags || '')
+        .split(/\r?\n|,/)
+        .map((t) => t.trim())
+        .filter(Boolean);
+  if (!list.length) return res.status(400).json({ error: 'tags is required (newline/comma-separated string or array)' });
+
+  const db = getDb();
+  const existing = new Set(db.prepare('SELECT tag_text FROM tags').all().map((r) => r.tag_text));
+  const insert = db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)');
+  const run = db.transaction(() => {
+    let inserted = 0;
+    for (const tag of list) {
+      if (existing.has(tag)) continue;
+      insert.run(tag, category || null, source || 'manual');
+      existing.add(tag);
+      inserted += 1;
+    }
+    return inserted;
+  });
+  const inserted = run();
+  res.status(201).json({ inserted, total: existing.size, tags: db.prepare('SELECT * FROM tags ORDER BY tag_text').all() });
+});
+
 app.get('/api/jobs', (req, res) => {
   const db = getDb();
   const jobs = db
@@ -95,11 +208,14 @@ app.get('/api/artworks/:id', (req, res) => {
 });
 
 // Creates a job for an artwork, seeding job_modules from the current pipeline config.
+// `pipeline_overrides` (optional): { [module_name]: boolean } — Module 6's per-run
+// pipeline-config-panel toggle (see ARCHITECTURE.md -> Step control model -> "UI
+// override"). Omit it to just use the saved default config as-is.
 app.post('/api/jobs', (req, res) => {
-  const { artwork_id } = req.body || {};
+  const { artwork_id, pipeline_overrides } = req.body || {};
   if (!artwork_id) return res.status(400).json({ error: 'artwork_id is required' });
   try {
-    const jobId = createJob(artwork_id);
+    const jobId = createJob(artwork_id, pipeline_overrides || {});
     res.status(201).json(getJobWithModules(jobId));
   } catch (err) {
     res.status(400).json({ error: err.message });
