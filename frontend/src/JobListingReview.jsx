@@ -105,7 +105,7 @@ function ListingCard({ listing, onSaved }) {
         <button onClick={save} disabled={saving}>
           {saving ? 'Saving…' : 'Save'}
         </button>
-        <button className="btn-secondary" onClick={copyForEtsy}>{copied ? 'Copied!' : 'Copy for Etsy'}</button>
+        <button className="btn-secondary" data-testid="copy-for-etsy" onClick={copyForEtsy}>{copied ? 'Copied!' : 'Copy for Etsy'}</button>
       </div>
 
       {warnings.length > 0 && (
