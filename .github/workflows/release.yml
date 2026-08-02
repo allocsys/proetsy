@@ -1,26 +1,23 @@
 name: Release
 
-# See ARCHITECTURE.md -> Testing & CI/CD -> "CD (packaging, not deployment)":
-# "On a tagged release, a GitHub Actions workflow runs electron-builder and attaches the
-# resulting Windows installer/exe as a release artifact automatically."
+# See ARCHITECTURE.md -> Testing & CI/CD -> "CD (packaging, not deployment)" and ->
+# Suggested build order, step 6 ("Electron packaging (Windows exe)") / its "Electron
+# packaging -- build sequence" subsection for full status and rationale.
 #
-# That's the *target* CD step, but electron-builder packaging isn't built yet
-# (ARCHITECTURE.md -> Suggested build order, step 6: "Electron packaging (Windows exe) —
-# once the app is fully working as a normal local web app... wrap it with
-# electron-builder"). No Electron main process, no electron-builder config, and no
-# packaging dependency exist in the repo as of this workflow.
+# Electron packaging sub-steps 1-4 (main process skeleton, packaged-mode frontend/data
+# paths, electron-builder config, better-sqlite3 Electron-ABI rebuild) are done -- see
+# electron/main.js and the root package.json `build` config. This workflow adds
+# sub-step 5: an actual `electron-builder` packaging job producing a Windows
+# installer/exe, alongside (not replacing) the existing local-bundle tarball job below,
+# which stays useful for anyone who'd rather run the app locally via `npm ci && npm
+# start` without installing anything.
 #
-# Rather than fabricate an electron-builder step against config that doesn't exist (which
-# would just fail on the first tag), this workflow does the CD-adjacent work that *is*
-# real today: gate the tag on the same lint+test checks CI runs, build the frontend for
-# production, and publish a local-bundle tarball (backend source + frontend's built
-# `dist/` + the config files a local install needs) as a GitHub Release artifact — enough
-# for `npm ci && npm start`-style local deployment without cloning the repo.
-#
-# TODO(step 6): once electron-builder + a main process are added, replace (or add
-# alongside) the "package-local-bundle" job below with the real
-# `electron-builder --publish always` step this doc describes, producing the actual
-# Windows installer/exe.
+# NOT YET VERIFIED end-to-end: sub-steps 3/4's config has not actually been run through
+# electron-builder on a real machine or in CI yet. This job is the first real test of
+# that config -- if it fails, that's expected information, not a sign this workflow was
+# written wrong; see ARCHITECTURE.md's "Electron packaging -- build sequence" for the
+# specific pieces (asarUnpack path, ELECTRON_RUN_AS_NODE spawn, npmRebuild) most likely
+# to need adjustment once real output is available to debug against.
 
 on:
   push:
@@ -108,6 +105,48 @@ jobs:
             extracted folder: `npm ci --workspace backend`, copy `backend/.env.example`
             to `backend/.env` and fill in a Gemini key, then `npm start -w backend`.
             The built frontend (`frontend/dist`) is included but not yet served by the
-            backend or packaged into an installer — see ARCHITECTURE.md's build order
-            step 6 (Electron packaging) for what a real installable release will look
-            like once that's built.
+            backend directly.
+
+  # Electron packaging build-sequence sub-step 5. Runs on windows-latest rather than
+  # cross-compiling the NSIS target from Linux via Wine, since a native module
+  # (better-sqlite3) is involved and native-rebuild tooling is most reliable running on
+  # its actual target OS rather than under emulation. A separate, full `npm ci` runs here
+  # (rather than restoring `verify`'s Ubuntu node_modules cache) since native deps built
+  # on Ubuntu aren't usable on Windows regardless of caching -- npmRebuild (see root
+  # package.json's `build` config) then rebuilds better-sqlite3 specifically against
+  # Electron's own Node ABI, on top of whatever `npm ci` just installed.
+  package-electron-win:
+    needs: verify
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Build Windows installer
+        run: npm run electron:build
+
+      # electron-builder's own directories.output setting (root package.json's `build`
+      # config: "release-builds") controls where this lands; the NSIS installer's exact
+      # filename includes the version from package.json, so a glob picks it up without
+      # hardcoding a version string here.
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-builds/*.exe
+          generate_release_notes: true
+          body: |
+            Windows installer for ${{ github.ref_name }}. Run the installer, then launch
+            ProEtsy from the Start menu -- no separate Node.js install or manual
+            `npm start` needed (unlike the local-bundle tarball release also attached
+            here). First run still needs a Gemini API key entered into the app's setup
+            screen (ARCHITECTURE.md -> First-Run Setup).
+
+            The installer is unsigned, so Windows SmartScreen will show a "Windows
+            protected your PC" warning on first run -- click "More info" -> "Run anyway".
+            See ARCHITECTURE.md -> Open Discussions -> "Unsigned Windows exe /
+            SmartScreen."
