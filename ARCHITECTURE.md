@@ -366,8 +366,8 @@ raw`/`--ar`/`--s` backstop, mirroring `listing-generator/validate.js`'s pattern)
 new Midjourney conventions themselves in `backend/config/shop-conventions.js`
 (`MIDJOURNEY_CONVENTIONS`). Wired up via `POST /api/prompts/generate`, `GET
 /api/prompts`, plus `GET /api/trends` and `POST /api/trends` (single-entry manual trend
-creation — CSV import via `trends/manual.js`'s existing `importFromCsvRows` isn't wired to
-a route yet) in `backend/server.js`. **Deliberately NOT job-scoped**, per this module's
+creation) plus `POST /api/trends/csv` (CSV import via `trends/manual.js`'s existing
+`importFromCsvRows`) in `backend/server.js`. **Deliberately NOT job-scoped**, per this module's
 isolation from the main pipeline (see Partial Failure Handling): no `job_modules` row, no
 `jobId` parameter anywhere in its code path — a generation run is keyed only by an
 optional `trend_id` + a target `category`. Each call **inserts a new batch of `prompts`
@@ -779,7 +779,7 @@ SQLite (matches the local-first, local-DB decision above). `pipeline_config` and
 
 1. **Local skeleton** — ✅ done: React frontend + Node backend running locally, DB schema in place, pipeline config wired up (modules currently stubbed), plus the three provider-layer interfaces (`lib/llm/`, `lib/trends/`, `lib/tags/`) scaffolded with their v1 implementations
 2. **Module 2** (Listing Generator) — core, get this solid first, matches original Phase 1. **✅ done:** generation (`backend/lib/listing-generator/index.js`), shop-convention enforcement (`validate.js`), tags-provider integration, the LLM provider layer's key×model cascade plus request-spacing/cooldown/escalation hardening (see LLM Provider Layer status note above), a dashboard review/edit UI (`JobListingReview.jsx`), and automated tests (unit, idempotency, and route-level integration — see Module 2 status note above).
-3. **Module 3** (Mockup Composer with own templates) — no external mockup API needed, so this can move up earlier than the original plan's Phase 2. **✅ core + smart-crop + PSD template support + AI-outpainting fallback + dashboard review UI done** (see Module 3 status note above). **Not yet done:** a committed real PSD test fixture, and integration/idempotency tests for the PSD-specific compositing path's own file-IO (the flat-template path's upsert idempotency is covered; PSD's isn't yet).
+3. **Module 3** (Mockup Composer with own templates) — no external mockup API needed, so this can move up earlier than the original plan's Phase 2. **✅ core + smart-crop + PSD template support + AI-outpainting fallback + dashboard review UI done** (see Module 3 status note above). **This is now done too** (see Module 3 status note above for the committed fixture and PSD-specific idempotency suite).
 4. **Module 4** (manual-trend prompt helper) — ✅ done (see Module 4 status note above)
 4a. **Module 7** (Taste Filter, pre-pipeline curation gate) — ✅ full build sequence done: embeddings, centroids, scoring, routes, dashboard UI, the Module 4 prompt-feedback write side, and auto-import via watched folder (see Module 7 status note above).
 5. **Local persistent deployment** — running the finished app as an always-on local process (own machine or a small home server); not a cloud/serverless deployment (see Stack section)
