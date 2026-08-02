@@ -22,6 +22,7 @@ import { generatePromptsForTrend, listPrompts } from './lib/prompt-helper/index.
 import { embedImage } from './lib/taste-filter/embeddings.js';
 import { scoreCandidate } from './lib/taste-filter/scoring.js';
 import { getCentroids, addImagePreference, recomputeCentroids, tallyPromptTermsForLabel } from './lib/taste-filter/store.js';
+import { syncWatcherFromSettings, getPendingCandidates, removePendingCandidate, getWatcherStatus } from './lib/taste-filter/watcher.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
