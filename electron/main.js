@@ -14,11 +14,24 @@
 // spawnBackend(). Without sub-step 4, a packaged build's spawned backend will fail at
 // require-time on better-sqlite3, even though the paths/loading logic here is otherwise
 // ready for it.
+//
+// ESM, not CJS: Vitest's vi.mock() only intercepts static `import` statements (it
+// rewrites them to check the mock registry); a literal require() call is never
+// intercepted, regardless of dependency externalization settings. This file used to be
+// CommonJS, which meant electron/main.test.js's vi.mock('electron'/'node:child_process'/
+// 'node:http', ...) silently never took effect -- every "mocked" dependency was actually
+// the real one. Root package.json now sets `"type": "module"` so this file (no local
+// package.json of its own) parses as ESM.
 
-const { app, BrowserWindow } = require('electron');
-const { spawn } = require('node:child_process');
-const path = require('node:path');
-const http = require('node:http');
+import { app, BrowserWindow } from 'electron';
+import { spawn } from 'node:child_process';
+import path from 'node:path';
+import http from 'node:http';
+import { fileURLToPath } from 'node:url';
+
+// ESM has no CJS-style __dirname/__filename globals.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const BACKEND_PORT = process.env.PORT || 4000;
 const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
@@ -48,7 +61,7 @@ let mainWindow = null;
 // generated-mockups directories are, so there's no writability problem to solve for it
 // yet. Revisit if/when template management becomes dashboard-editable rather than
 // config-file-edited (see Module 6's "product-sizes are shown read-only" status note).
-function packagedBackendEnv() {
+export function packagedBackendEnv() {
   if (!app.isPackaged) return {};
   const userDataDir = app.getPath('userData');
   return {
@@ -79,12 +92,12 @@ function packagedBackendEnv() {
 // NOT YET VERIFIED end-to-end on a real packaged build -- this is the standard,
 // documented fix for this exact situation, wired up per electron-builder's own guidance,
 // but nothing here has actually been packaged and run on a real machine yet.
-function backendExecutable() {
+export function backendExecutable() {
   if (!app.isPackaged) return { command: 'node', extraEnv: {} };
   return { command: process.execPath, extraEnv: { ELECTRON_RUN_AS_NODE: '1' } };
 }
 
-function spawnBackend() {
+export function spawnBackend() {
   const backendDir = path.join(__dirname, '..', 'backend');
   const { command, extraEnv } = backendExecutable();
   const child = spawn(command, ['server.js'], {
@@ -105,7 +118,7 @@ function spawnBackend() {
 // initRateLimitCache()'s rehydration). Same "fail loud, not silent" philosophy as
 // ARCHITECTURE.md's First-Run Setup section -- if the backend never comes up, this
 // rejects instead of leaving a blank window with no explanation.
-function waitForBackend(url, { timeoutMs = 20000, intervalMs = 250 } = {}) {
+export function waitForBackend(url, { timeoutMs = 20000, intervalMs = 250 } = {}) {
   const deadline = Date.now() + timeoutMs;
   return new Promise((resolve, reject) => {
     const attempt = () => {
@@ -127,7 +140,7 @@ function waitForBackend(url, { timeoutMs = 20000, intervalMs = 250 } = {}) {
   });
 }
 
-async function createWindow() {
+export async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 860,
@@ -158,27 +171,17 @@ async function createWindow() {
   });
 }
 
-// Exported for unit testing (electron/main.test.js) -- see the require.main guard below
-// for why importing this module doesn't also trigger the app lifecycle it drives.
-module.exports = {
-  packagedBackendEnv,
-  backendExecutable,
-  waitForBackend,
-  spawnBackend,
-  createWindow,
-  BACKEND_PORT,
-  BACKEND_URL,
-  DEV_FRONTEND_URL,
-};
+export { BACKEND_PORT, BACKEND_URL, DEV_FRONTEND_URL };
 
 // Only run the actual Electron app lifecycle when this file is executed directly as the
 // app's entry point (`electron electron/main.js`, or via package.json's `main` field) --
-// not when a test file `require()`s it just to reach the exported helpers above.
-// `electron` sets `require.main` to this module the same way plain `node main.js`
-// would, so this guard doesn't change real app startup behavior at all -- it only stops
-// the side effects (spawning a real backend, opening a real window) from firing on a
-// bare `require()`.
-if (require.main === module) {
+// not when a test file imports it just to reach the exported helpers above. ESM has no
+// `require.main === module` -- the equivalent here is comparing this file's own path to
+// the path Node/Electron was actually launched with (process.argv[1]), which is set the
+// same way for an ESM entry point as it is for a CJS one.
+const isMainModule = process.argv[1] && path.resolve(process.argv[1]) === __filename;
+
+if (isMainModule) {
   app.whenReady().then(async () => {
     backendProcess = spawnBackend();
     try {
