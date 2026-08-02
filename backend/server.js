@@ -534,8 +534,8 @@ app.post('/api/trends/csv', (req, res) => {
   if (!csv) return res.status(400).json({ error: 'csv is required (raw CSV text)' });
   const rows = rowsFromCsvText(csv);
   if (!rows.length) return res.status(400).json({ error: 'No usable rows found (expected a term/keyword/trend column)' });
-  importFromCsvRows(rows);
-  res.status(201).json({ imported: rows.length });
+  const inserted = importFromCsvRows(rows);
+  res.status(201).json({ imported: inserted });
 });
 
 // Runs Module 4: generates a fresh batch of ready-to-paste Midjourney prompts for an
