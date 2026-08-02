@@ -108,6 +108,11 @@ function App() {
     const formData = new FormData();
     files.forEach((f) => formData.append('files', f));
 
+    // Multi-file drops get a shared batch_id (a client-generated UUID) so the history
+    // table below can group their jobs into one row instead of N separate ones. A
+    // single-file drop stays ungrouped (batch_id omitted) since there's nothing to group.
+    const batchId = files.length > 1 ? crypto.randomUUID() : null;
+
     try {
       const uploadRes = await fetch('/api/artworks/upload', { method: 'POST', body: formData });
       const { artworks, error } = await uploadRes.json();
@@ -119,7 +124,7 @@ function App() {
         const jobRes = await fetch('/api/jobs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ artwork_id: artwork.id, pipeline_overrides: overrides }),
+          body: JSON.stringify({ artwork_id: artwork.id, pipeline_overrides: overrides, batch_id: batchId }),
         });
         const job = await jobRes.json();
         jobIds.push(job.id);
