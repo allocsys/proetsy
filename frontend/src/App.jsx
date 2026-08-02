@@ -456,17 +456,73 @@ function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {jobs.map((job) => (
-                      <tr key={job.id}>
-                        <td className="mono">#{job.id}</td>
-                        <td style={{ wordBreak: 'break-all' }}>{job.artwork_file_path?.split('/').pop()}</td>
-                        <td><StatusBadge status={job.overall_status} /></td>
-                        <td className="text-muted mono" style={{ fontSize: '13px' }}>{job.updated_at}</td>
-                        <td>
-                          <button onClick={() => { setActiveJobId(String(job.id)); setJobIdInput(String(job.id)); }}>Review</button>
-                        </td>
-                      </tr>
-                    ))}
+                    {groupedJobs.map((entry) => {
+                      if (entry.type === 'single') {
+                        const job = entry.job;
+                        return (
+                          <tr key={job.id}>
+                            <td className="mono">#{job.id}</td>
+                            <td style={{ wordBreak: 'break-all' }}>{job.artwork_file_path?.split('/').pop()}</td>
+                            <td><StatusBadge status={job.overall_status} /></td>
+                            <td className="text-muted mono" style={{ fontSize: '13px' }}>{job.updated_at}</td>
+                            <td>
+                              <button onClick={() => { setActiveJobId(String(job.id)); setJobIdInput(String(job.id)); }}>Review</button>
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      // Bulk batch: one summary row (item count + per-status breakdown),
+                      // expandable to the same per-job rows a single upload would show.
+                      const { batchId, jobs: batchJobs } = entry;
+                      const expanded = !!expandedBatches[batchId];
+                      const statusCounts = batchJobs.reduce((acc, j) => {
+                        acc[j.overall_status] = (acc[j.overall_status] || 0) + 1;
+                        return acc;
+                      }, {});
+                      const mostRecentUpdate = batchJobs.reduce(
+                        (latest, j) => (j.updated_at > latest ? j.updated_at : latest),
+                        batchJobs[0].updated_at
+                      );
+                      return (
+                        <>
+                          <tr key={`batch-${batchId}`} style={{ background: 'var(--paper-shade, rgba(0,0,0,0.02))' }}>
+                            <td className="mono">
+                              <button
+                                className="btn-secondary"
+                                style={{ padding: '0.1rem 0.5rem' }}
+                                onClick={() => setExpandedBatches((prev) => ({ ...prev, [batchId]: !prev[batchId] }))}
+                              >
+                                {expanded ? '▾' : '▸'}
+                              </button>
+                            </td>
+                            <td style={{ fontWeight: 600 }}>Batch — {batchJobs.length} artwork{batchJobs.length > 1 ? 's' : ''}</td>
+                            <td>
+                              <div className="flex-row flex-wrap" style={{ gap: '0.35rem' }}>
+                                {Object.entries(statusCounts).map(([status, count]) => (
+                                  <span key={status} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                                    <StatusBadge status={status} /> <span className="text-muted mono" style={{ fontSize: '12px' }}>x{count}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="text-muted mono" style={{ fontSize: '13px' }}>{mostRecentUpdate}</td>
+                            <td />
+                          </tr>
+                          {expanded && batchJobs.map((job) => (
+                            <tr key={job.id} style={{ opacity: 0.9 }}>
+                              <td className="mono" style={{ paddingLeft: '1.5rem' }}>#{job.id}</td>
+                              <td style={{ wordBreak: 'break-all' }}>{job.artwork_file_path?.split('/').pop()}</td>
+                              <td><StatusBadge status={job.overall_status} /></td>
+                              <td className="text-muted mono" style={{ fontSize: '13px' }}>{job.updated_at}</td>
+                              <td>
+                                <button onClick={() => { setActiveJobId(String(job.id)); setJobIdInput(String(job.id)); }}>Review</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
