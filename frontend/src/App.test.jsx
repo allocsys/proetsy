@@ -76,7 +76,15 @@ function mockFetchByUrl(overrides = {}) {
   const responses = { ...defaults, ...overrides };
 
   global.fetch = vi.fn((url, options) => {
-    const key = Object.keys(responses).find((k) => url === k || url.startsWith(k));
+    // Prefer an exact match; otherwise the longest matching prefix, so a specific
+    // route like '/api/jobs/run-batch' never falls through to the '/api/jobs' handler
+    // just because both are present and the shorter one happens to iterate first.
+    const keys = Object.keys(responses);
+    let key = keys.find((k) => url === k);
+    if (!key) {
+      const prefixMatches = keys.filter((k) => url.startsWith(k));
+      key = prefixMatches.sort((a, b) => b.length - a.length)[0];
+    }
     if (!key) {
       return Promise.resolve({ ok: true, json: async () => ({}) });
     }
