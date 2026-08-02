@@ -5,5 +5,6 @@ backend/data/*.db
 backend/data/*.db-*
 backend/data/mockups/
 backend/data/uploads/
+backend/models/
 dist/
 .DS_Store
