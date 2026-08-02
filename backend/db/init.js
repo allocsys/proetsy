@@ -47,8 +47,10 @@ function runDefensiveMigrations(db) {
     "ALTER TABLE taste_centroids ADD COLUMN kept_count INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE taste_centroids ADD COLUMN discarded_count INTEGER NOT NULL DEFAULT 0",
     // Groups a bulk drop's jobs for the dashboard history view — see schema.sql's
-    // jobs.batch_id comment.
+    // jobs.batch_id comment. The index is created here too (not in schema.sql) since it
+    // must run after this column exists on a pre-existing dev DB.
     'ALTER TABLE jobs ADD COLUMN batch_id TEXT',
+    'CREATE INDEX IF NOT EXISTS idx_jobs_batch_id ON jobs(batch_id)',
   ];
   for (const sql of migrations) {
     try {
