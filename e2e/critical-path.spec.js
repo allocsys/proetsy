@@ -27,11 +27,30 @@ function writeTestArtwork() {
 }
 
 test.describe('critical path: upload → generate listing → review → copy-to-clipboard', () => {
-  test.use({ permissions: ['clipboard-read', 'clipboard-write'] });
-
   test('uploads artwork, runs the pipeline, reviews the generated listing, and copies it for Etsy', async ({
     page,
   }) => {
+    // Stub navigator.clipboard with an in-memory implementation rather than relying on
+    // headless Chromium's real OS-clipboard integration, which can hang indefinitely on
+    // minimal CI runners (no clipboard backend/display service) even with
+    // clipboard-read/clipboard-write permissions granted. This test's goal is verifying
+    // JobListingReview.jsx's copy-to-Etsy code path (writeText called with the right
+    // content, UI reflects success), not Chromium's OS clipboard plumbing -- addInitScript
+    // runs before any page script, so copyForEtsy()'s real call still exercises the same
+    // code path, just against a stub that always resolves.
+    await page.addInitScript(() => {
+      let clipboardText = '';
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          writeText: async (text) => {
+            clipboardText = text;
+          },
+          readText: async () => clipboardText,
+        },
+      });
+    });
+
     await page.goto('/');
 
     // Confirm the backend is actually reachable before doing anything real — a much
@@ -88,15 +107,6 @@ test.describe('critical path: upload → generate listing → review → copy-to
     // button's own visual feedback and the real clipboard contents.
     const copyButton = page.getByRole('button', { name: 'Copy for Etsy' }).first();
     await copyButton.click();
-    await page.waitForTimeout(500);
-    // DEBUG (temporary): surface JobListingReview.jsx's on-page error text ("Clipboard
-    // copy failed — select and copy manually.") if the click didn't flip to "Copied!",
-    // since copyForEtsy()'s catch block swallows the real error without logging it.
-    const stillUncopied = await copyButton.textContent();
-    if (stillUncopied !== 'Copied!') {
-      const errorText = await fineArtCard.locator('p').last().textContent().catch(() => '(no error paragraph found)');
-      throw new Error(`Copy button never flipped to "Copied!" (was "${stillUncopied}"). On-page error: ${errorText}`);
-    }
     await expect(copyButton).toHaveText('Copied!');
 
     const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
