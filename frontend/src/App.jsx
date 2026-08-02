@@ -85,6 +85,32 @@ function App() {
 
   const sizeKeys = useMemo(() => Object.keys(productSizes || {}), [productSizes]);
 
+  const [expandedBatches, setExpandedBatches] = useState({});
+
+  // Module 6 -> "consolidated single-page 'bulk batch' view": groups jobs sharing the
+  // same batch_id (set at creation time for a multi-file drop, see handleFiles below)
+  // into one entry, so a bulk drop shows as a single collapsible row in the history table
+  // instead of N indistinguishable ones. Jobs without a batch_id (single-artwork uploads)
+  // pass through unchanged. Preserves the API's newest-first ordering by grouping at each
+  // batch's first-seen position rather than re-sorting.
+  const groupedJobs = useMemo(() => {
+    const groups = [];
+    const batchIndex = new Map();
+    for (const job of jobs) {
+      if (!job.batch_id) {
+        groups.push({ type: 'single', job });
+        continue;
+      }
+      if (batchIndex.has(job.batch_id)) {
+        groups[batchIndex.get(job.batch_id)].jobs.push(job);
+      } else {
+        batchIndex.set(job.batch_id, groups.length);
+        groups.push({ type: 'batch', batchId: job.batch_id, jobs: [job] });
+      }
+    }
+    return groups;
+  }, [jobs]);
+
   // Runs a batch of jobs' full pipelines via the server-side runner
   // (backend/lib/pipeline-runner.js), one request for the whole batch instead of the
   // dashboard sequencing each module call itself. Each job still proceeds independently
