@@ -662,6 +662,11 @@ app.post('/api/taste-filter/label', (req, res) => {
     // no prompt_id was given or it doesn't resolve to a real prompt -- optional/opt-in,
     // never blocks the label above from having already saved.
     tallyPromptTermsForLabel(resolvedPromptId, label);
+    // Step 7's auto-import queue (see lib/taste-filter/watcher.js): if this label was for
+    // a watched-folder candidate, drop it from the pending queue so a subsequent
+    // GET /api/taste-filter/pending poll doesn't re-surface an already-labeled image. A
+    // no-op for a manually drag-and-dropped candidate, which was never in this queue.
+    removePendingCandidate(image_path);
     res.status(201).json({
       id,
       counts: Object.fromEntries(Array.from(counts.entries()).map(([k, v]) => [k === null ? 'global' : k, v])),
@@ -669,6 +674,22 @@ app.post('/api/taste-filter/label', (req, res) => {
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// Module 7 -> "Auto-import via watched folder" (step 7). The dashboard polls this to pick
+// up whatever the watcher has detected + scored since the last poll -- same response
+// shape as POST /api/taste-filter/import's own `{ candidates }`, so TasteFilter.jsx can
+// merge results from both sources into one local list without a separate code path.
+app.get('/api/taste-filter/pending', (req, res) => {
+  res.json({ candidates: getPendingCandidates() });
+});
+
+// Read-only status for the dashboard Settings panel -- whether the watcher is currently
+// active, which folder/category it's watching, and how many candidates are sitting
+// unlabeled in the pending queue. Nothing here is user-editable directly; the watcher
+// itself is driven entirely by the taste_filter_watch_* keys in PATCH /api/settings.
+app.get('/api/taste-filter/watch-status', (req, res) => {
+  res.json(getWatcherStatus());
 });
 
 // Current centroid coverage (counts only, not the raw vectors) -- backs the dashboard's
