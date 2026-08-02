@@ -86,23 +86,18 @@ function App() {
 
   const sizeKeys = useMemo(() => Object.keys(productSizes || {}), [productSizes]);
 
-  // Orchestrates one job's modules in pipeline order, honoring this run's overrides.
-  // Mirrors ARCHITECTURE.md -> Pipeline overview: Module 1 (optional) -> Module 2 (core,
-  // always runs) -> Module 3 (optional, once per configured product size).
-  async function runJobPipeline(jobId) {
-    if (overrides.image_analyzer !== false) {
-      await fetch(`/api/jobs/${jobId}/run/image-analyzer`, { method: 'POST' }).catch(() => {});
-    }
-    await fetch(`/api/jobs/${jobId}/run/listing-generator`, { method: 'POST' }).catch(() => {});
-    if (overrides.mockup_composer !== false) {
-      for (const size_key of sizeKeys) {
-        await fetch(`/api/jobs/${jobId}/run/mockup-composer`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ size_key }),
-        }).catch(() => {});
-      }
-    }
+  // Runs a batch of jobs' full pipelines via the server-side runner
+  // (backend/lib/pipeline-runner.js), one request for the whole batch instead of the
+  // dashboard sequencing each module call itself. Each job still proceeds independently
+  // server-side (Partial Failure Handling's bulk-mode rule), and — unlike the old
+  // client-side sequencing — the work isn't tied to this browser tab staying open once
+  // the request has been sent.
+  async function runJobsBatch(jobIds) {
+    await fetch('/api/jobs/run-batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job_ids: jobIds }),
+    }).catch(() => {});
     refreshJobs();
   }
 
@@ -132,9 +127,11 @@ function App() {
       }
       refreshJobs();
 
-      setUploadStatus(`Running pipeline for ${jobIds.length} job${jobIds.length > 1 ? 's' : ''}… (bulk mode — each runs independently)`);
-      // Bulk mode: each job proceeds independently, one failure doesn't block the rest.
-      await Promise.all(jobIds.map((id) => runJobPipeline(id)));
+      setUploadStatus(`Running pipeline for ${jobIds.length} job${jobIds.length > 1 ? 's' : ''} on the server… (bulk mode — each runs independently; safe to navigate away)`);
+      // Server-side batch runner: each job proceeds independently, one failure doesn't
+      // block the rest, and — unlike the old client-side sequencing — the run isn't
+      // cancelled by closing this tab once the request has been sent.
+      await runJobsBatch(jobIds);
       setUploadStatus(`Done. ${jobIds.length} job${jobIds.length > 1 ? 's' : ''} processed — see history below.`);
       if (jobIds.length === 1) setActiveJobId(String(jobIds[0]));
     } catch (err) {
