@@ -17,6 +17,9 @@ import { initRateLimitCache } from './lib/llm/rate-limits.js';
 import { getTrends } from './lib/trends/index.js';
 import { addManualTrend } from './lib/trends/manual.js';
 import { generatePromptsForTrend, listPrompts } from './lib/prompt-helper/index.js';
+import { embedImage } from './lib/taste-filter/embeddings.js';
+import { scoreCandidate } from './lib/taste-filter/scoring.js';
+import { getCentroids, addImagePreference, recomputeCentroids } from './lib/taste-filter/store.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -40,10 +43,30 @@ const uploadStorage = multer.diskStorage({
 });
 const upload = multer({ storage: uploadStorage, limits: { fileSize: 25 * 1024 * 1024 } });
 
+// Module 7 (Taste Filter) -> "Build sequence" step 4. Storage for raw Midjourney-batch
+// candidates dragged into the dashboard for scoring, kept separate from artwork uploads
+// (UPLOADS_DIR) since candidates aren't artworks until/unless a kept one is later dragged
+// into "Upload Artwork" per the closed-loop diagram.
+const CANDIDATES_DIR = process.env.TASTE_FILTER_CANDIDATES_DIR
+  ? path.resolve(process.cwd(), process.env.TASTE_FILTER_CANDIDATES_DIR)
+  : path.join(__dirname, 'data', 'taste-filter');
+fs.mkdirSync(CANDIDATES_DIR, { recursive: true });
+
+const candidateStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, CANDIDATES_DIR),
+  filename: (req, file, cb) => {
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9_.-]/g, '_');
+    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}-${safeName}`);
+  },
+});
+const uploadCandidate = multer({ storage: candidateStorage, limits: { fileSize: 25 * 1024 * 1024 } });
+
 app.use(cors());
 app.use(express.json());
 // Serves uploaded artwork files back to the dashboard (thumbnails, review screens).
 app.use('/artwork-files', express.static(UPLOADS_DIR));
+// Serves raw taste-filter candidate images back to the dashboard's ranked batch grid.
+app.use('/taste-filter-files', express.static(CANDIDATES_DIR));
 
 // Serves generated mockup images for the dashboard review UI (step 7). Files in
 // OUTPUT_DIR are flat (no subdirectories — see composeMockup's naming convention), so a
@@ -494,6 +517,113 @@ app.get('/api/prompts', (req, res) => {
   const { trend_id, category } = req.query;
   const prompts = listPrompts({ trendId: trend_id ? Number(trend_id) : undefined, category: category || undefined });
   res.json(prompts);
+});
+
+// Module 7 (Taste Filter) routes. See ARCHITECTURE.md -> Module 7 -> "Build sequence"
+// steps 4-5. Candidates are NOT persisted to image_preferences until the user actually
+// labels them (keep/discard) -- per the doc, "nothing is auto-deleted [...] the user
+// confirms keep/discard, and that confirmation is the training signal", so an imported-
+// but-not-yet-labeled batch only lives on disk + in this response, never in
+// image_preferences. No separate "pending candidates" table -- just a scoring pass over
+// freshly-saved files, matching the doc's "nothing extra needs to be built" closed-loop
+// design.
+
+// Batch import: saves each uploaded file to disk, embeds it via the local CLIP model, and
+// scores it against the CURRENT global + (optional) category centroids. Body fields
+// alongside the `files` multipart field: `category` (optional -- applies to the whole
+// batch) and `prompt_id` (optional -- links every candidate in this batch to the Module 4
+// prompt that generated them, for the prompt-feedback link). Returns each candidate's
+// embedding back to the caller (plain array) so the label call doesn't need to re-run the
+// model -- the frontend holds it only for as long as the batch is under review. A
+// per-file embed/score failure (e.g. a corrupt image) doesn't fail the whole batch --
+// that candidate comes back with an `error` field instead of scores.
+app.post('/api/taste-filter/import', uploadCandidate.array('files', 100), async (req, res) => {
+  const files = req.files || [];
+  if (!files.length) return res.status(400).json({ error: 'No files uploaded (expected multipart field "files")' });
+
+  const category = req.body?.category || null;
+  const promptId = req.body?.prompt_id ? Number(req.body.prompt_id) : null;
+
+  const globalCentroids = getCentroids(null);
+  const categoryCentroids = category ? getCentroids(category) : null;
+
+  const candidates = [];
+  for (const file of files) {
+    try {
+      const embedding = await embedImage(file.path);
+      const scores = scoreCandidate(embedding, { global: globalCentroids, category: categoryCentroids });
+      candidates.push({
+        imagePath: file.path,
+        imageUrl: `/taste-filter-files/${path.basename(file.path)}`,
+        category,
+        promptId,
+        embedding: Array.from(embedding),
+        ...scores,
+      });
+    } catch (err) {
+      candidates.push({
+        imagePath: file.path,
+        imageUrl: `/taste-filter-files/${path.basename(file.path)}`,
+        category,
+        promptId,
+        error: err.message,
+      });
+    }
+  }
+
+  res.status(201).json({ candidates });
+});
+
+// Records a keep/discard decision for one candidate -- the actual training signal (see
+// ARCHITECTURE.md -> Module 7 -> "How the 'training' works"). Body: { image_path,
+// embedding: number[], label: 'keep' | 'discard', category?, prompt_id? }. The embedding
+// is passed back in from the import response rather than re-derived, so labeling doesn't
+// need the model loaded again. Centroids recompute synchronously right after, per
+// "centroids recompute automatically after every labeled batch" -- a single label is the
+// smallest possible batch.
+app.post('/api/taste-filter/label', (req, res) => {
+  const { image_path, embedding, label, category, prompt_id } = req.body || {};
+  if (!image_path || !Array.isArray(embedding) || !embedding.length) {
+    return res.status(400).json({ error: 'image_path and a non-empty embedding array are required' });
+  }
+  if (label !== 'keep' && label !== 'discard') {
+    return res.status(400).json({ error: "label must be 'keep' or 'discard'" });
+  }
+
+  try {
+    const id = addImagePreference({
+      imagePath: image_path,
+      embedding: Float32Array.from(embedding),
+      label,
+      category: category || null,
+      promptId: prompt_id ? Number(prompt_id) : null,
+    });
+    const counts = recomputeCentroids();
+    res.status(201).json({
+      id,
+      counts: Object.fromEntries(Array.from(counts.entries()).map(([k, v]) => [k === null ? 'global' : k, v])),
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Current centroid coverage (counts only, not the raw vectors) -- backs the dashboard's
+// cold-start messaging without exposing embedding data over the API.
+app.get('/api/taste-filter/centroids', (req, res) => {
+  const db = getDb();
+  const rows = db.prepare('SELECT category, kept_count, discarded_count, updated_at FROM taste_centroids').all();
+  res.json(rows.map((r) => ({ ...r, category: r.category === null ? 'global' : r.category })));
+});
+
+// Manual "Recompute now" button (ARCHITECTURE.md -> Module 7: "a 'Recompute now' button
+// in the dashboard triggers an immediate recompute [...] without waiting for the next
+// batch").
+app.post('/api/taste-filter/recompute', (req, res) => {
+  const counts = recomputeCentroids();
+  res.json({
+    counts: Object.fromEntries(Array.from(counts.entries()).map(([k, v]) => [k === null ? 'global' : k, v])),
+  });
 });
 
 // Guarded so importing this module (e.g. supertest-based integration tests, which wrap
