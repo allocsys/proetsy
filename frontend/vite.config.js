@@ -7,6 +7,7 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:4000',
       '/mockup-files': 'http://localhost:4000',
+      '/artwork-files': 'http://localhost:4000',
     },
   },
 });
