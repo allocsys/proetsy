@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import JobArtworkAnalysisReview from './JobArtworkAnalysisReview.jsx';
 import JobListingReview from './JobListingReview.jsx';
 import JobMockupReview from './JobMockupReview.jsx';
+import PromptHelper from './PromptHelper.jsx';
 
 function App() {
   const [health, setHealth] = useState(null);
@@ -56,6 +57,9 @@ function App() {
           <JobMockupReview jobId={activeJobId} />
         </>
       )}
+
+      <h2>Trend / Prompt Helper (Module 4)</h2>
+      <PromptHelper />
 
       <p style={{ color: '#888' }}>
         Skeleton dashboard — modules are stubbed. See ARCHITECTURE.md for the full plan.
