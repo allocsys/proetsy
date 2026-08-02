@@ -9,16 +9,20 @@ import { getPipelineConfig } from '../config/index.js';
 // model, this is the "UI override" layer — it applies only to this one job, never
 // rewrites pipeline.config.json. A required module (e.g. listing_generator) ignores an
 // attempt to disable it, so a bad request can't produce a job that can never succeed.
-export function createJob(artworkId, overrides = {}) {
+// `batchId` (optional): a caller-supplied string (Module 6's dashboard generates one
+// client-side per bulk drop) shared across every job created from the same batch, so the
+// dashboard history view can group them into one row instead of N indistinguishable
+// single-job rows. Null for a single-artwork upload — no grouping to do.
+export function createJob(artworkId, overrides = {}, batchId = null) {
   const db = getDb();
   const artwork = db.prepare('SELECT id FROM artworks WHERE id = ?').get(artworkId);
   if (!artwork) throw new Error(`Artwork ${artworkId} not found`);
 
-  const insertJob = db.prepare("INSERT INTO jobs (artwork_id, overall_status) VALUES (?, 'pending')");
+  const insertJob = db.prepare("INSERT INTO jobs (artwork_id, overall_status, batch_id) VALUES (?, 'pending', ?)");
   const insertModule = db.prepare('INSERT INTO job_modules (job_id, module_name, status) VALUES (?, ?, ?)');
 
   const run = db.transaction(() => {
-    const { lastInsertRowid: jobId } = insertJob.run(artworkId);
+    const { lastInsertRowid: jobId } = insertJob.run(artworkId, batchId || null);
     const { pipeline } = getPipelineConfig();
     for (const { module, enabled, required } of pipeline) {
       const override = overrides[module];
