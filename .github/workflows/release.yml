@@ -12,12 +12,15 @@ name: Release
 # which stays useful for anyone who'd rather run the app locally via `npm ci && npm
 # start` without installing anything.
 #
-# NOT YET VERIFIED end-to-end: sub-steps 3/4's config has not actually been run through
-# electron-builder on a real machine or in CI yet. This job is the first real test of
-# that config -- if it fails, that's expected information, not a sign this workflow was
-# written wrong; see ARCHITECTURE.md's "Electron packaging -- build sequence" for the
-# specific pieces (asarUnpack path, ELECTRON_RUN_AS_NODE spawn, npmRebuild) most likely
-# to need adjustment once real output is available to debug against.
+# VERIFIED end-to-end as of run #6 (workflow_dispatch, commit after the package-lock.json
+# regeneration fix): npm ci passes against the current lockfile, @electron/rebuild
+# successfully rebuilds better-sqlite3 against Electron's ABI, electron-builder produces
+# a working NSIS installer, and the asar-inspection step below confirms better-sqlite3
+# (and by extension the rest of backend's runtime deps, via root package.json's
+# `dependencies` block -- see ARCHITECTURE.md's "Fourth CI run") actually land in the
+# packaged app, both inside app.asar and unpacked at app.asar.unpacked. See
+# ARCHITECTURE.md's "Electron packaging -- build sequence" for the full run #1-#6
+# debugging trail that got here.
 
 on:
   push:
