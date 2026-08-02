@@ -42,6 +42,10 @@ function runDefensiveMigrations(db) {
     'ALTER TABLE mockups ADD COLUMN smart_crop_path TEXT',
     "ALTER TABLE mockups ADD COLUMN needs_review INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE mockups ADD COLUMN selected_variant TEXT NOT NULL DEFAULT 'smart_crop'",
+    // Taste Filter scoring's cold-start confidence check — see ARCHITECTURE.md ->
+    // Module 7 -> "Build sequence" step 3 and schema.sql's taste_centroids comment.
+    "ALTER TABLE taste_centroids ADD COLUMN kept_count INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE taste_centroids ADD COLUMN discarded_count INTEGER NOT NULL DEFAULT 0",
   ];
   for (const sql of migrations) {
     try {
