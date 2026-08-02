@@ -24,7 +24,7 @@ on:
     tags: ['v*.*.*']
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '24'
 
 jobs:
   # Same gate as CI — a release should never ship on top of a red build. This job is
