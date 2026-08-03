@@ -10,6 +10,7 @@ import { LISTING_VARIATIONS } from '../../config/shop-conventions.js';
 let getDb;
 let generateListingsForJob;
 let createJob;
+let llmIndex;
 let tmpRoot;
 
 function fixtureVariations() {
@@ -38,6 +39,7 @@ beforeAll(async () => {
   ({ getDb } = await import('../../db/init.js'));
   ({ generateListingsForJob } = await import('./index.js'));
   ({ createJob } = await import('../jobs.js'));
+  llmIndex = await import('../llm/index.js');
 
   const db = getDb();
   const { lastInsertRowid: artworkId } = db
@@ -93,5 +95,64 @@ describe('generateListingsForJob upsert idempotency (ARCHITECTURE.md -> Module 2
       expect(JSON.parse(row.tags)).toHaveLength(13);
       expect(JSON.parse(row.tag_alternates)).toHaveLength(5);
     }
+  });
+});
+
+// plan.md Testing: "Add a fixture ... covering a mixed-category tag library to guard
+// against regressing this fix later." This exercises the real tags table + real
+// getTagCandidates() scoring (backend/lib/tags/user-list.js) end-to-end through Module 2,
+// asserting the category-aware ordering actually reaches the prompt text handed to the
+// LLM provider — not just the ordering of the array in isolation (already covered in
+// tags/user-list.test.js).
+describe('generateListingsForJob tag candidate ordering (mixed-category regression guard)', () => {
+  it('lists category-corroborated tags before uncategorized tags before category-conflicting tags in the prompt', async () => {
+    const db = getDb();
+    db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)').run(
+      'watercolor',
+      'watercolor',
+      'manual'
+    );
+    db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)').run('fox', null, 'manual');
+    db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)').run(
+      'boho decor',
+      'boho',
+      'manual'
+    );
+
+    const { lastInsertRowid: artworkId } = db
+      .prepare('INSERT INTO artworks (file_path, image_analysis) VALUES (?, ?)')
+      .run(
+        'mixed-category-artwork.png',
+        JSON.stringify({
+          subject: 'a fox in a meadow',
+          style: 'watercolor',
+          suggested_categories: ['botanical'],
+          palette: [],
+          mood: 'calm',
+          themes: ['boho decor'],
+          notable_elements: [],
+        })
+      );
+    const jobId = createJob(artworkId);
+
+    llmIndex.generateText.mockClear();
+    await generateListingsForJob(jobId);
+
+    expect(llmIndex.generateText).toHaveBeenCalledTimes(1);
+    const promptSent = llmIndex.generateText.mock.calls[0][0];
+
+    // Scope the ordering check to the candidate-tags section of the prompt specifically —
+    // 'watercolor' also appears earlier in the raw image-analysis JSON block, so comparing
+    // indices across the whole prompt would give a false pass/fail unrelated to tag scoring.
+    const tagSection = promptSent.slice(promptSent.indexOf("Candidate tags from the shop's tag library"));
+    const watercolorIdx = tagSection.indexOf('watercolor');
+    const foxIdx = tagSection.indexOf('fox');
+    const bohoIdx = tagSection.indexOf('boho decor');
+
+    expect(watercolorIdx).toBeGreaterThan(-1);
+    expect(foxIdx).toBeGreaterThan(-1);
+    expect(bohoIdx).toBeGreaterThan(-1);
+    expect(watercolorIdx).toBeLessThan(foxIdx);
+    expect(foxIdx).toBeLessThan(bohoIdx);
   });
 });
