@@ -240,7 +240,7 @@ export async function listConfiguredTemplates() {
   const db = getDb();
   const rows = db
     .prepare(
-      'SELECT size_key, dimensions, dpi, orientation, mockup_template_path, placement_layer FROM product_sizes ORDER BY size_key'
+      'SELECT size_key, dimensions, dpi, orientation, mockup_template_path, placement_layer, category FROM product_sizes ORDER BY size_key'
     )
     .all();
 
@@ -274,10 +274,10 @@ export async function listConfiguredTemplates() {
  * module" -> upsertConfiguredTemplate). `mockup_template` is stored as-given (a filename
  * relative to the templates dir, matching the existing product-sizes.json convention).
  *
- * @param {{ size_key: string, dimensions?: string, dpi?: number, orientation?: string, mockup_template: string, placement_layer?: string }} entry
+ * @param {{ size_key: string, dimensions?: string, dpi?: number, orientation?: string, mockup_template: string, placement_layer?: string, category?: string }} entry
  * @returns {object} the resulting product_sizes row
  */
-export function upsertConfiguredTemplate({ size_key, dimensions, dpi, orientation, mockup_template, placement_layer } = {}) {
+export function upsertConfiguredTemplate({ size_key, dimensions, dpi, orientation, mockup_template, placement_layer, category } = {}) {
   if (!size_key) throw new Error('size_key is required');
   if (!mockup_template) throw new Error('mockup_template is required');
 
@@ -289,14 +289,15 @@ export function upsertConfiguredTemplate({ size_key, dimensions, dpi, orientatio
 
   const db = getDb();
   const upsert = db.prepare(`
-    INSERT INTO product_sizes (size_key, dimensions, dpi, orientation, mockup_template_path, placement_layer)
-    VALUES (@size_key, @dimensions, @dpi, @orientation, @mockup_template_path, @placement_layer)
+    INSERT INTO product_sizes (size_key, dimensions, dpi, orientation, mockup_template_path, placement_layer, category)
+    VALUES (@size_key, @dimensions, @dpi, @orientation, @mockup_template_path, @placement_layer, @category)
     ON CONFLICT(size_key) DO UPDATE SET
       dimensions = excluded.dimensions,
       dpi = excluded.dpi,
       orientation = excluded.orientation,
       mockup_template_path = excluded.mockup_template_path,
-      placement_layer = excluded.placement_layer
+      placement_layer = excluded.placement_layer,
+      category = excluded.category
   `);
   upsert.run({
     size_key,
@@ -305,9 +306,26 @@ export function upsertConfiguredTemplate({ size_key, dimensions, dpi, orientatio
     orientation: orientation || null,
     mockup_template_path: mockup_template,
     placement_layer: placement_layer || null,
+    category: category || null,
   });
 
-  return db.prepare('SELECT size_key, dimensions, dpi, orientation, mockup_template_path, placement_layer FROM product_sizes WHERE size_key = ?').get(size_key);
+  return db.prepare('SELECT size_key, dimensions, dpi, orientation, mockup_template_path, placement_layer, category FROM product_sizes WHERE size_key = ?').get(size_key);
+}
+
+/**
+ * Distinct, non-null `category` values currently configured on `product_sizes`, sorted
+ * alphabetically -- backs `GET /api/mockup-templates/categories` (plan.md -> "Mockup
+ * categories" -> "New route"), which the curated flow's category-selection picker
+ * populates its checklist from, and MockupTemplates.jsx's category `<datalist>` merges
+ * into its suggestion list, rather than either hardcoding a fixed taxonomy.
+ * @returns {string[]}
+ */
+export function listConfiguredCategories() {
+  const db = getDb();
+  return db
+    .prepare('SELECT DISTINCT category FROM product_sizes WHERE category IS NOT NULL ORDER BY category')
+    .all()
+    .map((row) => row.category);
 }
 
 /**
