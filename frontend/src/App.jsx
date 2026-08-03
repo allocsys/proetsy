@@ -6,10 +6,11 @@ import PromptHelper from './PromptHelper.jsx';
 import TasteFilter from './TasteFilter.jsx';
 
 function StatusBadge({ status }) {
+  const statusText = status || 'pending';
   return (
-    <span className={`status-pill ${status || 'pending'}`}>
-      <span className="status-dot" />
-      {status}
+    <span className={`status-pill ${statusText}`} aria-label={`Status: ${statusText}`}>
+      <span className="status-dot" aria-hidden="true" />
+      {statusText}
     </span>
   );
 }
@@ -278,8 +279,8 @@ function App() {
           <div className="wordmark-crop">
             <h1 className="wordmark">ProEtsy</h1>
           </div>
-          <span className="status-pill success">
-            <span className="status-dot" />
+          <span className="status-pill success" aria-label="Status: Local Print Pipeline active">
+            <span className="status-dot" aria-hidden="true" />
             Local Print Pipeline
           </span>
         </div>
