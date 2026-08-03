@@ -182,6 +182,8 @@ describe('MockupCategorySelector (Rollout step 5)', () => {
         postCalls.push(JSON.parse(opts.body));
         return { ok: true, json: async () => ({ job: {}, results: {} }) };
       }],
+      // onGenerated reloads the mockups list after a successful run.
+      ['/api/jobs/42/mockups', () => ({ ok: true, json: async () => [] })],
     ]);
     const user = userEvent.setup();
     render(<JobMockupReview jobId="42" />);
