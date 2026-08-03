@@ -16,11 +16,10 @@ function StatusBadge({ status }) {
 }
 
 const NAV_ITEMS = [
-  { id: 'pipeline', label: 'Upload & Config', group: 'Pipeline' },
+  { id: 'upload', label: 'Upload', group: 'Pipeline' },
   { id: 'history', label: 'Listing History', group: 'Pipeline' },
   { id: 'review', label: 'Review a Job', group: 'Pipeline' },
   { id: 'prompt-helper', label: 'Prompt Helper', group: 'Modules' },
-  { id: 'taste-filter', label: 'Taste Filter', group: 'Modules' },
   { id: 'settings', label: 'Shop Settings & Tags', group: 'Configuration' },
 ];
 
@@ -55,7 +54,7 @@ function App() {
   const [uploadStatus, setUploadStatus] = useState('');
   const [jobIdInput, setJobIdInput] = useState('');
   const [activeJobId, setActiveJobId] = useState(null);
-  const [activeView, setActiveView] = useState('pipeline');
+  const [activeView, setActiveView] = useState('upload');
 
   function goTo(view) {
     setActiveView(view);
@@ -331,7 +330,7 @@ function App() {
               {health ? health.status : 'checking...'}
             </strong>
           </span>
-          <button className="btn-secondary" onClick={() => goTo(activeView === 'settings' ? 'pipeline' : 'settings')}>
+          <button className="btn-secondary" onClick={() => goTo(activeView === 'settings' ? 'upload' : 'settings')}>
             {activeView === 'settings' ? 'Close settings' : '⚙ Settings'}
           </button>
         </div>
@@ -590,37 +589,46 @@ function App() {
             </section>
           )}
 
-          {activeView === 'pipeline' && (
+          {activeView === 'upload' && (
             <section className="paper-card">
-              <h2 style={{ marginTop: 0 }}>Pipeline Config & Upload</h2>
-              <p className="text-muted" style={{ marginTop: 0 }}>Defaults come from <code>pipeline.config.json</code>; toggles here apply only to artwork uploaded next.</p>
-              <div className="flex-row flex-wrap" style={{ gap: '1.5rem', marginBottom: '1.5rem' }}>
-                {pipelineDefault?.pipeline?.map((m) => (
-                  <label key={m.module} style={{ opacity: m.required ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: m.required ? 'not-allowed' : 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={!!overrides[m.module]}
-                      disabled={m.required}
-                      onChange={() => toggleModule(m.module, m.required)}
-                    />
-                    <span>{m.module}</span>
-                    {m.required ? <span className="text-muted mono-sm">(required)</span> : null}
-                  </label>
-                ))}
+              <h2 style={{ marginTop: 0 }}>Upload</h2>
+
+              <div className="upload-lane">
+                <h3 style={{ marginTop: 0 }}>Curation</h3>
+                <TasteFilter overrides={overrides} refreshJobs={refreshJobs} />
               </div>
 
-              <div
-                className={`dropzone crop-frame ${dragActive ? 'active' : ''}`}
-                onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-                onDragLeave={() => setDragActive(false)}
-                onDrop={onDrop}
-              >
-                <p className="dropzone-title">Drag and drop artwork here (bulk supported)</p>
-                <p>or browse files from your computer</p>
-                <div style={{ marginTop: '1rem', display: 'inline-block' }}>
-                  <input type="file" multiple accept="image/*" onChange={(e) => handleFiles(e.target.files)} />
+              <div className="upload-lane">
+                <h3>Pipeline</h3>
+                <p className="text-muted" style={{ marginTop: 0 }}>Defaults come from <code>pipeline.config.json</code>; toggles here apply only to artwork uploaded next.</p>
+                <div className="flex-row flex-wrap" style={{ gap: '1.5rem', marginBottom: '1.5rem' }}>
+                  {pipelineDefault?.pipeline?.map((m) => (
+                    <label key={m.module} style={{ opacity: m.required ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: m.required ? 'not-allowed' : 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={!!overrides[m.module]}
+                        disabled={m.required}
+                        onChange={() => toggleModule(m.module, m.required)}
+                      />
+                      <span>{m.module}</span>
+                      {m.required ? <span className="text-muted mono-sm">(required)</span> : null}
+                    </label>
+                  ))}
                 </div>
-                {uploadStatus && <p className="mono taste-status" style={{ marginTop: '1rem' }}>{uploadStatus}</p>}
+
+                <div
+                  className={`dropzone crop-frame ${dragActive ? 'active' : ''}`}
+                  onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                  onDragLeave={() => setDragActive(false)}
+                  onDrop={onDrop}
+                >
+                  <p className="dropzone-title">Drag and drop artwork here (bulk supported)</p>
+                  <p>or browse files from your computer</p>
+                  <div style={{ marginTop: '1rem', display: 'inline-block' }}>
+                    <input type="file" multiple accept="image/*" onChange={(e) => handleFiles(e.target.files)} />
+                  </div>
+                  {uploadStatus && <p className="mono taste-status" style={{ marginTop: '1rem' }}>{uploadStatus}</p>}
+                </div>
               </div>
             </section>
           )}
@@ -629,7 +637,7 @@ function App() {
             <section className="paper-card">
               <h2 style={{ marginTop: 0 }}>Listing History</h2>
               {jobs.length === 0 ? (
-                <p className="empty-state">No jobs yet — drop some artwork on the Upload & Config view to get started.</p>
+                <p className="empty-state">No jobs yet — drop some artwork on the Upload view to get started.</p>
               ) : (
                 <div style={{ overflowX: 'auto' }}>
                   <table className="data-table">
@@ -759,12 +767,6 @@ function App() {
             </section>
           )}
 
-          {activeView === 'taste-filter' && (
-            <section className="paper-card">
-              <h2 style={{ marginTop: 0 }}>Taste Filter (Curation)</h2>
-              <TasteFilter overrides={overrides} refreshJobs={refreshJobs} />
-            </section>
-          )}
         </main>
       </div>
     </div>
