@@ -127,7 +127,7 @@ since `mockups.product_size_id`'s FK needs a row to point at, and gained a
 for existing dev DBs).
 
 **Dashboard mockup-template-manager plan (folder picker + template selection) — in
-progress, Rollout step 2 of 6 done.** See `plan.md` for the full plan (replaces the
+progress, Rollout step 3 of 6 done.** See `plan.md` for the full plan (replaces the
 hand-edit-JSON workflow for configuring mockup templates with a real dashboard
 feature: pick a folder, browse thumbnails, assign product-size templates). Step 1 landed
 first, with no UI change yet: `backend/config/index.js`'s `getProductSizes()` now reads
@@ -177,10 +177,25 @@ this same fallback chain. Test coverage: `backend/lib/mockup-templates/index.tes
 generation and its cache-reuse for both kinds; upsert/delete/list against a real temp SQLite
 DB) and `backend/server.mockup-templates-routes.test.js` (Supertest — scan/list/create/
 update/delete route behavior, the missing-folder 400 path, the settings-fallback path, and a
-real fetch of a generated `preview_url`). Remaining steps (dynamic
-`resolveTemplatesBaseDir()` wiring in `mockup-generator.js`, the `MockupTemplates.jsx`
-dashboard page, and the Electron native folder picker) are not started yet — see `plan.md`'s
-"Rollout" section.
+real fetch of a generated `preview_url`).
+
+Step 3 landed next, still backend-only: `mockup-generator.js`'s `TEMPLATES_BASE_DIR` —
+previously a module-load-time constant read once from `MOCKUP_TEMPLATES_DIR` — is now a
+function, `resolveTemplatesBaseDir()`, called fresh on every `composeMockup()` invocation.
+It delegates straight to `lib/mockup-templates/index.js`'s `resolveTemplatesDir()` (built in
+step 2 for exactly this reuse) rather than duplicating the settings-first fallback chain, so
+picking a folder from the dashboard's (not-yet-built) folder field takes effect immediately
+for real mockup composition too — no server restart — the same principle
+`syncWatcherFromSettings()` already established for Module 7's watched folder. The single
+call site that read the old constant (`composeMockup`'s `templatePath` join) now calls the
+function instead. Test coverage:
+`backend/lib/mockup-generator.templates-dir.test.js` — confirms the env-var fallback when no
+setting is saved, confirms the setting wins once saved (same already-imported module
+instance, proving no restart/re-import is needed), and an end-to-end `composeMockup()` run
+against a template that only exists under the settings-configured folder (not the
+env-configured one), so a regression back to the old env-only behavior would fail loudly.
+Remaining steps (the `MockupTemplates.jsx` dashboard page and the Electron native folder
+picker) are not started yet — see `plan.md`'s "Rollout" section.
 
 **AI-outpainting fallback for large aspect-ratio mismatches and the
 dashboard side-by-side smart-crop/AI-extended review step are now ✅ done too** — see the
