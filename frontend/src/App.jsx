@@ -458,234 +458,261 @@ function App() {
           )}
 
           {activeView === 'settings' && (
-            <section className="paper-card">
-              <h2 style={{ marginTop: 0 }}>Shop Settings & Tag Library</h2>
+            <div>
+              <h2 style={{ marginTop: 0, marginBottom: '1.5rem' }}>Shop Settings & Tag Library</h2>
 
-              <h3>Tag library</h3>
-              <p className="text-muted" style={{ marginTop: 0 }}>Paste tags (one per line, or comma-separated). Module 2 matches listings against this list.</p>
-              <textarea
-                rows={5}
-                className="mono"
-                style={{ width: '100%', marginBottom: '1rem' }}
-                value={tagsText}
-                onChange={(e) => setTagsText(e.target.value)}
-                placeholder={'wall art\nboho decor\nminimalist print\n...'}
-              />
-              <label style={{ display: 'block', marginBottom: '0.5rem' }}>
-                Category (optional — applies to all tags pasted above):{' '}
-                <input
-                  list="tag-category-options"
-                  value={tagsCategory}
-                  onChange={(e) => setTagsCategory(e.target.value)}
-                  placeholder="e.g. botanical, boho, minimalist"
-                />
-                <datalist id="tag-category-options">
-                  {tagCategories.map((c) => (
-                    <option key={c} value={c} />
-                  ))}
-                </datalist>
-              </label>
-              <div className="flex-row mb-2">
-                <button className="btn-primary" onClick={saveTags} disabled={!tagsText.trim()}>Save tags</button>
-                {tagsSavedMessage && <span className="text-muted mono-sm">{tagsSavedMessage}</span>}
+              <div className="settings-section-card">
+                <h3 className="settings-section-title">Tags & Trends</h3>
+
+                <div className="settings-subsection">
+                  <h4 className="settings-sub-heading">Tag library</h4>
+                  <textarea
+                    rows={5}
+                    className="mono"
+                    style={{ width: '100%', marginBottom: '0.75rem' }}
+                    value={tagsText}
+                    onChange={(e) => setTagsText(e.target.value)}
+                    placeholder={'wall art\nboho decor\nminimalist print\n...'}
+                  />
+                  <div className="settings-field-row">
+                    <div className="settings-field">
+                      <span className="settings-field-label">Category (optional, applies to all)</span>
+                      <input
+                        list="tag-category-options"
+                        value={tagsCategory}
+                        onChange={(e) => setTagsCategory(e.target.value)}
+                        placeholder="e.g. botanical, boho, minimalist"
+                      />
+                      <datalist id="tag-category-options">
+                        {tagCategories.map((c) => (
+                          <option key={c} value={c} />
+                        ))}
+                      </datalist>
+                    </div>
+                    <button className="btn-primary" onClick={saveTags} disabled={!tagsText.trim()}>Save tags</button>
+                    {tagsSavedMessage && <span className="text-muted mono-sm">{tagsSavedMessage}</span>}
+                  </div>
+                </div>
+
+                <div className="settings-subsection">
+                  <h4 className="settings-sub-heading">Bulk tools</h4>
+                  <div className="settings-actions-row">
+                    <label className="settings-inline-action">
+                      Import CSV
+                      <input type="file" accept=".csv,text/csv" onChange={(e) => importTagsCsv(e.target.files?.[0])} />
+                    </label>
+                    {tagsCsvMessage && <span className="text-muted mono-sm">{tagsCsvMessage}</span>}
+                    <button onClick={backfillTagCategories} disabled={tagsBackfillRunning}>
+                      Suggest categories for uncategorized tags
+                    </button>
+                    {tagsBackfillMessage && <span className="text-muted mono-sm">{tagsBackfillMessage}</span>}
+                  </div>
+                </div>
+
+                <div className="settings-subsection" style={{ marginBottom: 0 }}>
+                  <h4 className="settings-sub-heading">Trend list</h4>
+                  {trends.length ? (
+                    <ul className="settings-compact-list">
+                      {trends.map((t) => (
+                        <li key={t.id}>
+                          {t.term}{t.category ? ` (${t.category})` : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="empty-state">No trends added yet.</p>
+                  )}
+                  <div className="flex-row flex-wrap">
+                    <input
+                      value={newTrendTerm}
+                      onChange={(e) => setNewTrendTerm(e.target.value)}
+                      placeholder="Trend term"
+                    />
+                    <input
+                      value={newTrendCategory}
+                      onChange={(e) => setNewTrendCategory(e.target.value)}
+                      placeholder="Category (optional)"
+                    />
+                    <button onClick={addTrendFromSettings} disabled={!newTrendTerm.trim()}>Add trend</button>
+                  </div>
+                </div>
               </div>
 
-              <p className="text-muted" style={{ marginBottom: '0.25rem' }}>Or import a CSV export from a tag-research tool (needs a <code>tag_text</code>/<code>tag</code>/<code>text</code>/<code>keyword</code> column, and an optional <code>category</code> column):</p>
-              <div className="flex-row mb-2">
-                <input type="file" accept=".csv,text/csv" onChange={(e) => importTagsCsv(e.target.files?.[0])} />
-                {tagsCsvMessage && <span className="text-muted mono-sm">{tagsCsvMessage}</span>}
+              <div className="settings-section-card">
+                <h3 className="settings-section-title">Shop Defaults & Conventions</h3>
+
+                <div className="settings-subsection">
+                  <div className="settings-field-row">
+                    <div className="settings-field">
+                      <span className="settings-field-label">Default price</span>
+                      <input
+                        value={settings.default_price || ''}
+                        onChange={(e) => setSettings((s) => ({ ...s, default_price: e.target.value }))}
+                        onBlur={(e) => saveSettings({ default_price: e.target.value })}
+                        placeholder="24.00"
+                      />
+                    </div>
+                    <div className="settings-field" style={{ flex: 1, minWidth: '240px' }}>
+                      <span className="settings-field-label">Delivery text</span>
+                      <input
+                        value={settings.delivery_text || ''}
+                        onChange={(e) => setSettings((s) => ({ ...s, delivery_text: e.target.value }))}
+                        onBlur={(e) => saveSettings({ delivery_text: e.target.value })}
+                        placeholder="Digital file, no physical shipment"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="settings-subsection">
+                  <div className="settings-readonly-box">
+                    <div className="settings-readonly-header">
+                      <h4 className="settings-readonly-title">Shop conventions</h4>
+                      <span className="read-only-badge">Read-only</span>
+                    </div>
+                    {shopConventions ? (
+                      <ul className="settings-compact-list">
+                        <li>Title separator: <code>{shopConventions.listing.titleSeparator}</code></li>
+                        <li>Max title length: {shopConventions.listing.maxTitleLength}</li>
+                        <li>Tags per listing: {shopConventions.listing.tagsPerListing} (+{shopConventions.listing.tagAlternates} alternates, max {shopConventions.listing.maxTagLength} chars)</li>
+                        <li>Forbidden title words: {shopConventions.listing.forbiddenTitleWords.join(', ')}</li>
+                        <li>Midjourney: {shopConventions.midjourney.version}, {shopConventions.midjourney.style}, stylize {shopConventions.midjourney.stylizeMin}–{shopConventions.midjourney.stylizeMax}</li>
+                      </ul>
+                    ) : (
+                      <p className="empty-state" style={{ margin: 0 }}>Loading…</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="settings-subsection" style={{ marginBottom: 0 }}>
+                  <div className="settings-readonly-box">
+                    <div className="settings-readonly-header">
+                      <h4 className="settings-readonly-title">Product sizes / mockup templates</h4>
+                      <span className="read-only-badge">Read-only</span>
+                    </div>
+                    {sizeKeys.length ? (
+                      <ul className="settings-compact-list">
+                        {sizeKeys.map((k) => (
+                          <li key={k}>
+                            <code>{k}</code> — {productSizes[k].dimensions} @ {productSizes[k].dpi}dpi ({productSizes[k].orientation})
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="empty-state" style={{ margin: 0 }}>None configured — edit <code>backend/config/product-sizes.json</code>.</p>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              <p className="text-muted" style={{ marginBottom: '0.25rem' }}>
-                Or backfill categories on tags already in the library that don&apos;t have one yet, by
-                matching their text against categories already in use (won&apos;t touch tags that
-                already have a category, and won&apos;t invent a brand-new category):
-              </p>
-              <div className="flex-row mb-2">
-                <button onClick={backfillTagCategories} disabled={tagsBackfillRunning}>
-                  Suggest categories for uncategorized tags
-                </button>
-                {tagsBackfillMessage && <span className="text-muted mono-sm">{tagsBackfillMessage}</span>}
+              <div className="settings-section-card">
+                <h3 className="settings-section-title">Automation & Diagnostics</h3>
+
+                <div className="settings-subsection">
+                  <h4 className="settings-sub-heading">Auto-import from folder</h4>
+                  <label className="settings-checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={settings.taste_filter_watch_enabled === 'true'}
+                      onChange={(e) => {
+                        const enabled = e.target.checked;
+                        setSettings((s) => ({ ...s, taste_filter_watch_enabled: String(enabled) }));
+                        saveWatchSetting({ taste_filter_watch_enabled: enabled });
+                      }}
+                    />
+                    Auto-import from folder
+                  </label>
+                  <div className="settings-field-row">
+                    <div className="settings-field" style={{ flex: 1, minWidth: '260px' }}>
+                      <span className="settings-field-label">Watched folder path</span>
+                      <input
+                        value={settings.taste_filter_watch_folder || ''}
+                        onChange={(e) => setSettings((s) => ({ ...s, taste_filter_watch_folder: e.target.value }))}
+                        onBlur={(e) => saveWatchSetting({ taste_filter_watch_folder: e.target.value })}
+                        placeholder="/home/you/midjourney-downloads"
+                      />
+                    </div>
+                    <div className="settings-field">
+                      <span className="settings-field-label">Category (optional)</span>
+                      <input
+                        value={settings.taste_filter_watch_category || ''}
+                        onChange={(e) => setSettings((s) => ({ ...s, taste_filter_watch_category: e.target.value }))}
+                        onBlur={(e) => saveWatchSetting({ taste_filter_watch_category: e.target.value })}
+                        placeholder="e.g. square-canvas"
+                      />
+                    </div>
+                  </div>
+                  {watchStatus && (
+                    <p className="text-muted mono-sm" style={{ marginTop: '0.5rem' }}>
+                      {watchStatus.active ? `✅ Watching ${watchStatus.folder}` : '⚠️ Not currently watching'}
+                      {watchStatus.category ? ` (category: ${watchStatus.category})` : ''}
+                      {watchStatus.pendingCount ? ` — ${watchStatus.pendingCount} pending` : ''}
+                      {watchStatus.lastError ? ` — ${watchStatus.lastError}` : ''}
+                    </p>
+                  )}
+                </div>
+
+                <div className="settings-subsection">
+                  <h4 className="settings-sub-heading">Taste filter auto-sort</h4>
+                  <label className="settings-checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={settings.taste_filter_auto_enabled === 'true'}
+                      onChange={(e) => {
+                        const enabled = e.target.checked;
+                        setSettings((s) => ({ ...s, taste_filter_auto_enabled: String(enabled) }));
+                        saveSettings({ taste_filter_auto_enabled: enabled });
+                      }}
+                    />
+                    Auto-compute taste threshold
+                  </label>
+                  <div className="settings-field" style={{ maxWidth: '200px' }}>
+                    <span className="settings-field-label">Auto threshold (score cutoff)</span>
+                    <input
+                      value={settings.taste_filter_auto_threshold ?? ''}
+                      onChange={(e) => setSettings((s) => ({ ...s, taste_filter_auto_threshold: e.target.value }))}
+                      onBlur={(e) => saveSettings({ taste_filter_auto_threshold: e.target.value })}
+                      placeholder="0.3"
+                    />
+                  </div>
+                </div>
+
+                <div className="settings-subsection" style={{ marginBottom: 0 }}>
+                  <div className="settings-readonly-box">
+                    <div className="settings-readonly-header">
+                      <h4 className="settings-readonly-title">LLM rate-limit status</h4>
+                      <span className="read-only-badge">Read-only</span>
+                    </div>
+                    {rateLimits.length ? (
+                      <table className="data-table" style={{ marginBottom: 0 }}>
+                        <thead>
+                          <tr>
+                            <th>Key #</th>
+                            <th>Model</th>
+                            <th>Status</th>
+                            <th>Consecutive hits</th>
+                            <th>Limited until</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rateLimits.map((r) => (
+                            <tr key={`${r.keyIndex}-${r.model}`}>
+                              <td className="mono">{r.keyIndex}</td>
+                              <td className="mono">{r.model}</td>
+                              <td>{r.currentlyLimited ? '⚠️ Cooling down' : '✅ OK'}</td>
+                              <td>{r.consecutiveHits}</td>
+                              <td className="text-muted mono mono-sm">{r.currentlyLimited ? r.limitedUntil : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p className="empty-state" style={{ margin: 0 }}>No key/model pair has hit a rate limit yet.</p>
+                    )}
+                  </div>
+                </div>
               </div>
-
-              <h3>Shop defaults</h3>
-              <label style={{ display: 'block', margin: '0.5rem 0' }}>
-                Default price:{' '}
-                <input
-                  value={settings.default_price || ''}
-                  onChange={(e) => setSettings((s) => ({ ...s, default_price: e.target.value }))}
-                  onBlur={(e) => saveSettings({ default_price: e.target.value })}
-                  placeholder="24.00"
-                />
-              </label>
-              <label style={{ display: 'block', margin: '0.5rem 0' }}>
-                Delivery text:{' '}
-                <input
-                  style={{ width: '100%', maxWidth: '600px' }}
-                  value={settings.delivery_text || ''}
-                  onChange={(e) => setSettings((s) => ({ ...s, delivery_text: e.target.value }))}
-                  onBlur={(e) => saveSettings({ delivery_text: e.target.value })}
-                  placeholder="Digital file, no physical shipment"
-                />
-              </label>
-
-              <h3>Trend list</h3>
-              <p className="text-muted" style={{ marginTop: 0 }}>Shared by Module 2 (trend-aware listing angles) and Module 4 (prompt helper).</p>
-              {trends.length ? (
-                <ul style={{ marginBottom: '1rem', paddingLeft: '1.25rem' }}>
-                  {trends.map((t) => (
-                    <li key={t.id}>
-                      {t.term}{t.category ? ` (${t.category})` : ''}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="empty-state">No trends added yet.</p>
-              )}
-              <div className="flex-row flex-wrap">
-                <input
-                  value={newTrendTerm}
-                  onChange={(e) => setNewTrendTerm(e.target.value)}
-                  placeholder="Trend term"
-                />
-                <input
-                  value={newTrendCategory}
-                  onChange={(e) => setNewTrendCategory(e.target.value)}
-                  placeholder="Category (optional)"
-                />
-                <button onClick={addTrendFromSettings} disabled={!newTrendTerm.trim()}>Add trend</button>
-              </div>
-
-              <h3>Shop conventions</h3>
-              <p className="text-muted" style={{ marginTop: 0 }}>Hardcoded (see ARCHITECTURE.md, Module 2), shown here read-only for reference.</p>
-              {shopConventions ? (
-                <ul style={{ paddingLeft: '1.25rem' }}>
-                  <li>Title separator: <code>{shopConventions.listing.titleSeparator}</code></li>
-                  <li>Max title length: {shopConventions.listing.maxTitleLength}</li>
-                  <li>Tags per listing: {shopConventions.listing.tagsPerListing} (+{shopConventions.listing.tagAlternates} alternates, max {shopConventions.listing.maxTagLength} chars)</li>
-                  <li>Forbidden title words: {shopConventions.listing.forbiddenTitleWords.join(', ')}</li>
-                  <li>Midjourney: {shopConventions.midjourney.version}, {shopConventions.midjourney.style}, stylize {shopConventions.midjourney.stylizeMin}–{shopConventions.midjourney.stylizeMax}</li>
-                </ul>
-              ) : (
-                <p className="empty-state">Loading…</p>
-              )}
-
-              <h3>Product sizes / mockup templates</h3>
-              {sizeKeys.length ? (
-                <ul style={{ paddingLeft: '1.25rem' }}>
-                  {sizeKeys.map((k) => (
-                    <li key={k}>
-                      <code>{k}</code> — {productSizes[k].dimensions} @ {productSizes[k].dpi}dpi ({productSizes[k].orientation})
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="empty-state">None configured yet — edit <code>backend/config/product-sizes.json</code>.</p>
-              )}
-
-              <h3>Auto-import from folder (Module 7)</h3>
-              <p className="text-muted" style={{ marginTop: 0 }}>
-                Watches a local folder for new Midjourney downloads and pulls them into the Taste Filter queue automatically, without a manual drag-and-drop. Off by default.
-              </p>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0.5rem 0' }}>
-                <input
-                  type="checkbox"
-                  checked={settings.taste_filter_watch_enabled === 'true'}
-                  onChange={(e) => {
-                    const enabled = e.target.checked;
-                    setSettings((s) => ({ ...s, taste_filter_watch_enabled: String(enabled) }));
-                    saveWatchSetting({ taste_filter_watch_enabled: enabled });
-                  }}
-                />
-                Auto-import from folder
-              </label>
-              <label style={{ display: 'block', margin: '0.5rem 0' }}>
-                Watched folder path:{' '}
-                <input
-                  style={{ width: '100%', maxWidth: '500px' }}
-                  value={settings.taste_filter_watch_folder || ''}
-                  onChange={(e) => setSettings((s) => ({ ...s, taste_filter_watch_folder: e.target.value }))}
-                  onBlur={(e) => saveWatchSetting({ taste_filter_watch_folder: e.target.value })}
-                  placeholder="/home/you/midjourney-downloads"
-                />
-              </label>
-              <label style={{ display: 'block', margin: '0.5rem 0' }}>
-                Category (optional):{' '}
-                <input
-                  value={settings.taste_filter_watch_category || ''}
-                  onChange={(e) => setSettings((s) => ({ ...s, taste_filter_watch_category: e.target.value }))}
-                  onBlur={(e) => saveWatchSetting({ taste_filter_watch_category: e.target.value })}
-                  placeholder="e.g. square-canvas"
-                />
-              </label>
-              {watchStatus && (
-                <p className="text-muted mono-sm">
-                  {watchStatus.active ? `✅ Watching ${watchStatus.folder}` : '⚠️ Not currently watching'}
-                  {watchStatus.category ? ` (category: ${watchStatus.category})` : ''}
-                  {watchStatus.pendingCount ? ` — ${watchStatus.pendingCount} pending` : ''}
-                  {watchStatus.lastError ? ` — ${watchStatus.lastError}` : ''}
-                </p>
-              )}
-
-              <h3>Auto-sort taste filter candidates</h3>
-              <p className="text-muted" style={{ marginTop: 0 }}>
-                When enabled, sufficiently confident, sufficiently extreme taste-filter
-                scores are auto-sorted into keep/discard without a manual click. Everything
-                else still requires manual review. Off by default.
-              </p>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0.5rem 0' }}>
-                <input
-                  type="checkbox"
-                  checked={settings.taste_filter_auto_enabled === 'true'}
-                  onChange={(e) => {
-                    const enabled = e.target.checked;
-                    setSettings((s) => ({ ...s, taste_filter_auto_enabled: String(enabled) }));
-                    saveSettings({ taste_filter_auto_enabled: enabled });
-                  }}
-                />
-                Auto-compute taste threshold
-              </label>
-              <label style={{ display: 'block', margin: '0.5rem 0' }}>
-                Auto threshold (absolute score cutoff):{' '}
-                <input
-                  value={settings.taste_filter_auto_threshold ?? ''}
-                  onChange={(e) => setSettings((s) => ({ ...s, taste_filter_auto_threshold: e.target.value }))}
-                  onBlur={(e) => saveSettings({ taste_filter_auto_threshold: e.target.value })}
-                  placeholder="0.3"
-                />
-              </label>
-
-              <h3>LLM rate-limit status</h3>
-              <p className="text-muted" style={{ marginTop: 0 }}>
-                Which Gemini key × model pairs are currently in cooldown (see ARCHITECTURE.md, LLM Provider Layer). Read-only — key index only, never the actual API key.
-              </p>
-              {rateLimits.length ? (
-                <table className="data-table" style={{ marginBottom: '1rem' }}>
-                  <thead>
-                    <tr>
-                      <th>Key #</th>
-                      <th>Model</th>
-                      <th>Status</th>
-                      <th>Consecutive hits</th>
-                      <th>Limited until</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rateLimits.map((r) => (
-                      <tr key={`${r.keyIndex}-${r.model}`}>
-                        <td className="mono">{r.keyIndex}</td>
-                        <td className="mono">{r.model}</td>
-                        <td>{r.currentlyLimited ? '⚠️ Cooling down' : '✅ OK'}</td>
-                        <td>{r.consecutiveHits}</td>
-                        <td className="text-muted mono mono-sm">{r.currentlyLimited ? r.limitedUntil : '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p className="empty-state">No key/model pair has hit a rate limit yet.</p>
-              )}
-            </section>
+            </div>
           )}
 
           {activeView === 'upload' && (
@@ -766,8 +793,6 @@ function App() {
                           );
                         }
 
-                        // Bulk batch: one summary row (item count + per-status breakdown),
-                        // expandable to the same per-job rows a single upload would show.
                         const { batchId, jobs: batchJobs } = entry;
                         const expanded = !!expandedBatches[batchId];
                         const statusCountsForBatch = batchJobs.reduce((acc, j) => {
