@@ -234,6 +234,29 @@ function App() {
     handleFiles(e.dataTransfer.files);
   }
 
+  // Step 1.4: TasteFilter's "Keep & send to pipeline" action. Mirrors handleFiles' own
+  // upload -> create-job -> refreshJobs sequence, but starting from an already-kept
+  // taste-filter candidate instead of a fresh file drop: promote it into an `artworks`
+  // row via POST /api/taste-filter/promote (Step 1.2), then create a job for it with the
+  // same pipeline `overrides` state the direct-upload dropzone already uses, then
+  // refresh Listing History so the new job shows up immediately.
+  async function promoteCandidateToPipeline(candidate) {
+    const promoteRes = await fetch('/api/taste-filter/promote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image_path: candidate.imagePath }),
+    });
+    const { artwork, error } = await promoteRes.json();
+    if (error) throw new Error(error);
+
+    await fetch('/api/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ artwork_id: artwork.id, pipeline_overrides: overrides }),
+    });
+    refreshJobs();
+  }
+
   function toggleModule(module, required) {
     if (required) return;
     setOverrides((prev) => ({ ...prev, [module]: !prev[module] }));
@@ -762,7 +785,7 @@ function App() {
           {activeView === 'taste-filter' && (
             <section className="paper-card">
               <h2 style={{ marginTop: 0 }}>Taste Filter (Curation)</h2>
-              <TasteFilter />
+              <TasteFilter onPromoteToPipeline={promoteCandidateToPipeline} />
             </section>
           )}
         </main>
