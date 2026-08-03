@@ -57,6 +57,82 @@ describe('getTagCandidates (ARCHITECTURE.md -> Tags Provider Layer, v1 user-list
     expect(() => getTagCandidates()).not.toThrow();
     expect(getTagCandidates()).toEqual([]);
   });
+
+  it('ranks a tag whose category matches suggested_categories above one whose category conflicts, even when both substring-match', () => {
+    const db = getDb();
+    // Both tag texts appear in the analysis blob below, so both pass the substring check —
+    // only the category should decide the ordering.
+    db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)').run(
+      'wall art',
+      'abstract',
+      'manual'
+    );
+    db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)').run(
+      'wall art print',
+      'botanical',
+      'manual'
+    );
+
+    const matches = getTagCandidates({
+      subject: 'a fern in wall art print form',
+      style: 'watercolor',
+      suggested_categories: ['botanical'],
+    });
+
+    expect(matches.map((t) => t.tag_text)).toEqual(['wall art print', 'wall art']);
+  });
+
+  it('ranks a tag whose category matches the detected style above an uncategorized tag', () => {
+    const db = getDb();
+    db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)').run(
+      'watercolor',
+      'watercolor',
+      'manual'
+    );
+    db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)').run(
+      'watercolor art',
+      null,
+      'manual'
+    );
+
+    const matches = getTagCandidates({ subject: 'watercolor art of a fox', style: 'watercolor' });
+
+    expect(matches.map((t) => t.tag_text)).toEqual(['watercolor', 'watercolor art']);
+  });
+
+  it('still returns a category-conflicting tag (demoted, not dropped) alongside a corroborated one', () => {
+    const db = getDb();
+    db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)').run(
+      'boho decor',
+      'boho',
+      'manual'
+    );
+    db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)').run(
+      'botanical print',
+      'botanical',
+      'manual'
+    );
+
+    const matches = getTagCandidates({
+      subject: 'a fern, boho decor style, botanical print',
+      suggested_categories: ['botanical'],
+    });
+
+    expect(matches.map((t) => t.tag_text)).toEqual(['botanical print', 'boho decor']);
+  });
+
+  it('preserves existing behavior for tags with no category (pure substring match, order unaffected by category)', () => {
+    const db = getDb();
+    db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)').run('Fox', null, 'manual');
+    db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)').run(
+      'watercolor',
+      null,
+      'manual'
+    );
+
+    const matches = getTagCandidates({ subject: 'a fox', style: 'watercolor' });
+    expect(matches.map((t) => t.tag_text).sort()).toEqual(['Fox', 'watercolor'].sort());
+  });
 });
 
 describe('tagRowsFromCsvText', () => {
