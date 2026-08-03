@@ -49,9 +49,9 @@ const JOB = {
   updated_at: '2026-08-01T12:00:00Z',
 };
 
-// App fires eight fetches on mount, in this order: health, pipeline config,
-// product-sizes, shop-conventions, settings, setup-status, jobs, trends. Rather than
-// depend on call order (fragile if App's effect ever gets reordered), route by URL.
+// App fires nine fetches on mount, in this order: health, pipeline config,
+// product-sizes, shop-conventions, settings, setup-status, jobs, trends, tags. Rather
+// than depend on call order (fragile if App's effect ever gets reordered), route by URL.
 function mockFetchByUrl(overrides = {}) {
   const defaults = {
     '/api/health': { status: 'ok' },
@@ -72,6 +72,7 @@ function mockFetchByUrl(overrides = {}) {
     '/api/setup-status': SETUP_STATUS_READY,
     '/api/jobs': [],
     '/api/trends': [],
+    '/api/tags': [],
     '/api/taste-filter/watch-status': { active: false, folder: null, category: null, pendingCount: 0, lastError: null },
   };
   const responses = { ...defaults, ...overrides };
