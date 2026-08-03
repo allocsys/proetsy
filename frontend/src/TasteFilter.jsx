@@ -30,13 +30,11 @@ function ScoreBadge({ label, score, confident }) {
 // import call are held in local component state only; nothing is persisted server-side
 // until the user clicks Keep/Discard on it (see backend/server.js -> "Module 7 (Taste
 // Filter) routes" for why).
-// `onPromoteToPipeline` (optional): callback from App.jsx, called with the candidate
-// after it's been labeled 'keep' here. Owns the promote + create-job + refreshJobs
-// sequence itself (see App.jsx's promoteCandidateToPipeline) since that needs the
-// current pipeline `overrides` state and refreshJobs(), both of which already live in
-// App.jsx for the direct-upload dropzone -- TasteFilter stays unaware of jobs/pipeline
-// config beyond firing this one callback.
-function TasteFilter({ onPromoteToPipeline } = {}) {
+// `overrides` / `refreshJobs`: the same pipeline-module-overrides state and
+// Listing-History-refresh function App.jsx already tracks for the direct-upload
+// dropzone (see App.jsx's handleFiles), passed down as props so "Keep & send to
+// pipeline" below can create a job identically to a direct upload.
+function TasteFilter({ overrides, refreshJobs } = {}) {
   const [category, setCategory] = useState('');
   const [promptId, setPromptId] = useState('');
   const [candidates, setCandidates] = useState([]);
@@ -117,19 +115,31 @@ function TasteFilter({ onPromoteToPipeline } = {}) {
   }
 
   // Does everything Keep does (records the training-signal label, removes the card),
-  // then also promotes the candidate straight into the pipeline as a real artwork + job
-  // via the parent's callback -- see backend/server.js's POST /api/taste-filter/promote
-  // (Step 1.2) for the copy-into-UPLOADS_DIR + insertArtworkRecord behavior this kicks
-  // off. Nothing enters the pipeline as a side effect of Keep alone; this is a separate,
-  // explicit opt-in per image.
+  // then promotes the candidate straight into the pipeline: POST /api/taste-filter/promote
+  // (Step 1.2) copies the file into UPLOADS_DIR and creates the `artworks` row, then
+  // POST /api/jobs creates a job for it using the same pipeline `overrides` the
+  // direct-upload dropzone uses, then refreshJobs() so it shows up in Listing History
+  // immediately. Nothing enters the pipeline as a side effect of Keep alone -- this is a
+  // separate, explicit opt-in per image.
   async function handleKeepAndSendToPipeline(candidate) {
     await handleLabel(candidate, 'keep');
-    if (onPromoteToPipeline) {
-      try {
-        await onPromoteToPipeline(candidate);
-      } catch {
-        setStatus('Kept, but failed to send to pipeline — try again from Upload & Config.');
-      }
+    try {
+      const promoteRes = await fetch('/api/taste-filter/promote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_path: candidate.imagePath }),
+      });
+      const promoteData = await promoteRes.json();
+      if (!promoteRes.ok) throw new Error(promoteData.error || 'Promote failed');
+
+      await fetch('/api/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ artwork_id: promoteData.artwork.id, pipeline_overrides: overrides }),
+      });
+      if (refreshJobs) refreshJobs();
+    } catch (err) {
+      setStatus(`Kept, but failed to send to pipeline: ${err.message}`);
     }
   }
 
