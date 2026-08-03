@@ -89,24 +89,44 @@ has limited effect until the library actually has categories on it. Add:
   current library without forcing a full manual re-tag. This is a nice-to-have, not required
   for the core fix.
 
-### 3. No change needed to `getTagCandidates()` call site
+### 3. No change needed to `getTagCandidates()` call site — ✅ confirmed
 
 `backend/lib/listing-generator/index.js` and `prompt.js` don't need changes — they already
 just take whatever `getTagCandidates()` returns and pass tag text into the prompt. Only the
 ordering/scoring inside `user-list.js` changes.
 
+Confirmed by reading both files: `index.js` passes `getTagCandidates()`'s return value
+straight through to `buildListingPrompt()` as `tagCandidates` with no inspection of order or
+shape beyond array-ness, and `prompt.js` only reads `t.tag_text` per candidate and
+`tagCandidates.length` for the empty-state message. No edits made here.
+
 ## Testing
 
-- Update `backend/lib/tags/user-list.test.js`:
+- Update `backend/lib/tags/user-list.test.js` — ✅ done:
   - Existing substring-match tests should still pass unchanged (uncategorized tags).
   - New test: a tag with a category matching `suggested_categories` outranks a tag with a
     mismatched category, even when both substring-match the analysis blob.
   - New test: a tag with no category behaves exactly as today (pure substring match, no
     score penalty).
 - No changes expected to `backend/lib/tags/index.test.js` (provider wrapper) unless the
-  return shape changes (e.g. adding a `score` field) — confirm and update if so.
+  return shape changes (e.g. adding a `score` field) — confirm and update if so. ✅
+  Confirmed: that test mocks `user-list.js`'s `getTagCandidates` directly and only checks
+  pass-through delegation, so it doesn't assert anything about tag shape or ordering. No
+  update needed.
 - Add a fixture in `backend/lib/llm/fixture.test.js` / listing-generator idempotency tests
-  covering a mixed-category tag library to guard against regressing this fix later.
+  covering a mixed-category tag library to guard against regressing this fix later. — ✅
+  done, in `index.idempotency.test.js` rather than `fixture.test.js`: the fixture LLM
+  provider's output doesn't depend on tag content (it returns fixed variations regardless
+  of what's in the prompt), so a fixture.test.js test wouldn't actually exercise
+  `getTagCandidates()` scoring at all. Added
+  `generateListingsForJob tag candidate ordering (mixed-category regression guard)` to
+  `index.idempotency.test.js` instead: seeds the real `tags` table with a
+  category-corroborated, an uncategorized, and a category-conflicting tag, runs the real
+  Module 2 pipeline, and asserts the category-corroborated tag appears before the
+  uncategorized tag before the conflicting one in the actual prompt string sent to the LLM
+  provider — confirming the scoring order in `user-list.js` survives all the way through
+  `listing-generator/index.js` and `prompt.js` into what the model actually sees. Full
+  backend suite (45 files / 424 tests) passes with this added.
 
 ## Rollout
 
