@@ -147,7 +147,7 @@ Existing design constraint to preserve: per the current code comment in
 always confirms." Auto-compute must not silently delete or silently
 mislabel files with zero human-visible trace — see Step 2.5.
 
-### Step 2.1 — Schema: `auto_labeled` column
+### Step 2.1 — Schema: `auto_labeled` column ✅ done (commits 3b99ae5, 46a57fc)
 
 `backend/db/schema.sql` — add `auto_labeled INTEGER DEFAULT 0` to
 `image_preferences`. Land this migration first, on its own, so every
