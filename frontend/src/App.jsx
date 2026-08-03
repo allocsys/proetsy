@@ -466,48 +466,42 @@ function App() {
 
                 <div className="settings-subsection">
                   <h4 className="settings-sub-heading">Tag library</h4>
-                  <p className="settings-caption">Paste tags (one per line or comma-separated).</p>
                   <textarea
                     rows={5}
                     className="mono"
-                    style={{ width: '100%', marginBottom: '1rem' }}
+                    style={{ width: '100%', marginBottom: '0.75rem' }}
                     value={tagsText}
                     onChange={(e) => setTagsText(e.target.value)}
                     placeholder={'wall art\nboho decor\nminimalist print\n...'}
                   />
-                  <label style={{ display: 'block', marginBottom: '0.5rem' }}>
-                    Category (optional — applies to all tags pasted above):{' '}
-                    <input
-                      list="tag-category-options"
-                      value={tagsCategory}
-                      onChange={(e) => setTagsCategory(e.target.value)}
-                      placeholder="e.g. botanical, boho, minimalist"
-                    />
-                    <datalist id="tag-category-options">
-                      {tagCategories.map((c) => (
-                        <option key={c} value={c} />
-                      ))}
-                    </datalist>
-                  </label>
-                  <div className="flex-row mb-2">
+                  <div className="settings-field-row">
+                    <div className="settings-field">
+                      <span className="settings-field-label">Category (optional, applies to all)</span>
+                      <input
+                        list="tag-category-options"
+                        value={tagsCategory}
+                        onChange={(e) => setTagsCategory(e.target.value)}
+                        placeholder="e.g. botanical, boho, minimalist"
+                      />
+                      <datalist id="tag-category-options">
+                        {tagCategories.map((c) => (
+                          <option key={c} value={c} />
+                        ))}
+                      </datalist>
+                    </div>
                     <button className="btn-primary" onClick={saveTags} disabled={!tagsText.trim()}>Save tags</button>
                     {tagsSavedMessage && <span className="text-muted mono-sm">{tagsSavedMessage}</span>}
                   </div>
                 </div>
 
                 <div className="settings-subsection">
-                  <h4 className="settings-sub-heading">CSV Tag Import</h4>
-                  <p className="settings-caption">Import CSV export from tag-research tools.</p>
-                  <div className="flex-row mb-2">
-                    <input type="file" accept=".csv,text/csv" onChange={(e) => importTagsCsv(e.target.files?.[0])} />
+                  <h4 className="settings-sub-heading">Bulk tools</h4>
+                  <div className="settings-actions-row">
+                    <label className="settings-inline-action">
+                      Import CSV
+                      <input type="file" accept=".csv,text/csv" onChange={(e) => importTagsCsv(e.target.files?.[0])} />
+                    </label>
                     {tagsCsvMessage && <span className="text-muted mono-sm">{tagsCsvMessage}</span>}
-                  </div>
-                </div>
-
-                <div className="settings-subsection">
-                  <h4 className="settings-sub-heading">Category Backfill</h4>
-                  <p className="settings-caption">Suggest categories for uncategorized tags using existing library categories.</p>
-                  <div className="flex-row mb-2">
                     <button onClick={backfillTagCategories} disabled={tagsBackfillRunning}>
                       Suggest categories for uncategorized tags
                     </button>
@@ -517,9 +511,8 @@ function App() {
 
                 <div className="settings-subsection" style={{ marginBottom: 0 }}>
                   <h4 className="settings-sub-heading">Trend list</h4>
-                  <p className="settings-caption">Shared with Module 2 listing angles and Module 4 prompt helper.</p>
                   {trends.length ? (
-                    <ul style={{ marginBottom: '1rem', paddingLeft: '1.25rem' }}>
+                    <ul className="settings-compact-list">
                       {trends.map((t) => (
                         <li key={t.id}>
                           {t.term}{t.category ? ` (${t.category})` : ''}
@@ -549,38 +542,36 @@ function App() {
                 <h3 className="settings-section-title">Shop Defaults & Conventions</h3>
 
                 <div className="settings-subsection">
-                  <h4 className="settings-sub-heading">Shop defaults</h4>
-                  <p className="settings-caption">Base pricing and fulfillment delivery text for generated listings.</p>
-                  <label style={{ display: 'block', margin: '0.5rem 0' }}>
-                    Default price:{' '}
-                    <input
-                      value={settings.default_price || ''}
-                      onChange={(e) => setSettings((s) => ({ ...s, default_price: e.target.value }))}
-                      onBlur={(e) => saveSettings({ default_price: e.target.value })}
-                      placeholder="24.00"
-                    />
-                  </label>
-                  <label style={{ display: 'block', margin: '0.5rem 0' }}>
-                    Delivery text:{' '}
-                    <input
-                      style={{ width: '100%', maxWidth: '600px' }}
-                      value={settings.delivery_text || ''}
-                      onChange={(e) => setSettings((s) => ({ ...s, delivery_text: e.target.value }))}
-                      onBlur={(e) => saveSettings({ delivery_text: e.target.value })}
-                      placeholder="Digital file, no physical shipment"
-                    />
-                  </label>
+                  <div className="settings-field-row">
+                    <div className="settings-field">
+                      <span className="settings-field-label">Default price</span>
+                      <input
+                        value={settings.default_price || ''}
+                        onChange={(e) => setSettings((s) => ({ ...s, default_price: e.target.value }))}
+                        onBlur={(e) => saveSettings({ default_price: e.target.value })}
+                        placeholder="24.00"
+                      />
+                    </div>
+                    <div className="settings-field" style={{ flex: 1, minWidth: '240px' }}>
+                      <span className="settings-field-label">Delivery text</span>
+                      <input
+                        value={settings.delivery_text || ''}
+                        onChange={(e) => setSettings((s) => ({ ...s, delivery_text: e.target.value }))}
+                        onBlur={(e) => saveSettings({ delivery_text: e.target.value })}
+                        placeholder="Digital file, no physical shipment"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div className="settings-subsection">
                   <div className="settings-readonly-box">
                     <div className="settings-readonly-header">
                       <h4 className="settings-readonly-title">Shop conventions</h4>
-                      <span className="read-only-badge">Read-only reference</span>
+                      <span className="read-only-badge">Read-only</span>
                     </div>
-                    <p className="settings-caption">Hardcoded Etsy formatting rules and Midjourney parameters.</p>
                     {shopConventions ? (
-                      <ul style={{ paddingLeft: '1.25rem', margin: 0 }}>
+                      <ul className="settings-compact-list">
                         <li>Title separator: <code>{shopConventions.listing.titleSeparator}</code></li>
                         <li>Max title length: {shopConventions.listing.maxTitleLength}</li>
                         <li>Tags per listing: {shopConventions.listing.tagsPerListing} (+{shopConventions.listing.tagAlternates} alternates, max {shopConventions.listing.maxTagLength} chars)</li>
@@ -597,11 +588,10 @@ function App() {
                   <div className="settings-readonly-box">
                     <div className="settings-readonly-header">
                       <h4 className="settings-readonly-title">Product sizes / mockup templates</h4>
-                      <span className="read-only-badge">Read-only reference</span>
+                      <span className="read-only-badge">Read-only</span>
                     </div>
-                    <p className="settings-caption">Configured print dimensions, DPI, and orientations.</p>
                     {sizeKeys.length ? (
-                      <ul style={{ paddingLeft: '1.25rem', margin: 0 }}>
+                      <ul className="settings-compact-list">
                         {sizeKeys.map((k) => (
                           <li key={k}>
                             <code>{k}</code> — {productSizes[k].dimensions} @ {productSizes[k].dpi}dpi ({productSizes[k].orientation})
@@ -609,7 +599,7 @@ function App() {
                         ))}
                       </ul>
                     ) : (
-                      <p className="empty-state" style={{ margin: 0 }}>None configured yet — edit <code>backend/config/product-sizes.json</code>.</p>
+                      <p className="empty-state" style={{ margin: 0 }}>None configured — edit <code>backend/config/product-sizes.json</code>.</p>
                     )}
                   </div>
                 </div>
@@ -619,9 +609,8 @@ function App() {
                 <h3 className="settings-section-title">Automation & Diagnostics</h3>
 
                 <div className="settings-subsection">
-                  <h4 className="settings-sub-heading">Auto-import from folder (Module 7)</h4>
-                  <p className="settings-caption">Automatically pull new downloads from a local watch folder.</p>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0.5rem 0' }}>
+                  <h4 className="settings-sub-heading">Auto-import from folder</h4>
+                  <label className="settings-checkbox-row">
                     <input
                       type="checkbox"
                       checked={settings.taste_filter_watch_enabled === 'true'}
@@ -633,25 +622,26 @@ function App() {
                     />
                     Auto-import from folder
                   </label>
-                  <label style={{ display: 'block', margin: '0.5rem 0' }}>
-                    Watched folder path:{' '}
-                    <input
-                      style={{ width: '100%', maxWidth: '500px' }}
-                      value={settings.taste_filter_watch_folder || ''}
-                      onChange={(e) => setSettings((s) => ({ ...s, taste_filter_watch_folder: e.target.value }))}
-                      onBlur={(e) => saveWatchSetting({ taste_filter_watch_folder: e.target.value })}
-                      placeholder="/home/you/midjourney-downloads"
-                    />
-                  </label>
-                  <label style={{ display: 'block', margin: '0.5rem 0' }}>
-                    Category (optional):{' '}
-                    <input
-                      value={settings.taste_filter_watch_category || ''}
-                      onChange={(e) => setSettings((s) => ({ ...s, taste_filter_watch_category: e.target.value }))}
-                      onBlur={(e) => saveWatchSetting({ taste_filter_watch_category: e.target.value })}
-                      placeholder="e.g. square-canvas"
-                    />
-                  </label>
+                  <div className="settings-field-row">
+                    <div className="settings-field" style={{ flex: 1, minWidth: '260px' }}>
+                      <span className="settings-field-label">Watched folder path</span>
+                      <input
+                        value={settings.taste_filter_watch_folder || ''}
+                        onChange={(e) => setSettings((s) => ({ ...s, taste_filter_watch_folder: e.target.value }))}
+                        onBlur={(e) => saveWatchSetting({ taste_filter_watch_folder: e.target.value })}
+                        placeholder="/home/you/midjourney-downloads"
+                      />
+                    </div>
+                    <div className="settings-field">
+                      <span className="settings-field-label">Category (optional)</span>
+                      <input
+                        value={settings.taste_filter_watch_category || ''}
+                        onChange={(e) => setSettings((s) => ({ ...s, taste_filter_watch_category: e.target.value }))}
+                        onBlur={(e) => saveWatchSetting({ taste_filter_watch_category: e.target.value })}
+                        placeholder="e.g. square-canvas"
+                      />
+                    </div>
+                  </div>
                   {watchStatus && (
                     <p className="text-muted mono-sm" style={{ marginTop: '0.5rem' }}>
                       {watchStatus.active ? `✅ Watching ${watchStatus.folder}` : '⚠️ Not currently watching'}
@@ -663,9 +653,8 @@ function App() {
                 </div>
 
                 <div className="settings-subsection">
-                  <h4 className="settings-sub-heading">Auto-sort taste filter candidates</h4>
-                  <p className="settings-caption">Auto-sort high-confidence taste scores into keep or discard.</p>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0.5rem 0' }}>
+                  <h4 className="settings-sub-heading">Taste filter auto-sort</h4>
+                  <label className="settings-checkbox-row">
                     <input
                       type="checkbox"
                       checked={settings.taste_filter_auto_enabled === 'true'}
@@ -677,24 +666,23 @@ function App() {
                     />
                     Auto-compute taste threshold
                   </label>
-                  <label style={{ display: 'block', margin: '0.5rem 0' }}>
-                    Auto threshold (absolute score cutoff):{' '}
+                  <div className="settings-field" style={{ maxWidth: '200px' }}>
+                    <span className="settings-field-label">Auto threshold (score cutoff)</span>
                     <input
                       value={settings.taste_filter_auto_threshold ?? ''}
                       onChange={(e) => setSettings((s) => ({ ...s, taste_filter_auto_threshold: e.target.value }))}
                       onBlur={(e) => saveSettings({ taste_filter_auto_threshold: e.target.value })}
                       placeholder="0.3"
                     />
-                  </label>
+                  </div>
                 </div>
 
                 <div className="settings-subsection" style={{ marginBottom: 0 }}>
                   <div className="settings-readonly-box">
                     <div className="settings-readonly-header">
                       <h4 className="settings-readonly-title">LLM rate-limit status</h4>
-                      <span className="read-only-badge">Read-only reference</span>
+                      <span className="read-only-badge">Read-only</span>
                     </div>
-                    <p className="settings-caption">Active cooldown tracking for Gemini key and model pairs.</p>
                     {rateLimits.length ? (
                       <table className="data-table" style={{ marginBottom: 0 }}>
                         <thead>
