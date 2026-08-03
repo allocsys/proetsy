@@ -28,9 +28,17 @@ const MockBrowserWindow = vi.fn(function BrowserWindowMock() {
 });
 MockBrowserWindow.getAllWindows = vi.fn(() => []);
 
+// Rollout step 5: mocks for the select-folder IPC handler -- ipcMain.handle just needs
+// to be a no-op vi.fn() here (main.js calls it unconditionally at module scope), and
+// dialog.showOpenDialog is the one main.js's exported selectFolder() actually calls.
+const mockIpcMain = { handle: vi.fn() };
+const mockDialog = { showOpenDialog: vi.fn() };
+
 vi.mock('electron', () => ({
   app: mockApp,
   BrowserWindow: MockBrowserWindow,
+  ipcMain: mockIpcMain,
+  dialog: mockDialog,
 }));
 
 // Fake child process: enough of Node's ChildProcess surface (an EventEmitter with
@@ -59,6 +67,8 @@ beforeEach(async () => {
   MockBrowserWindow.mockClear();
   mockBrowserWindowInstance.loadFile.mockClear();
   mockBrowserWindowInstance.loadURL.mockClear();
+  mockIpcMain.handle.mockClear();
+  mockDialog.showOpenDialog.mockReset();
   main = await import('./main.js');
 });
 
