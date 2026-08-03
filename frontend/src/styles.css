@@ -635,6 +635,10 @@ input:focus, select:focus, textarea:focus {
 .mockup-selected-label { color: var(--ink-soft); font-size: 13px; }
 .mockup-variant-image { width: clamp(120px, 20vw, 200px); border-radius: var(--radius-sm); display: block; object-fit: cover; }
 
+/* Mockup category-selection step (plan.md -> "Mockup categories", Rollout step 5) */
+.mockup-category-selector { margin-bottom: var(--space-4); }
+.mockup-category-checklist { display: flex; flex-wrap: wrap; gap: var(--space-4); margin-bottom: var(--space-3); }
+
 /* Job Listing Review & Card */
 .listing-card { margin-bottom: var(--space-4); }
 .listing-card-title { margin-top: 0; text-transform: capitalize; color: var(--ink); }
