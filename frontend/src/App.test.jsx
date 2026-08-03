@@ -49,9 +49,9 @@ const JOB = {
   updated_at: '2026-08-01T12:00:00Z',
 };
 
-// App fires eight fetches on mount, in this order: health, pipeline config,
-// product-sizes, shop-conventions, settings, setup-status, jobs, trends. Rather than
-// depend on call order (fragile if App's effect ever gets reordered), route by URL.
+// App fires nine fetches on mount, in this order: health, pipeline config,
+// product-sizes, shop-conventions, settings, setup-status, jobs, trends, tags. Rather
+// than depend on call order (fragile if App's effect ever gets reordered), route by URL.
 function mockFetchByUrl(overrides = {}) {
   const defaults = {
     '/api/health': { status: 'ok' },
@@ -72,6 +72,7 @@ function mockFetchByUrl(overrides = {}) {
     '/api/setup-status': SETUP_STATUS_READY,
     '/api/jobs': [],
     '/api/trends': [],
+    '/api/tags': [],
     '/api/taste-filter/watch-status': { active: false, folder: null, category: null, pendingCount: 0, lastError: null },
   };
   const responses = { ...defaults, ...overrides };
@@ -110,9 +111,9 @@ describe('App', () => {
   it('shows the backend-unreachable banner when health fetch fails', async () => {
     global.fetch = vi.fn((url) => {
       if (url === '/api/health') return Promise.reject(new Error('network error'));
-      // Array-returning routes need an array back, or App's jobs.map()/trends.map()
-      // crashes on an object.
-      if (url === '/api/jobs' || url === '/api/trends') return Promise.resolve({ ok: true, json: async () => [] });
+      // Array-returning routes need an array back, or App's jobs.map()/trends.map()/
+      // tagCategories' tags.map() crashes on an object.
+      if (url === '/api/jobs' || url === '/api/trends' || url === '/api/tags') return Promise.resolve({ ok: true, json: async () => [] });
       return Promise.resolve({ ok: true, json: async () => ({}) });
     });
     render(<App />);
@@ -271,7 +272,7 @@ describe('App', () => {
     expect(await screen.findByText(/Upload failed: No files received/)).toBeInTheDocument();
   });
 
-  it('opens the settings panel and saves pasted tags', async () => {
+  it('opens the settings panel and saves pasted tags with no category', async () => {
     mockFetchByUrl({ '/api/tags/bulk': { inserted: 3, total: 10 } });
     const user = userEvent.setup();
     render(<App />);
@@ -285,10 +286,42 @@ describe('App', () => {
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         '/api/tags/bulk',
-        expect.objectContaining({ method: 'POST', body: JSON.stringify({ tags: 'boho decor' }) })
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ tags: 'boho decor', category: null }) })
       );
     });
     expect(await screen.findByText('Saved. 3 new tag(s), 10 total.')).toBeInTheDocument();
+  });
+
+  it('saves pasted tags with a category, and offers existing categories as suggestions (plan.md step 2)', async () => {
+    mockFetchByUrl({
+      '/api/tags': [{ id: 1, tag_text: 'boho decor', category: 'boho' }, { id: 2, tag_text: 'fern print', category: 'botanical' }],
+      '/api/tags/bulk': { inserted: 1, total: 11 },
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('ok');
+
+    await user.click(screen.getByText('⚙ Settings'));
+    const textarea = await screen.findByPlaceholderText(/wall art/);
+    await user.type(textarea, 'macrame wall hanging');
+    const categoryInput = screen.getByPlaceholderText(/e\.g\. botanical, boho, minimalist/);
+    await user.type(categoryInput, 'boho');
+    await user.click(screen.getByText('Save tags'));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/tags/bulk',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ tags: 'macrame wall hanging', category: 'boho' }),
+        })
+      );
+    });
+    expect(await screen.findByText('Saved. 1 new tag(s), 11 total.')).toBeInTheDocument();
+
+    // Existing distinct categories from the library are offered as <datalist> suggestions.
+    const datalistOptions = Array.from(document.querySelectorAll('#tag-category-options option')).map((o) => o.value);
+    expect(datalistOptions).toEqual(['boho', 'botanical']);
   });
 
   it('imports a tag CSV file from the settings panel', async () => {

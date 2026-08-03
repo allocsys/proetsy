@@ -44,9 +44,13 @@ function App() {
   const [trends, setTrends] = useState([]);
   const [newTrendTerm, setNewTrendTerm] = useState('');
   const [newTrendCategory, setNewTrendCategory] = useState('');
+  const [tags, setTags] = useState([]);
   const [tagsText, setTagsText] = useState('');
+  const [tagsCategory, setTagsCategory] = useState('');
   const [tagsSavedMessage, setTagsSavedMessage] = useState('');
   const [tagsCsvMessage, setTagsCsvMessage] = useState('');
+  const [tagsBackfillMessage, setTagsBackfillMessage] = useState('');
+  const [tagsBackfillRunning, setTagsBackfillRunning] = useState(false);
   const [watchStatus, setWatchStatus] = useState(null);
   const [rateLimits, setRateLimits] = useState([]);
   const [jobs, setJobs] = useState([]);
@@ -79,6 +83,16 @@ function App() {
     fetch('/api/trends')
       .then((r) => r.json())
       .then(setTrends)
+      .catch(() => {});
+  }
+
+  // Backs the category <datalist> next to the tag-paste textarea (plan.md step 2): lets
+  // the category input suggest whatever categories already exist in the library, while
+  // still accepting free text for a brand-new category.
+  function refreshTags() {
+    fetch('/api/tags')
+      .then((r) => r.json())
+      .then(setTags)
       .catch(() => {});
   }
 
@@ -124,11 +138,19 @@ function App() {
     refreshSetupStatus();
     refreshJobs();
     refreshTrends();
+    refreshTags();
     refreshWatchStatus();
     refreshRateLimits();
   }, []);
 
   const sizeKeys = useMemo(() => Object.keys(productSizes || {}), [productSizes]);
+
+  // plan.md step 2: distinct categories already present in the tag library, offered as
+  // suggestions (not a hard enum) in the category input next to the tag-paste textarea.
+  const tagCategories = useMemo(
+    () => Array.from(new Set(tags.map((t) => t.category).filter(Boolean))).sort(),
+    [tags]
+  );
 
   const [expandedBatches, setExpandedBatches] = useState({});
 
@@ -242,12 +264,13 @@ function App() {
     const res = await fetch('/api/tags/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tags: tagsText }),
+      body: JSON.stringify({ tags: tagsText, category: tagsCategory.trim() || null }),
     });
     const data = await res.json();
     setTagsSavedMessage(res.ok ? `Saved. ${data.inserted} new tag(s), ${data.total} total.` : data.error);
     setTagsText('');
     refreshSetupStatus();
+    refreshTags();
   }
 
   // CSV tag import (ARCHITECTURE.md -> Module 6 -> Settings panel). Reads the picked
@@ -270,6 +293,28 @@ function App() {
       setTagsCsvMessage(`Import failed: ${err.message}`);
     }
     refreshSetupStatus();
+    refreshTags();
+  }
+
+  // plan.md Rollout step 3: one-time admin action that runs uncategorized tags' text
+  // against categories already present elsewhere in the library and backfills any
+  // obvious matches, without requiring a full manual re-tag of the existing library.
+  async function backfillTagCategories() {
+    setTagsBackfillRunning(true);
+    setTagsBackfillMessage('Checking uncategorized tags…');
+    try {
+      const res = await fetch('/api/tags/backfill-categories', { method: 'POST' });
+      const data = await res.json();
+      setTagsBackfillMessage(
+        res.ok
+          ? `Backfilled ${data.updated} of ${data.checked} uncategorized tag(s).`
+          : data.error
+      );
+    } catch (err) {
+      setTagsBackfillMessage(`Backfill failed: ${err.message}`);
+    }
+    setTagsBackfillRunning(false);
+    refreshTags();
   }
 
   async function saveSettings(updates) {
@@ -426,6 +471,20 @@ function App() {
                 onChange={(e) => setTagsText(e.target.value)}
                 placeholder={'wall art\nboho decor\nminimalist print\n...'}
               />
+              <label style={{ display: 'block', marginBottom: '0.5rem' }}>
+                Category (optional — applies to all tags pasted above):{' '}
+                <input
+                  list="tag-category-options"
+                  value={tagsCategory}
+                  onChange={(e) => setTagsCategory(e.target.value)}
+                  placeholder="e.g. botanical, boho, minimalist"
+                />
+                <datalist id="tag-category-options">
+                  {tagCategories.map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
+              </label>
               <div className="flex-row mb-2">
                 <button className="btn-primary" onClick={saveTags} disabled={!tagsText.trim()}>Save tags</button>
                 {tagsSavedMessage && <span className="text-muted mono-sm">{tagsSavedMessage}</span>}
@@ -435,6 +494,18 @@ function App() {
               <div className="flex-row mb-2">
                 <input type="file" accept=".csv,text/csv" onChange={(e) => importTagsCsv(e.target.files?.[0])} />
                 {tagsCsvMessage && <span className="text-muted mono-sm">{tagsCsvMessage}</span>}
+              </div>
+
+              <p className="text-muted" style={{ marginBottom: '0.25rem' }}>
+                Or backfill categories on tags already in the library that don't have one yet, by
+                matching their text against categories already in use (won't touch tags that
+                already have a category, and won't invent a brand-new category):
+              </p>
+              <div className="flex-row mb-2">
+                <button onClick={backfillTagCategories} disabled={tagsBackfillRunning}>
+                  Suggest categories for uncategorized tags
+                </button>
+                {tagsBackfillMessage && <span className="text-muted mono-sm">{tagsBackfillMessage}</span>}
               </div>
 
               <h3>Shop defaults</h3>

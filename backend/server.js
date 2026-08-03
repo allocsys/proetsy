@@ -17,7 +17,11 @@ import { runPendingModulesForJob, runPendingModulesForJobs } from './lib/pipelin
 import { initRateLimitCache } from './lib/llm/rate-limits.js';
 import { getTrends } from './lib/trends/index.js';
 import { addManualTrend, importFromCsvRows, rowsFromCsvText } from './lib/trends/manual.js';
-import { importTagsFromCsvRows, tagRowsFromCsvText } from './lib/tags/user-list.js';
+import {
+  importTagsFromCsvRows,
+  tagRowsFromCsvText,
+  suggestCategoriesForUncategorizedTags,
+} from './lib/tags/user-list.js';
 import { generatePromptsForTrend, listPrompts } from './lib/prompt-helper/index.js';
 import { embedImage } from './lib/taste-filter/embeddings.js';
 import { scoreCandidate, autoDecision } from './lib/taste-filter/scoring.js';
@@ -304,6 +308,17 @@ app.post('/api/tags/csv', (req, res) => {
   const inserted = importTagsFromCsvRows(rows);
   const db = getDb();
   res.status(201).json({ inserted, tags: db.prepare('SELECT * FROM tags ORDER BY tag_text').all() });
+});
+
+// plan.md Rollout step 3: one-time "Suggest categories for uncategorized tags" admin
+// action (Tag Library settings). Matches each uncategorized tag's text against
+// categories already in use elsewhere in the library -- no request body needed, this is
+// entirely derived from the current state of the tags table (see
+// suggestCategoriesForUncategorizedTags).
+app.post('/api/tags/backfill-categories', (req, res) => {
+  const result = suggestCategoriesForUncategorizedTags();
+  const db = getDb();
+  res.status(200).json({ ...result, tags: db.prepare('SELECT * FROM tags ORDER BY tag_text').all() });
 });
 
 app.get('/api/jobs', (req, res) => {

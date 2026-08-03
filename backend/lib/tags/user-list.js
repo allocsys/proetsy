@@ -1,6 +1,50 @@
 import { getDb } from '../../db/init.js';
 import { parseCsv, firstColumn } from '../csv.js';
 
+// plan.md Rollout step 3: "Suggest categories for uncategorized tags" one-time admin
+// action. Not a fresh classifier -- it runs each uncategorized tag's own text against the
+// set of categories that already exist elsewhere in the library (the same free-text
+// values the category <datalist> in the Tag Library UI already surfaces), so a shop that
+// has categorized even a handful of tags (e.g. 'botanical', 'boho') gets the obvious
+// substring matches ("botanical print" -> 'botanical') backfilled without a full manual
+// re-tag. Deliberately conservative: only ever assigns a category that's already in use
+// by at least one other tag, never invents a new one, and never touches a tag that
+// already has a category (no silent overwrites).
+export function suggestCategoriesForUncategorizedTags() {
+  const db = getDb();
+  const allTags = db.prepare('SELECT * FROM tags').all();
+
+  const knownCategories = Array.from(
+    new Set(allTags.map((t) => t.category).filter(Boolean))
+  );
+
+  const update = db.prepare('UPDATE tags SET category = ? WHERE id = ?');
+  const uncategorized = allTags.filter((t) => !t.category);
+  const updates = [];
+
+  const run = db.transaction(() => {
+    for (const tag of uncategorized) {
+      const haystack = tag.tag_text.toLowerCase();
+      // First matching known category wins; longest-first so a more specific category
+      // (e.g. 'nursery decor') isn't shadowed by a shorter one (e.g. 'decor') that also
+      // happens to substring-match.
+      const match = [...knownCategories]
+        .sort((a, b) => b.length - a.length)
+        .find((category) => haystack.includes(category.toLowerCase()));
+      if (!match) continue;
+      update.run(match, tag.id);
+      updates.push({ tagText: tag.tag_text, category: match });
+    }
+  });
+  run();
+
+  return {
+    checked: uncategorized.length,
+    updated: updates.length,
+    updates,
+  };
+}
+
 // v2: still requires the existing substring overlap against Module 1's image analysis
 // output (so behavior for uncategorized tags — the bulk of most libraries today — is
 // unchanged), but now ranks candidates by whether the tag's own `category` corroborates

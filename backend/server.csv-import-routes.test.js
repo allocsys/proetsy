@@ -111,3 +111,24 @@ describe('POST /api/tags/csv', () => {
     expect(res.body.error).toMatch(/No usable rows/);
   });
 });
+
+describe('POST /api/tags/backfill-categories', () => {
+  it('backfills uncategorized tags whose text matches a category already in use, and reports how many', async () => {
+    await request(app).post('/api/tags/bulk').send({ tags: 'botanical print', category: 'botanical' });
+    await request(app).post('/api/tags/bulk').send({ tags: 'botanical accent piece' });
+
+    const res = await request(app).post('/api/tags/backfill-categories').send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body.updated).toBeGreaterThanOrEqual(1);
+    const backfilled = res.body.tags.find((t) => t.tag_text === 'botanical accent piece');
+    expect(backfilled.category).toBe('botanical');
+  });
+
+  it('is a no-op (200, zero updates) when there are no uncategorized tags left to check', async () => {
+    // Second call right after the one above: every tag from that test now has a category.
+    const res = await request(app).post('/api/tags/backfill-categories').send({});
+    expect(res.status).toBe(200);
+    expect(res.body.updated).toBe(0);
+  });
+});
