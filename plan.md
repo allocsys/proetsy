@@ -153,14 +153,14 @@ mislabel files with zero human-visible trace — see Step 2.5.
 `image_preferences`. Land this migration first, on its own, so every
 later step in this part can rely on the column existing.
 
-### Step 2.2 — Backend: `addImagePreference` flag
+### Step 2.2 — Backend: `addImagePreference` flag ✅ done
 
 `backend/lib/taste-filter/store.js` — `addImagePreference` accepts an
 optional `autoLabeled` flag, defaulting to `false` (no change to existing
 callers' behavior). Small, isolated change — confirm existing store tests
 still pass before wiring anything into it.
 
-### Step 2.3 — New setting keys
+### Step 2.3 — New setting keys ✅ done
 
 Added to the existing `settings` key/value table (same pattern as
 `taste_filter_watch_*`):
@@ -174,7 +174,7 @@ Backend only for this step: make sure the settings table accepts and
 returns these keys (default `false`/`'0.3'` when unset). Settings UI comes
 later, in Step 2.8.
 
-### Step 2.4 — Backend: decision rule in the scoring path
+### Step 2.4 — Backend: decision rule in the scoring path ✅ done
 
 Applied per-candidate, per-centroid-pair (global and category scored
 independently, same as today), only when `taste_filter_auto_enabled` is on:
@@ -191,13 +191,13 @@ only ever acts on centroid pairs that already clear the existing cold-start
 bar. Implement this rule as a small, independently testable function in
 `scoring.js` before wiring it into the `/import` route in Step 2.5.
 
-### Step 2.5 — Backend: decision-rule unit tests
+### Step 2.5 — Backend: decision-rule unit tests ✅ done
 
 `backend/lib/taste-filter/scoring.test.js` (or equivalent) — unit tests
 for the Step 2.4 decision rule at the threshold boundary and just inside
 the cold-start gate. Land and confirm green before touching the route.
 
-### Step 2.6 — Backend: wire the rule into `/api/taste-filter/import`
+### Step 2.6 — Backend: wire the rule into `/api/taste-filter/import` ✅ done
 
 `POST /api/taste-filter/import` — after scoring each candidate, if
 `taste_filter_auto_enabled` is on, apply the Step 2.4 rule server-side and
