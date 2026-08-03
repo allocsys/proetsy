@@ -6,13 +6,10 @@
 // never composes a mockup, it only manages the `product_sizes` DB rows and generates
 // small preview thumbnails for the dashboard's folder-picker UI.
 //
-// Deliberately reads its own `mockup_templates_dir` setting rather than importing
-// mockup-generator.js's TEMPLATES_BASE_DIR: Rollout step 3 (not this step) is what
-// switches mockup-generator.js's constant over to a settings-first resolveTemplatesDir()
-// call taking effect without a restart. This module's resolveTemplatesDir() below uses
-// the exact same fallback chain (setting -> MOCKUP_TEMPLATES_DIR env -> BACKEND_ROOT) so
-// step 3 can simply have mockup-generator.js import and call this one instead of
-// duplicating it.
+// resolveTemplatesDir() below is the shared settings-first fallback chain (setting ->
+// MOCKUP_TEMPLATES_DIR env -> BACKEND_ROOT). As of Rollout step 3, mockup-generator.js's
+// own resolveTemplatesBaseDir() delegates straight to this function rather than
+// duplicating the chain -- see mockup-generator.js's doc comment on that function.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
