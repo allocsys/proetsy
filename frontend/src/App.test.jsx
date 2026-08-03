@@ -271,7 +271,7 @@ describe('App', () => {
     expect(await screen.findByText(/Upload failed: No files received/)).toBeInTheDocument();
   });
 
-  it('opens the settings panel and saves pasted tags', async () => {
+  it('opens the settings panel and saves pasted tags with no category', async () => {
     mockFetchByUrl({ '/api/tags/bulk': { inserted: 3, total: 10 } });
     const user = userEvent.setup();
     render(<App />);
@@ -285,10 +285,42 @@ describe('App', () => {
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         '/api/tags/bulk',
-        expect.objectContaining({ method: 'POST', body: JSON.stringify({ tags: 'boho decor' }) })
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ tags: 'boho decor', category: null }) })
       );
     });
     expect(await screen.findByText('Saved. 3 new tag(s), 10 total.')).toBeInTheDocument();
+  });
+
+  it('saves pasted tags with a category, and offers existing categories as suggestions (plan.md step 2)', async () => {
+    mockFetchByUrl({
+      '/api/tags': [{ id: 1, tag_text: 'boho decor', category: 'boho' }, { id: 2, tag_text: 'fern print', category: 'botanical' }],
+      '/api/tags/bulk': { inserted: 1, total: 11 },
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('ok');
+
+    await user.click(screen.getByText('⚙ Settings'));
+    const textarea = await screen.findByPlaceholderText(/wall art/);
+    await user.type(textarea, 'macrame wall hanging');
+    const categoryInput = screen.getByPlaceholderText(/e\.g\. botanical, boho, minimalist/);
+    await user.type(categoryInput, 'boho');
+    await user.click(screen.getByText('Save tags'));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/tags/bulk',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ tags: 'macrame wall hanging', category: 'boho' }),
+        })
+      );
+    });
+    expect(await screen.findByText('Saved. 1 new tag(s), 11 total.')).toBeInTheDocument();
+
+    // Existing distinct categories from the library are offered as <datalist> suggestions.
+    const datalistOptions = Array.from(document.querySelectorAll('#tag-category-options option')).map((o) => o.value);
+    expect(datalistOptions).toEqual(['boho', 'botanical']);
   });
 
   it('imports a tag CSV file from the settings panel', async () => {
