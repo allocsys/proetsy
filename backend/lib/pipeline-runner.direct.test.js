@@ -94,6 +94,45 @@ describe('runPendingModulesForJob - mockup_composer partial-success rule', () =>
   });
 });
 
+describe('runPendingModulesForJob - options.sizeKeys filter (Rollout step 4)', () => {
+  it('with no sizeKeys option, attempts every configured size (regression guard)', async () => {
+    const { generateMockupForJob } = await import('./mockup-generator.js');
+    generateMockupForJob.mockClear();
+    const jobId = createJob(artworkId);
+
+    const { results } = await runPendingModulesForJob(jobId);
+
+    expect(generateMockupForJob.mock.calls.map(([, sizeKey]) => sizeKey).sort()).toEqual(
+      ['size-bad', 'size-ok'].sort()
+    );
+    expect(Object.keys(results.mockup_composer.perSize).sort()).toEqual(['size-bad', 'size-ok'].sort());
+  });
+
+  it('with a sizeKeys filter, only attempts the given sizes (not every configured size)', async () => {
+    const { generateMockupForJob } = await import('./mockup-generator.js');
+    generateMockupForJob.mockClear();
+    const jobId = createJob(artworkId);
+
+    const { results } = await runPendingModulesForJob(jobId, { sizeKeys: ['size-ok'] });
+
+    expect(generateMockupForJob.mock.calls.map(([, sizeKey]) => sizeKey)).toEqual(['size-ok']);
+    expect(Object.keys(results.mockup_composer.perSize)).toEqual(['size-ok']);
+    expect(results.mockup_composer.status).toBe('success');
+  });
+
+  it('an empty sizeKeys filter attempts nothing and still reports mockup_composer success', async () => {
+    const { generateMockupForJob } = await import('./mockup-generator.js');
+    generateMockupForJob.mockClear();
+    const jobId = createJob(artworkId);
+
+    const { results } = await runPendingModulesForJob(jobId, { sizeKeys: [] });
+
+    expect(generateMockupForJob).not.toHaveBeenCalled();
+    expect(results.mockup_composer.perSize).toEqual({});
+    expect(results.mockup_composer.status).toBe('success');
+  });
+});
+
 describe('runPendingModulesForJobs - per-job isolation (last-resort guard)', () => {
   it('reports ok:false with an error message for a job id that does not exist, without affecting other jobs in the same batch', async () => {
     const healthyJobId = createJob(artworkId);
