@@ -33,28 +33,28 @@ function MockupCard({ mockup, onVariantChange }) {
   }
 
   return (
-    <div className="dark-panel" style={{ marginBottom: '1rem' }}>
-      <h4 style={{ marginTop: 0, color: 'var(--cream)' }}>
+    <div className="dark-panel mockup-card">
+      <h4>
         {mockup.size_key} {mockup.dimensions ? `(${mockup.dimensions})` : ''}
       </h4>
 
       {mockup.needs_review ? (
         <>
-          <p style={{ color: 'var(--state-pending)', marginTop: 0, fontSize: '13px' }}>Needs review — pick a variant:</p>
-          <div className="flex-row" style={{ gap: '1.5rem', alignItems: 'flex-start' }}>
-            <div className="flex-row" style={{ flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-start' }}>
-              <strong style={{ color: 'var(--cream-dim)', fontSize: '12px' }}>Smart crop</strong>
+          <p className="mockup-review-status">Needs review — pick a variant:</p>
+          <div className="mockup-variants-row">
+            <div className="mockup-variant-col">
+              <strong className="mockup-variant-label">Smart crop</strong>
               {mockup.smart_crop_url && (
-                <img src={mockup.smart_crop_url} alt="Smart crop variant" style={{ width: '200px', borderRadius: '4px' }} />
+                <img src={mockup.smart_crop_url} alt="Smart crop variant" className="mockup-variant-image" />
               )}
               <button className="btn-secondary" disabled={saving} onClick={() => selectVariant('smart_crop')}>
                 Use smart crop
               </button>
             </div>
-            <div className="flex-row" style={{ flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-start' }}>
-              <strong style={{ color: 'var(--cream-dim)', fontSize: '12px' }}>AI extended</strong>
+            <div className="mockup-variant-col">
+              <strong className="mockup-variant-label">AI extended</strong>
               {mockup.ai_extended_url && (
-                <img src={mockup.ai_extended_url} alt="AI-extended variant" style={{ width: '200px', borderRadius: '4px' }} />
+                <img src={mockup.ai_extended_url} alt="AI-extended variant" className="mockup-variant-image" />
               )}
               <button className="btn-secondary" disabled={saving} onClick={() => selectVariant('ai_extended')}>
                 Use AI extended
@@ -63,13 +63,13 @@ function MockupCard({ mockup, onVariantChange }) {
           </div>
         </>
       ) : (
-        <div className="flex-row" style={{ flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-start' }}>
-          <span style={{ color: 'var(--cream-dim)', fontSize: '13px' }}>Selected: {mockup.selected_variant}</span>
-          {mockup.file_url && <img src={mockup.file_url} alt="Selected mockup" style={{ width: '200px', borderRadius: '4px' }} />}
+        <div className="mockup-variant-col">
+          <span className="mockup-selected-label">Selected: {mockup.selected_variant}</span>
+          {mockup.file_url && <img src={mockup.file_url} alt="Selected mockup" className="mockup-variant-image" />}
         </div>
       )}
 
-      {error && <p style={{ color: 'var(--state-danger)', fontSize: '13px', marginTop: '0.5rem' }}>{error}</p>}
+      {error && <p className="text-danger mt-1">{error}</p>}
     </div>
   );
 }
@@ -110,12 +110,12 @@ export default function JobMockupReview({ jobId }) {
       <button onClick={loadMockups} disabled={!jobId || loading}>
         {loading ? 'Loading…' : 'Load mockups'}
       </button>
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
+      {error && <p className="text-danger mt-1">{error}</p>}
       {mockups.map((m) => (
         <MockupCard key={m.id} mockup={m} onVariantChange={handleVariantChange} />
       ))}
       {mockups.length === 0 && !loading && !error && (
-        <p style={{ color: '#888' }}>No mockups loaded yet.</p>
+        <p className="text-muted mt-2">No mockups loaded yet.</p>
       )}
     </div>
   );
