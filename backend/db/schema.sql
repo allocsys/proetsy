@@ -126,6 +126,12 @@ CREATE TABLE IF NOT EXISTS image_preferences (
   category TEXT,
   prompt_id INTEGER REFERENCES prompts(id),
   promoted_artwork_id INTEGER REFERENCES artworks(id),
+  -- Set when this row was written by the auto-compute decision rule (see
+  -- ARCHITECTURE.md / plan.md Part 2 -> scoring.js's decision rule) rather than a
+  -- manual Keep/Discard click. Purely informational -- doesn't change how the row
+  -- feeds into centroid recompute. Cleared back to 0 if the user manually corrects an
+  -- auto-sorted candidate.
+  auto_labeled INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_image_preferences_category ON image_preferences(category);
