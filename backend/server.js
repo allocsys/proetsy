@@ -6,7 +6,7 @@ import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
 import { getDb } from './db/init.js';
-import { getPipelineConfig, getProductSizes } from './config/index.js';
+import { getPipelineConfig, getProductSizes, migrateProductSizesSeed } from './config/index.js';
 import { SHOP_CONVENTIONS, MIDJOURNEY_CONVENTIONS } from './config/shop-conventions.js';
 import { createJob, getJobWithModules, setManualNotes, setModuleStatus } from './lib/jobs.js';
 import { analyzeArtworkForJob } from './lib/image-analyzer/index.js';
@@ -109,6 +109,13 @@ function withMockupUrls(row) {
 
 // Initializes the schema on boot (CREATE TABLE IF NOT EXISTS, so safe to call every start).
 getDb();
+
+// One-time migration: seeds `product_sizes` from product-sizes.json the first time the
+// table is found empty, so an existing dev setup with a hand-edited JSON file doesn't
+// lose its configured sizes now that getProductSizes() reads from the DB table instead
+// of the file (see config/index.js -> migrateProductSizesSeed(), plan.md -> "Rollout"
+// step 1). Safe to call on every startup -- a no-op once the table has any rows.
+migrateProductSizesSeed();
 
 // Rehydrates the LLM provider layer's in-process cooldown Map from the durable
 // llm_rate_limits table, so a restart doesn't reset an already-exhausted key/model pair
