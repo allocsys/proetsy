@@ -124,7 +124,29 @@ closes a schema gap: the `product_sizes` table is now populated (upserted from
 `product-sizes.json` on each mockup run, keyed on `size_key`) instead of staying empty,
 since `mockups.product_size_id`'s FK needs a row to point at, and gained a
 `placement_layer` column (with a defensive `ALTER TABLE` migration in `backend/db/init.js`
-for existing dev DBs). **AI-outpainting fallback for large aspect-ratio mismatches and the
+for existing dev DBs).
+
+**Dashboard mockup-template-manager plan (folder picker + template selection) — in
+progress, Rollout step 1 of 6 done.** See `plan.md` for the full plan (replaces the
+hand-edit-JSON workflow for configuring mockup templates with a real dashboard
+feature: pick a folder, browse thumbnails, assign product-size templates). Step 1 landed
+first, with no UI change yet: `backend/config/index.js`'s `getProductSizes()` now reads
+the `product_sizes` DB table directly (a fresh query every call, same "always current"
+property the JSON-file read had) instead of `product-sizes.json` — the DB table is now
+the live, dashboard-editable source of truth, not just a side-effect mirror written by
+`generateMockupForJob`'s own upsert (described above). A new `migrateProductSizesSeed()`,
+called once on backend startup in `server.js` right alongside `getDb()`'s schema init,
+seeds `product_sizes` from `product-sizes.json` the first time the table is found empty,
+so an existing dev setup's hand-edited JSON file doesn't lose its configured sizes on
+upgrade — a no-op on every later startup once the table has rows. After that first
+migration, `product-sizes.json` is inert (never read again by `getProductSizes()`); the
+file itself is intentionally left in place as a legacy record rather than deleted. Both
+`getProductSizes()`'s return shape and `GET /api/config/product-sizes`'s response shape
+are unchanged, so every existing caller (`mockup-generator.js`, Module 2's listing
+generator, the dashboard) keeps working without changes of its own. Remaining steps
+(new `mockup-templates` scan/list/create/delete module + routes, dynamic
+`resolveTemplatesBaseDir()`, the `MockupTemplates.jsx` dashboard page, and the Electron
+native folder picker) are not started yet — see `plan.md`'s "Rollout" section. **AI-outpainting fallback for large aspect-ratio mismatches and the
 dashboard side-by-side smart-crop/AI-extended review step are now ✅ done too** — see the
 full 8-step build sequence below; all 8 steps are complete. A committed real PSD test
 fixture, and integration/idempotency tests for the PSD-specific compositing path itself —
