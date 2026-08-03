@@ -20,7 +20,7 @@ import { addManualTrend, importFromCsvRows, rowsFromCsvText } from './lib/trends
 import { importTagsFromCsvRows, tagRowsFromCsvText } from './lib/tags/user-list.js';
 import { generatePromptsForTrend, listPrompts } from './lib/prompt-helper/index.js';
 import { embedImage } from './lib/taste-filter/embeddings.js';
-import { scoreCandidate } from './lib/taste-filter/scoring.js';
+import { scoreCandidate, autoDecision } from './lib/taste-filter/scoring.js';
 import { getCentroids, addImagePreference, recomputeCentroids, tallyPromptTermsForLabel } from './lib/taste-filter/store.js';
 import { syncWatcherFromSettings, getPendingCandidates, removePendingCandidate, getWatcherStatus } from './lib/taste-filter/watcher.js';
 
@@ -653,14 +653,48 @@ app.post('/api/taste-filter/import', uploadCandidate.array('files', 100), async 
   const category = req.body?.category || null;
   const promptId = req.body?.prompt_id ? Number(req.body.prompt_id) : null;
 
-  const globalCentroids = getCentroids(null);
-  const categoryCentroids = category ? getCentroids(category) : null;
+  // plan.md Part 2, Step 2.6: read the auto-compute settings for this batch. Same
+  // key/value `settings` table as everything else (Step 2.3) — falls back to
+  // AUTO_SETTING_DEFAULTS so an unset row behaves as "off" / the default threshold,
+  // never as a crash or an accidental auto-enable.
+  const autoSettingRows = getDb()
+    .prepare('SELECT key, value FROM settings WHERE key IN (?, ?)')
+    .all(SETTING_AUTO_ENABLED, SETTING_AUTO_THRESHOLD);
+  const autoSettings = { ...AUTO_SETTING_DEFAULTS, ...Object.fromEntries(autoSettingRows.map((r) => [r.key, r.value])) };
+  const autoEnabled = autoSettings[SETTING_AUTO_ENABLED] === 'true';
+  const autoThreshold = Number(autoSettings[SETTING_AUTO_THRESHOLD]);
+
+  let globalCentroids = getCentroids(null);
+  let categoryCentroids = category ? getCentroids(category) : null;
 
   const candidates = [];
   for (const file of files) {
     try {
       const embedding = await embedImage(file.path);
       const scores = scoreCandidate(embedding, { global: globalCentroids, category: categoryCentroids });
+
+      // Step 2.4's decision rule, applied per-centroid-pair, only when auto mode is on
+      // (`isConfident`/`COLD_START_MIN_EXAMPLES` inside autoDecision() are unchanged —
+      // this never acts on a pair that hasn't cleared the existing cold-start bar).
+      // When the candidate has a category, require the global and category rules to
+      // agree before auto-deciding: the two pairs are scored independently and can
+      // disagree (e.g. fine globally but off for this category's style bucket, the
+      // exact case ARCHITECTURE.md's "Output" section calls out both scores for), and
+      // silently picking one over the other for an unattended decision would risk
+      // exactly the "silently mislabel" failure mode Part 2's "Why" section rules out.
+      // A disagreement (or no category) falls back to `null` — manual review, the same
+      // state every candidate is already in today.
+      let decision = null;
+      if (autoEnabled) {
+        const globalDecision = autoDecision(scores.globalScore, globalCentroids, autoThreshold);
+        if (category) {
+          const categoryDecision = autoDecision(scores.categoryScore, categoryCentroids, autoThreshold);
+          decision = globalDecision && globalDecision === categoryDecision ? globalDecision : null;
+        } else {
+          decision = globalDecision;
+        }
+      }
+
       candidates.push({
         imagePath: file.path,
         imageUrl: `/taste-filter-files/${path.basename(file.path)}`,
@@ -668,7 +702,31 @@ app.post('/api/taste-filter/import', uploadCandidate.array('files', 100), async 
         promptId,
         embedding: Array.from(embedding),
         ...scores,
+        autoDecision: decision,
       });
+
+      if (decision) {
+        // Same two effects as a manual label (POST /api/taste-filter/label above):
+        // persist the training signal with `autoLabeled: true` (Step 2.2), then
+        // recompute centroids. Never deletes the underlying file, in either the
+        // auto-keep or auto-discard case — unchanged from today's manual-discard
+        // behavior, per Part 2's "Why" constraint.
+        addImagePreference({
+          imagePath: file.path,
+          embedding,
+          label: decision,
+          category,
+          promptId,
+          autoLabeled: true,
+        });
+        recomputeCentroids();
+        // Refresh the centroids used for scoring so later candidates in this same
+        // batch are scored (and auto-decided) against the just-updated centroids —
+        // matching "same as a manual label", where every label recomputes before the
+        // next one is scored.
+        globalCentroids = getCentroids(null);
+        categoryCentroids = category ? getCentroids(category) : null;
+      }
     } catch (err) {
       candidates.push({
         imagePath: file.path,
