@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import JobArtworkAnalysisReview from './JobArtworkAnalysisReview.jsx';
 import JobListingReview from './JobListingReview.jsx';
 import JobMockupReview from './JobMockupReview.jsx';
+import MockupTemplates from './MockupTemplates.jsx';
 import PromptHelper from './PromptHelper.jsx';
 import TasteFilter from './TasteFilter.jsx';
 
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { id: 'review', label: 'Review a Job', group: 'Pipeline' },
   { id: 'prompt-helper', label: 'Prompt Helper', group: 'Modules' },
   { id: 'settings', label: 'Shop Settings & Tags', group: 'Configuration' },
+  { id: 'mockup-templates', label: 'Mockup Templates', group: 'Configuration' },
 ];
 
 // Module 6 — Control Dashboard. See ARCHITECTURE.md -> Module 6 for the target feature
@@ -38,7 +40,6 @@ function App() {
   const [setupStatus, setSetupStatus] = useState(null);
   const [pipelineDefault, setPipelineDefault] = useState(null);
   const [overrides, setOverrides] = useState({});
-  const [productSizes, setProductSizes] = useState({});
   const [shopConventions, setShopConventions] = useState(null);
   const [settings, setSettings] = useState({});
   const [trends, setTrends] = useState([]);
@@ -132,7 +133,6 @@ function App() {
       })
       .catch(() => {});
 
-    fetch('/api/config/product-sizes').then((r) => r.json()).then(setProductSizes).catch(() => {});
     fetch('/api/config/shop-conventions').then((r) => r.json()).then(setShopConventions).catch(() => {});
     fetch('/api/settings').then((r) => r.json()).then(setSettings).catch(() => {});
     refreshSetupStatus();
@@ -142,8 +142,6 @@ function App() {
     refreshWatchStatus();
     refreshRateLimits();
   }, []);
-
-  const sizeKeys = useMemo(() => Object.keys(productSizes || {}), [productSizes]);
 
   // plan.md step 2: distinct categories already present in the tag library, offered as
   // suggestions (not a hard enum) in the category input next to the tag-paste textarea.
@@ -584,25 +582,6 @@ function App() {
                   </div>
                 </div>
 
-                <div className="settings-subsection" style={{ marginBottom: 0 }}>
-                  <div className="settings-readonly-box">
-                    <div className="settings-readonly-header">
-                      <h4 className="settings-readonly-title">Product sizes / mockup templates</h4>
-                      <span className="read-only-badge">Read-only</span>
-                    </div>
-                    {sizeKeys.length ? (
-                      <ul className="settings-compact-list">
-                        {sizeKeys.map((k) => (
-                          <li key={k}>
-                            <code>{k}</code> — {productSizes[k].dimensions} @ {productSizes[k].dpi}dpi ({productSizes[k].orientation})
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="empty-state" style={{ margin: 0 }}>None configured — edit <code>backend/config/product-sizes.json</code>.</p>
-                    )}
-                  </div>
-                </div>
               </div>
 
               <div className="settings-section-card">
@@ -888,6 +867,12 @@ function App() {
             <section className="paper-card">
               <h2 style={{ marginTop: 0 }}>Trend / Prompt Helper</h2>
               <PromptHelper />
+            </section>
+          )}
+
+          {activeView === 'mockup-templates' && (
+            <section className="paper-card">
+              <MockupTemplates />
             </section>
           )}
 

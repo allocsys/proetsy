@@ -41,7 +41,14 @@ describe('GET /api/health', () => {
 // Ordered before any other describe block below inserts tags/product-sizes, since these
 // two tests are asserting on the DB's starting-from-empty vs. after-one-tag state.
 describe('GET /api/setup-status', () => {
-  it('reports not-ready on a fresh DB with no Gemini key and no tag library', async () => {
+  // hasProductSize is true from the very first request, even on an otherwise-untouched
+  // DB -- server.js runs migrateProductSizesSeed() once on startup (before this test file
+  // ever calls the route), which seeds `product_sizes` from the committed
+  // product-sizes.json the first time the table is found empty (plan.md -> "Rollout"
+  // step 1). This is expected, not a leftover from another test: an existing dev setup's
+  // JSON-configured sizes (or, here, the repo's own shipped example entries) shouldn't
+  // read as "not set up" just because they haven't been re-entered through the DB yet.
+  it('reports not-ready on a fresh DB with no Gemini key and no tag library, but hasProductSize true from the JSON-seed migration', async () => {
     delete process.env.GEMINI_API_KEYS;
 
     const res = await request(app).get('/api/setup-status');
@@ -50,7 +57,7 @@ describe('GET /api/setup-status', () => {
     expect(res.body).toMatchObject({
       geminiKeyConfigured: false,
       dbInitialized: true,
-      hasProductSize: false,
+      hasProductSize: true,
       hasTagLibrary: false,
       readyToRun: false,
     });

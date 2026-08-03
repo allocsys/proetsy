@@ -818,3 +818,46 @@ input:focus, select:focus, textarea:focus {
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
+
+/* Mockup Template Manager (plan.md Rollout step 4) — reuses .taste-grid/.taste-card's
+   card-grid shape (same convention TasteFilter.jsx already established), new class
+   names only where the content genuinely differs (a thumbnail + select checkbox +
+   inline-editable fields, vs. a scored candidate + keep/discard actions). */
+.mockup-template-card {
+  gap: var(--space-2);
+}
+
+.mockup-template-thumb-frame {
+  margin-bottom: var(--space-2);
+}
+
+.mockup-template-thumb {
+  width: 100%;
+  border-radius: var(--radius-sm);
+  display: block;
+  object-fit: cover;
+  aspect-ratio: 1;
+}
+
+.mockup-template-thumb-placeholder {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  border: 1px dashed var(--hairline-paper);
+  margin-bottom: var(--space-2);
+}
+
+.mockup-template-select-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.mockup-template-filename {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--ink);
+  word-break: break-all;
+}

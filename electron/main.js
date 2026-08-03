@@ -23,7 +23,7 @@
 // the real one. Root package.json now sets `"type": "module"` so this file (no local
 // package.json of its own) parses as ESM.
 
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { get } from 'node:http';
@@ -44,7 +44,7 @@ const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
 const DEV_FRONTEND_URL = process.env.ELECTRON_START_URL || 'http://localhost:5173';
 
 let backendProcess = null;
-let mainWindow = null;
+let mainWindow;
 
 // Packaged-mode data directories (sub-step 2). Dev mode leaves these unset so the
 // backend falls back to its own existing defaults (backend/data/... resolved against
@@ -139,6 +139,26 @@ export function waitForBackend(url, { timeoutMs = 20000, intervalMs = 250 } = {}
     attempt();
   });
 }
+
+// Rollout step 5 (plan.md -> "Electron: real native folder picker"): opens a native OS
+// folder picker and returns the chosen path, or null if the user cancelled. Called via
+// the 'select-folder' IPC channel below -- preload.js's window.mockupTemplatesAPI is
+// the renderer-side bridge to it (contextIsolation stays on, so the renderer never
+// gets direct access to `dialog` itself). Kept as its own exported function (rather than
+// inlined into the ipcMain.handle call) so it's directly unit-testable, same as
+// spawnBackend()/waitForBackend()/createWindow() above.
+export async function selectFolder() {
+  const result = await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory'] });
+  return result.canceled ? null : result.filePaths[0];
+}
+
+// Registered unconditionally at module scope (not gated behind the isMainModule guard
+// below) -- ipcMain.handle() only registers a callback, it doesn't touch the app
+// lifecycle, so there's no harm in this running whenever the module loads (including
+// under electron/main.test.js's vi.resetModules()-per-test import), and it means the
+// renderer's 'select-folder' invoke always has a handler as soon as the module is
+// loaded, dev or packaged, without needing its own spot in the whenReady() chain below.
+ipcMain.handle('select-folder', selectFolder);
 
 export async function createWindow() {
   mainWindow = new BrowserWindow({

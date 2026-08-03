@@ -6,7 +6,7 @@ import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
 import { getDb } from './db/init.js';
-import { getPipelineConfig, getProductSizes } from './config/index.js';
+import { getPipelineConfig, getProductSizes, migrateProductSizesSeed } from './config/index.js';
 import { SHOP_CONVENTIONS, MIDJOURNEY_CONVENTIONS } from './config/shop-conventions.js';
 import { createJob, getJobWithModules, setManualNotes, setModuleStatus } from './lib/jobs.js';
 import { analyzeArtworkForJob } from './lib/image-analyzer/index.js';
@@ -27,6 +27,14 @@ import { embedImage } from './lib/taste-filter/embeddings.js';
 import { scoreCandidate, autoDecision } from './lib/taste-filter/scoring.js';
 import { getCentroids, addImagePreference, recomputeCentroids, tallyPromptTermsForLabel } from './lib/taste-filter/store.js';
 import { syncWatcherFromSettings, getPendingCandidates, removePendingCandidate, getWatcherStatus } from './lib/taste-filter/watcher.js';
+import {
+  scanTemplatesFolder,
+  listConfiguredTemplates,
+  upsertConfiguredTemplate,
+  deleteConfiguredTemplate,
+  getTemplatesDirSetting,
+  PREVIEW_DIR as MOCKUP_TEMPLATE_PREVIEW_DIR,
+} from './lib/mockup-templates/index.js';
 
 // Module 7 -> Part 2 (plan.md) -> Step 2.3: settings-table keys for the auto-compute
 // taste threshold, same key/value `settings` table as everything else (no dedicated
@@ -93,6 +101,10 @@ app.use('/taste-filter-files', express.static(CANDIDATES_DIR));
 // basename is a safe, stable public URL; mockupFileUrl() below is the one place that
 // turns a stored server-side path into one.
 app.use('/mockup-files', express.static(OUTPUT_DIR));
+// Serves generated mockup-template preview thumbnails for the dashboard folder-picker
+// grid (plan.md -> "New routes" -> "Static serving"). Same flat/basename-URL convention
+// as /mockup-files above -- see lib/mockup-templates/index.js's generateTemplatePreview.
+app.use('/mockup-template-previews', express.static(MOCKUP_TEMPLATE_PREVIEW_DIR));
 
 function mockupFileUrl(filePath) {
   return filePath ? `/mockup-files/${path.basename(filePath)}` : null;
@@ -109,6 +121,13 @@ function withMockupUrls(row) {
 
 // Initializes the schema on boot (CREATE TABLE IF NOT EXISTS, so safe to call every start).
 getDb();
+
+// One-time migration: seeds `product_sizes` from product-sizes.json the first time the
+// table is found empty, so an existing dev setup with a hand-edited JSON file doesn't
+// lose its configured sizes now that getProductSizes() reads from the DB table instead
+// of the file (see config/index.js -> migrateProductSizesSeed(), plan.md -> "Rollout"
+// step 1). Safe to call on every startup -- a no-op once the table has any rows.
+migrateProductSizesSeed();
 
 // Rehydrates the LLM provider layer's in-process cooldown Map from the durable
 // llm_rate_limits table, so a restart doesn't reset an already-exhausted key/model pair
@@ -573,6 +592,50 @@ app.patch('/api/jobs/:id/mockups/:mockupId/variant', (req, res) => {
   ).run(targetPath, variant, mockupId);
 
   res.json(withMockupUrls(db.prepare('SELECT * FROM mockups WHERE id = ?').get(mockupId)));
+});
+
+// Dashboard Mockup Template Manager routes (plan.md -> "Backend changes" -> "5. New
+// routes", Rollout step 2). Manage which files in the user's own templates folder are
+// configured as product-size templates -- scan a folder, list/create/delete configured
+// entries. Not nested under /api/jobs/:id: like Module 4 below, this isn't job-scoped.
+
+// If `folder` is omitted, falls back to the saved mockup_templates_dir setting -- same
+// "settings-first" convention as the taste-filter watcher's folder field. 400 (not 500)
+// for a missing/nonexistent folder, since this is a synchronous user-initiated scan, not
+// a background watcher silently recording lastError.
+app.get('/api/mockup-templates/scan', async (req, res) => {
+  const folder = req.query.folder || getTemplatesDirSetting();
+  if (!folder) {
+    return res.status(400).json({ error: 'folder query param is required (or set mockup_templates_dir in settings first)' });
+  }
+  try {
+    const files = await scanTemplatesFolder(folder);
+    res.json({ folder, files });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/mockup-templates', async (req, res) => {
+  const templates = await listConfiguredTemplates();
+  res.json(templates);
+});
+
+// Body matches upsertConfiguredTemplate's shape; used both for creating a new entry and
+// editing an existing one (same upsert-by-size_key semantics the JSON file always had).
+app.post('/api/mockup-templates', (req, res) => {
+  try {
+    const template = upsertConfiguredTemplate(req.body || {});
+    res.status(201).json(template);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/mockup-templates/:sizeKey', (req, res) => {
+  const deleted = deleteConfiguredTemplate(req.params.sizeKey);
+  if (!deleted) return res.status(404).json({ error: 'No configured template found for that size key' });
+  res.status(204).end();
 });
 
 // Module 4 (Trend/Prompt Helper) routes. Deliberately NOT nested under /api/jobs/:id —

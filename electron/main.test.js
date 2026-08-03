@@ -28,9 +28,17 @@ const MockBrowserWindow = vi.fn(function BrowserWindowMock() {
 });
 MockBrowserWindow.getAllWindows = vi.fn(() => []);
 
+// Rollout step 5: mocks for the select-folder IPC handler -- ipcMain.handle just needs
+// to be a no-op vi.fn() here (main.js calls it unconditionally at module scope), and
+// dialog.showOpenDialog is the one main.js's exported selectFolder() actually calls.
+const mockIpcMain = { handle: vi.fn() };
+const mockDialog = { showOpenDialog: vi.fn() };
+
 vi.mock('electron', () => ({
   app: mockApp,
   BrowserWindow: MockBrowserWindow,
+  ipcMain: mockIpcMain,
+  dialog: mockDialog,
 }));
 
 // Fake child process: enough of Node's ChildProcess surface (an EventEmitter with
@@ -59,6 +67,8 @@ beforeEach(async () => {
   MockBrowserWindow.mockClear();
   mockBrowserWindowInstance.loadFile.mockClear();
   mockBrowserWindowInstance.loadURL.mockClear();
+  mockIpcMain.handle.mockClear();
+  mockDialog.showOpenDialog.mockReset();
   main = await import('./main.js');
 });
 
@@ -193,6 +203,41 @@ describe('waitForBackend', () => {
     await expect(
       main.waitForBackend('http://localhost:4000/api/health', { timeoutMs: 5, intervalMs: 1 })
     ).rejects.toThrow(/did not become healthy within 5ms/);
+  });
+});
+
+describe('select-folder IPC handler (Rollout step 5)', () => {
+  it('registers a handler for the \'select-folder\' channel on module load', () => {
+    expect(mockIpcMain.handle).toHaveBeenCalledWith('select-folder', main.selectFolder);
+  });
+
+  it('returns the chosen path when the user picks a folder', async () => {
+    mockDialog.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/Users/me/mockup-packs'] });
+
+    await expect(main.selectFolder()).resolves.toBe('/Users/me/mockup-packs');
+    expect(mockDialog.showOpenDialog).toHaveBeenCalledWith(
+      undefined,
+      expect.objectContaining({ properties: ['openDirectory'] })
+    );
+  });
+
+  it('returns null when the user cancels the dialog', async () => {
+    mockDialog.showOpenDialog.mockResolvedValue({ canceled: true, filePaths: [] });
+
+    await expect(main.selectFolder()).resolves.toBeNull();
+  });
+
+  it('passes the current mainWindow to showOpenDialog once a window exists', async () => {
+    mockDialog.showOpenDialog.mockResolvedValue({ canceled: true, filePaths: [] });
+    mockApp.isPackaged = false;
+    await main.createWindow();
+
+    await main.selectFolder();
+
+    expect(mockDialog.showOpenDialog).toHaveBeenCalledWith(
+      mockBrowserWindowInstance,
+      expect.objectContaining({ properties: ['openDirectory'] })
+    );
   });
 });
 

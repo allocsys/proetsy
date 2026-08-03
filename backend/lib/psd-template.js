@@ -3,6 +3,7 @@
 // ARCHITECTURE.md -> Module 3 -> "Template formats".
 
 import path from 'node:path';
+import pureimage from 'pureimage';
 
 // Matches product-sizes.json's documented default (see ARCHITECTURE.md -> Module 3 ->
 // "Template formats": "`placement_layer` ... defaults to `"artwork"` if the field is
@@ -86,4 +87,53 @@ export function flattenPaintOrder(layers, ancestorHidden = false) {
     }
   }
   return result;
+}
+
+/**
+ * Renders every visible PSD layer, in stacking order, onto a fresh canvas sized to the
+ * full document — the actual compositing step shared by real mockup composition
+ * (mockup-generator.js's composeMockupPsd, which substitutes artwork into the placement
+ * layer) and template-preview generation (backend/lib/mockup-templates/index.js's
+ * generateTemplatePreview, which renders the template exactly as authored, no
+ * substitution). Extracted out of mockup-generator.js's former standalone
+ * `paintPsdCanvas` in the mockup-folder-picker plan (plan.md -> "New module" ->
+ * generateTemplatePreview) specifically so both callers share one flattening
+ * implementation instead of duplicating the paint loop.
+ *
+ * @param {object} psd - parsed PSD document (from ag-psd's readPsd)
+ * @param {object} [options]
+ * @param {object} [options.substituteLayer] - a layer node whose own pixel data should be
+ *   skipped in favor of options.substituteBitmap (e.g. the placement layer during real
+ *   mockup composition). Omit (along with substituteBitmap) to render every layer exactly
+ *   as authored — e.g. for a template preview.
+ * @param {import('pureimage').Bitmap} [options.substituteBitmap] - required together with
+ *   substituteLayer.
+ * @param {{ left: number, top: number, width: number, height: number }} [options.substituteBounds] -
+ *   defaults to substituteLayer's own resolved bounds if omitted.
+ * @returns {import('pureimage').Bitmap}
+ */
+export function renderPsdLayers(psd, options = {}) {
+  const { substituteLayer, substituteBitmap, substituteBounds } = options;
+  const outputCanvas = pureimage.make(psd.width, psd.height);
+  const outputCtx = outputCanvas.getContext('2d');
+
+  // Paint in stacking order (bottom-most first) so later layers correctly cover earlier
+  // ones — see flattenPaintOrder's doc comment for the array-order convention.
+  for (const layer of flattenPaintOrder(psd.children)) {
+    const left = layer.left ?? 0;
+    const top = layer.top ?? 0;
+    outputCtx.globalAlpha = layer.opacity ?? 1;
+
+    if (substituteLayer && layer === substituteLayer) {
+      const bounds = substituteBounds || resolvePlacementBounds(layer);
+      outputCtx.drawImage(substituteBitmap, 0, 0, bounds.width, bounds.height, bounds.left, bounds.top, bounds.width, bounds.height);
+    } else {
+      const layerWidth = (layer.right ?? 0) - (layer.left ?? 0);
+      const layerHeight = (layer.bottom ?? 0) - (layer.top ?? 0);
+      outputCtx.drawImage(layer.canvas, 0, 0, layerWidth, layerHeight, left, top, layerWidth, layerHeight);
+    }
+  }
+  outputCtx.globalAlpha = 1;
+
+  return outputCanvas;
 }

@@ -124,7 +124,80 @@ closes a schema gap: the `product_sizes` table is now populated (upserted from
 `product-sizes.json` on each mockup run, keyed on `size_key`) instead of staying empty,
 since `mockups.product_size_id`'s FK needs a row to point at, and gained a
 `placement_layer` column (with a defensive `ALTER TABLE` migration in `backend/db/init.js`
-for existing dev DBs). **AI-outpainting fallback for large aspect-ratio mismatches and the
+for existing dev DBs).
+
+**Dashboard mockup-template-manager plan (folder picker + template selection) — in
+progress, Rollout step 3 of 6 done.** See `plan.md` for the full plan (replaces the
+hand-edit-JSON workflow for configuring mockup templates with a real dashboard
+feature: pick a folder, browse thumbnails, assign product-size templates). Step 1 landed
+first, with no UI change yet: `backend/config/index.js`'s `getProductSizes()` now reads
+the `product_sizes` DB table directly (a fresh query every call, same "always current"
+property the JSON-file read had) instead of `product-sizes.json` — the DB table is now
+the live, dashboard-editable source of truth, not just a side-effect mirror written by
+`generateMockupForJob`'s own upsert (described above). A new `migrateProductSizesSeed()`,
+called once on backend startup in `server.js` right alongside `getDb()`'s schema init,
+seeds `product_sizes` from `product-sizes.json` the first time the table is found empty,
+so an existing dev setup's hand-edited JSON file doesn't lose its configured sizes on
+upgrade — a no-op on every later startup once the table has rows. After that first
+migration, `product-sizes.json` is inert (never read again by `getProductSizes()`); the
+file itself is intentionally left in place as a legacy record rather than deleted. Both
+`getProductSizes()`'s return shape and `GET /api/config/product-sizes`'s response shape
+are unchanged, so every existing caller (`mockup-generator.js`, Module 2's listing
+generator, the dashboard) keeps working without changes of its own.
+
+Step 2 landed next, still backend-only (no dashboard UI yet — `plan.md`'s rollout step 4
+is what wires a frontend to these routes): a new `backend/lib/mockup-templates/index.js`
+module plus its routes in `server.js`. `scanTemplatesFolder(folder)` lists the flat (not
+recursive) set of `.png`/`.jpg`/`.jpeg`/`.psd` files directly in a folder — cheap
+dimensions for each (Jimp for flat images, `ag-psd`'s `readPsd(..., { skipLayerImageData:
+true })` for PSDs), cross-referenced by filename against `product_sizes.mockup_template_path`
+so already-assigned files are flagged. `generateTemplatePreview(filePath, kind)` produces a
+small flattened thumbnail PNG into a new `MOCKUP_TEMPLATE_PREVIEWS_DIR`-overridable cache
+dir (same env-override convention as `OUTPUT_DIR`/`UPLOADS_DIR`/`CANDIDATES_DIR`), reusing
+`psd-template.js`'s `renderPsdLayers()` (the same paint-order flattening helper
+`composeMockupPsd()` uses) for the PSD case rather than duplicating that logic — the first
+real reuse of `renderPsdLayers()` outside actual mockup generation. Both dimension reads and
+previews are cached in-process by `(path, mtime)`, so re-scanning/re-opening the picker
+against an unchanged folder doesn't re-read or re-flatten every file. `listConfiguredTemplates()`,
+`upsertConfiguredTemplate()`, and `deleteConfiguredTemplate()` read/write `product_sizes`
+directly — `upsertConfiguredTemplate()` validates the referenced file actually exists under
+the current templates dir before writing, and shares the same `ON CONFLICT(size_key) DO
+UPDATE` upsert pattern `generateMockupForJob()` already used inline, so there's only one copy
+of that SQL now. New routes: `GET /api/mockup-templates/scan?folder=<path>` (falls back to
+the saved `mockup_templates_dir` setting when `folder` is omitted, 400s for a missing/
+nonexistent folder), `GET /api/mockup-templates` (each row annotated with a `preview_url`),
+`POST /api/mockup-templates` (upsert-by-`size_key`), `DELETE /api/mockup-templates/:sizeKey`,
+plus a new `/mockup-template-previews` static mount alongside the existing `/mockup-files`
+one. This module's `resolveTemplatesDir()` reads `mockup_templates_dir` from the settings
+table directly (falling back to `MOCKUP_TEMPLATES_DIR`/the backend root) rather than
+importing `mockup-generator.js`'s still-constant `TEMPLATES_BASE_DIR` — step 3 (next) is what
+switches `mockup-generator.js` itself over to a settings-first, restart-free resolution using
+this same fallback chain. Test coverage: `backend/lib/mockup-templates/index.test.js`
+(scan against a fixture folder mixing a flat PNG and the committed PSD test fixture; preview
+generation and its cache-reuse for both kinds; upsert/delete/list against a real temp SQLite
+DB) and `backend/server.mockup-templates-routes.test.js` (Supertest — scan/list/create/
+update/delete route behavior, the missing-folder 400 path, the settings-fallback path, and a
+real fetch of a generated `preview_url`).
+
+Step 3 landed next, still backend-only: `mockup-generator.js`'s `TEMPLATES_BASE_DIR` —
+previously a module-load-time constant read once from `MOCKUP_TEMPLATES_DIR` — is now a
+function, `resolveTemplatesBaseDir()`, called fresh on every `composeMockup()` invocation.
+It delegates straight to `lib/mockup-templates/index.js`'s `resolveTemplatesDir()` (built in
+step 2 for exactly this reuse) rather than duplicating the settings-first fallback chain, so
+picking a folder from the dashboard's (not-yet-built) folder field takes effect immediately
+for real mockup composition too — no server restart — the same principle
+`syncWatcherFromSettings()` already established for Module 7's watched folder. The single
+call site that read the old constant (`composeMockup`'s `templatePath` join) now calls the
+function instead. Test coverage:
+`backend/lib/mockup-generator.templates-dir.test.js` — confirms the env-var fallback when no
+setting is saved, confirms the setting wins once saved (same already-imported module
+instance, proving no restart/re-import is needed), and an end-to-end `composeMockup()` run
+against a template that only exists under the settings-configured folder (not the
+env-configured one), so a regression back to the old env-only behavior would fail loudly.
+Remaining steps (the `MockupTemplates.jsx` dashboard page and the Electron native folder
+picker) are not started yet — see `plan.md`'s "Rollout" section.
+
+**AI-outpainting fallback for large aspect-ratio mismatches and the
 dashboard side-by-side smart-crop/AI-extended review step are now ✅ done too** — see the
 full 8-step build sequence below; all 8 steps are complete. A committed real PSD test
 fixture, and integration/idempotency tests for the PSD-specific compositing path itself —
@@ -509,9 +582,12 @@ setup-status banner per the First-Run Setup section below.
   forbidden words, Midjourney `--v`/`--style`/stylize range) are shown read-only via the
   new `GET /api/config/shop-conventions` route — read-only because these are
   intentionally hardcoded (see Module 2 -> "Must hardcode shop conventions"), not
-  dashboard-editable config. Product-sizes are shown read-only (still
-  config-file-edited, not dashboard-CRUD, since `product-sizes.json`/DB round-tripping
-  is a bigger change than this pass's scope).
+  dashboard-editable config. Product-sizes are shown read-only in this dashboard pass
+  (still not dashboard-CRUD). `GET /api/config/product-sizes` is now DB-backed rather
+  than reading `product-sizes.json` directly (see Module 3's "Dashboard
+  mockup-template-manager plan" note — Rollout step 1), so the underlying data is
+  already live/DB-sourced; a real CRUD UI for it (`MockupTemplates.jsx`, folder scan +
+  thumbnail picker) is a later step of that same plan, not yet built.
 - **Previews/edits generated fields, and copy-to-clipboard/export** — already covered by
   the existing `JobListingReview.jsx` (Copy-for-Etsy button, inline edit) and
   `JobMockupReview.jsx`, wired into the dashboard's "Review a specific job" section; no
