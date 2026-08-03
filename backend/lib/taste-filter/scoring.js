@@ -89,6 +89,37 @@ export function isConfident(counts, minExamples = COLD_START_MIN_EXAMPLES) {
 }
 
 /**
+ * Module 7 -> Part 2 (plan.md) -> Step 2.4: the auto-compute decision rule. Pure and
+ * independently testable, same as the rest of this file -- no DB, no settings lookup;
+ * the caller (POST /api/taste-filter/import, Step 2.6) is responsible for reading
+ * `taste_filter_auto_enabled`/`taste_filter_auto_threshold` from the settings table and
+ * only calling this when auto mode is on.
+ *
+ * Existing design constraint preserved (see this file's top-of-file comment and
+ * ARCHITECTURE.md): "Nothing is auto-deleted ... this is advisory only" -- this function
+ * never causes a file to be deleted either way, it only decides which `image_preferences`
+ * row (if any) gets written automatically vs. left for manual review. A `null` result
+ * means "needs manual review", the same state every candidate is in today.
+ *
+ * `isConfident`/`COLD_START_MIN_EXAMPLES` are unchanged and always checked first --
+ * auto-compute only ever acts on centroid pairs that already clear the existing
+ * cold-start bar, regardless of how extreme the score is.
+ * @param {number | null} score - a single pair's score (global or category), as produced
+ *   by scoreAgainstCentroids()
+ * @param {{ keptCount: number, discardedCount: number }} counts - that same pair's counts
+ * @param {number} threshold - `taste_filter_auto_threshold`, an absolute score cutoff
+ * @returns {'keep' | 'discard' | null} null means "manual review" -- either the cold-start
+ *   gate isn't cleared yet, or the score falls inside the uncertain band around zero
+ */
+export function autoDecision(score, counts, threshold) {
+  if (score === null) return null;
+  if (!isConfident(counts)) return null;
+  if (score > threshold) return 'keep';
+  if (score < -threshold) return 'discard';
+  return null;
+}
+
+/**
  * The full per-candidate scoring result: both taste scores (global + category) plus a
  * suggested label for each, per ARCHITECTURE.md -> Module 7 -> "Output": "each candidate
  * gets two taste scores [...] plus a suggested label". Category is optional — a candidate
