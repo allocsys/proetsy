@@ -14,6 +14,7 @@ let generateTemplatePreview;
 let listConfiguredTemplates;
 let upsertConfiguredTemplate;
 let deleteConfiguredTemplate;
+let listConfiguredCategories;
 let _resetCachesForTests;
 let tmpRoot;
 let templatesDir;
@@ -40,6 +41,7 @@ beforeAll(async () => {
     listConfiguredTemplates,
     upsertConfiguredTemplate,
     deleteConfiguredTemplate,
+    listConfiguredCategories,
     _resetCachesForTests,
   } = await import('./index.js'));
 });
@@ -129,15 +131,32 @@ describe('upsertConfiguredTemplate / deleteConfiguredTemplate / listConfiguredTe
     expect(rows[0].dpi).toBe(150);
   });
 
-  it('listConfiguredTemplates returns configured rows annotated with a preview_url', async () => {
+  it('accepts and stores category, unset/null by default, and updated on a re-upsert', () => {
     upsertConfiguredTemplate({ size_key: '8x10', mockup_template: 'frame.png' });
+    expect(getDb().prepare('SELECT category FROM product_sizes WHERE size_key = ?').get('8x10').category).toBeNull();
+
+    upsertConfiguredTemplate({ size_key: 'mug-11oz', mockup_template: 'frame.png', category: 'mug' });
+    expect(
+      getDb().prepare('SELECT category FROM product_sizes WHERE size_key = ?').get('mug-11oz').category
+    ).toBe('mug');
+
+    upsertConfiguredTemplate({ size_key: 'mug-11oz', mockup_template: 'frame.png', category: 'kitchen' });
+    expect(
+      getDb().prepare('SELECT category FROM product_sizes WHERE size_key = ?').get('mug-11oz').category
+    ).toBe('kitchen');
+  });
+
+  it('listConfiguredTemplates returns configured rows annotated with a preview_url and category', async () => {
+    upsertConfiguredTemplate({ size_key: '8x10', mockup_template: 'frame.png', category: 'bedroom' });
     upsertConfiguredTemplate({ size_key: 'framed-wall', mockup_template: 'framed-wall.psd', placement_layer: 'artwork' });
 
     const rows = await listConfiguredTemplates();
     const byKey = Object.fromEntries(rows.map((r) => [r.size_key, r]));
 
     expect(byKey['8x10'].preview_url).toMatch(/^\/mockup-template-previews\//);
+    expect(byKey['8x10'].category).toBe('bedroom');
     expect(byKey['framed-wall'].preview_url).toMatch(/^\/mockup-template-previews\//);
+    expect(byKey['framed-wall'].category).toBeNull();
   });
 
   it('deleteConfiguredTemplate removes the row and reports whether anything was deleted', () => {
@@ -148,5 +167,21 @@ describe('upsertConfiguredTemplate / deleteConfiguredTemplate / listConfiguredTe
 
     const db = getDb();
     expect(db.prepare('SELECT * FROM product_sizes WHERE size_key = ?').get('8x10')).toBeUndefined();
+  });
+});
+
+describe('listConfiguredCategories', () => {
+  it('returns an empty array when nothing is categorized', () => {
+    upsertConfiguredTemplate({ size_key: '8x10', mockup_template: 'frame.png' });
+    expect(listConfiguredCategories()).toEqual([]);
+  });
+
+  it('returns distinct, alphabetically sorted categories, excluding null', () => {
+    upsertConfiguredTemplate({ size_key: 'a', mockup_template: 'frame.png', category: 'nature' });
+    upsertConfiguredTemplate({ size_key: 'b', mockup_template: 'frame.png', category: 'bedroom' });
+    upsertConfiguredTemplate({ size_key: 'c', mockup_template: 'framed-wall.psd', category: 'bedroom' });
+    upsertConfiguredTemplate({ size_key: 'd', mockup_template: 'frame.png' });
+
+    expect(listConfiguredCategories()).toEqual(['bedroom', 'nature']);
   });
 });
