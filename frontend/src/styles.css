@@ -724,11 +724,61 @@ input:focus, select:focus, textarea:focus {
   margin-bottom: var(--space-2);
 }
 
-.settings-caption {
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.settings-field-label {
   font-size: 12.5px;
+  font-weight: 600;
   color: var(--ink-soft);
-  margin-top: 0;
-  margin-bottom: var(--space-3);
+}
+
+.settings-field-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: flex-end;
+}
+
+.settings-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 var(--space-3);
+  font-size: 13.5px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.settings-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.settings-inline-action {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.settings-inline-action input[type="file"] {
+  font-size: 12px;
+}
+
+.settings-compact-list {
+  padding-left: 1.1rem;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.7;
 }
 
 .settings-readonly-box {
