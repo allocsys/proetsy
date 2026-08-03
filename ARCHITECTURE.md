@@ -146,7 +146,9 @@ are unchanged, so every existing caller (`mockup-generator.js`, Module 2's listi
 generator, the dashboard) keeps working without changes of its own. Remaining steps
 (new `mockup-templates` scan/list/create/delete module + routes, dynamic
 `resolveTemplatesBaseDir()`, the `MockupTemplates.jsx` dashboard page, and the Electron
-native folder picker) are not started yet — see `plan.md`'s "Rollout" section. **AI-outpainting fallback for large aspect-ratio mismatches and the
+native folder picker) are not started yet — see `plan.md`'s "Rollout" section.
+
+**AI-outpainting fallback for large aspect-ratio mismatches and the
 dashboard side-by-side smart-crop/AI-extended review step are now ✅ done too** — see the
 full 8-step build sequence below; all 8 steps are complete. A committed real PSD test
 fixture, and integration/idempotency tests for the PSD-specific compositing path itself —
