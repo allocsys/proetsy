@@ -1,7 +1,5 @@
 import { useState } from 'react';
 
-// No styles here, using CSS classes.
-
 function tagsToText(tags) {
   return Array.isArray(tags) ? tags.join(', ') : '';
 }
@@ -74,32 +72,45 @@ function ListingCard({ listing, onSaved }) {
   }
 
   return (
-    <div className="dark-panel" style={{ marginBottom: '1rem' }}>
-      <h4 style={{ marginTop: 0, textTransform: 'capitalize', color: 'var(--cream)' }}>{listing.variation?.replace('_', ' ')}</h4>
+    <div className="dark-panel listing-card">
+      <h4 className="listing-card-title">{listing.variation?.replace('_', ' ')}</h4>
 
-      <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--cream-dim)', fontSize: '13px' }}>
+      <label className="listing-field-label" htmlFor={`listing-title-${listing.id}`}>
         Title
-        <input value={title} onChange={(e) => setTitle(e.target.value)} />
       </label>
+      <input
+        id={`listing-title-${listing.id}`}
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+      />
 
-      <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--cream-dim)', fontSize: '13px' }}>
+      <label className="listing-field-label" htmlFor={`listing-desc-${listing.id}`}>
         Description
-        <textarea
-          style={{ minHeight: '4rem', marginTop: '0.25rem' }}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
       </label>
+      <textarea
+        id={`listing-desc-${listing.id}`}
+        className="listing-textarea"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+      />
 
-      <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--cream-dim)', fontSize: '13px' }}>
+      <label className="listing-field-label" htmlFor={`listing-tags-${listing.id}`}>
         Tags (comma-separated)
-        <input value={tagsText} onChange={(e) => setTagsText(e.target.value)} />
       </label>
+      <input
+        id={`listing-tags-${listing.id}`}
+        value={tagsText}
+        onChange={(e) => setTagsText(e.target.value)}
+      />
 
-      <label style={{ display: 'block', marginBottom: '1rem', color: 'var(--cream-dim)', fontSize: '13px' }}>
+      <label className="listing-field-label" htmlFor={`listing-alt-tags-${listing.id}`}>
         Alternate tags (comma-separated)
-        <input value={tagAltText} onChange={(e) => setTagAltText(e.target.value)} />
       </label>
+      <input
+        id={`listing-alt-tags-${listing.id}`}
+        value={tagAltText}
+        onChange={(e) => setTagAltText(e.target.value)}
+      />
 
       <div className="flex-row">
         <button onClick={save} disabled={saving}>
@@ -109,13 +120,13 @@ function ListingCard({ listing, onSaved }) {
       </div>
 
       {warnings.length > 0 && (
-        <ul style={{ color: 'var(--state-pending)', fontSize: '13px', marginTop: '0.75rem', paddingLeft: '1.25rem' }}>
+        <ul className="listing-warnings-list">
           {warnings.map((w, i) => (
             <li key={i}>{w}</li>
           ))}
         </ul>
       )}
-      {error && <p style={{ color: 'var(--state-danger)', fontSize: '13px', marginTop: '0.5rem' }}>{error}</p>}
+      {error && <p className="text-danger listing-error">{error}</p>}
     </div>
   );
 }
@@ -157,12 +168,12 @@ export default function JobListingReview({ jobId }) {
       <button onClick={loadListings} disabled={!jobId || loading}>
         {loading ? 'Loading…' : 'Load listings'}
       </button>
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
+      {error && <p className="text-danger">{error}</p>}
       {listings.map((l) => (
         <ListingCard key={l.id} listing={l} onSaved={handleSaved} />
       ))}
       {listings.length === 0 && !loading && !error && (
-        <p style={{ color: '#888' }}>No listings loaded yet.</p>
+        <p className="text-muted">No listings loaded yet.</p>
       )}
     </div>
   );
