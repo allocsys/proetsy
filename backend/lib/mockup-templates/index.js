@@ -103,6 +103,11 @@ async function readDimensions(filePath, kind) {
 
   let dims;
   if (kind === 'psd') {
+    // ag-psd still decodes the composite image data here even with
+    // skipLayerImageData: true, which needs the pureimage-backed canvas shim
+    // registered first -- same requirement as composeMockupPsd() (mockup-generator.js)
+    // and generateTemplatePreview() below.
+    ensurePsdCanvasInitialized();
     const buffer = fs.readFileSync(filePath);
     const psd = readPsd(buffer, { skipLayerImageData: true });
     dims = { width: psd.width, height: psd.height };
