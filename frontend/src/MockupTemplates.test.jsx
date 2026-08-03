@@ -35,6 +35,7 @@ const CONFIGURED_ROW = {
   orientation: 'portrait',
   mockup_template_path: 'frame-8x10.png',
   placement_layer: null,
+  category: null,
   preview_url: '/mockup-template-previews/abc123.png',
 };
 
@@ -44,6 +45,9 @@ beforeEach(() => {
       return Promise.resolve({ ok: true, json: async () => ({ mockup_templates_dir: '/templates' }) });
     }
     if (url === '/api/mockup-templates') {
+      return Promise.resolve({ ok: true, json: async () => [] });
+    }
+    if (url === '/api/mockup-templates/categories') {
       return Promise.resolve({ ok: true, json: async () => [] });
     }
     return Promise.resolve({ ok: true, json: async () => ({}) });
@@ -130,10 +134,11 @@ describe('MockupTemplates — scan and select', () => {
 });
 
 describe('MockupTemplates — bulk assign', () => {
-  it('submits one POST /api/mockup-templates call per checked file', async () => {
+  it('submits one POST /api/mockup-templates call per checked file, including the bulk category', async () => {
     global.fetch = makeFetchQueue([
       ['/api/settings', () => ({ ok: true, json: async () => ({ mockup_templates_dir: '/templates' }) })],
       ['/api/mockup-templates', () => ({ ok: true, json: async () => [] })],
+      ['/api/mockup-templates/categories', () => ({ ok: true, json: async () => ['mug'] })],
       [/\/api\/mockup-templates\/scan/, () => ({
         ok: true,
         json: async () => ({ folder: '/templates', files: [SCAN_FILE_FLAT, SCAN_FILE_PSD] }),
@@ -148,6 +153,9 @@ describe('MockupTemplates — bulk assign', () => {
     const checkboxes = screen.getAllByRole('checkbox');
     await user.click(checkboxes[0]);
     await user.click(checkboxes[1]);
+
+    const user2 = user;
+    await user2.type(screen.getByPlaceholderText('e.g. bedroom, mug, nature'), 'mug');
 
     const postCalls = [];
     global.fetch = makeFetchQueue([
@@ -168,6 +176,7 @@ describe('MockupTemplates — bulk assign', () => {
 
     await waitFor(() => expect(postCalls).toHaveLength(2));
     expect(postCalls.map((c) => c.mockup_template).sort()).toEqual(['frame-8x10.png', 'mug-white.psd'].sort());
+    expect(postCalls.every((c) => c.category === 'mug')).toBe(true);
   });
 });
 
@@ -260,5 +269,31 @@ describe('MockupTemplates — configured templates', () => {
       );
     });
     expect(await screen.findByText(/Saved 8x10-portrait/)).toBeInTheDocument();
+  });
+
+  it('renders a Category field for a configured template and includes it in the save payload', async () => {
+    const postCalls = [];
+    global.fetch = makeFetchQueue([
+      ['/api/settings', () => ({ ok: true, json: async () => ({ mockup_templates_dir: '/templates' }) })],
+      ['/api/mockup-templates', (url, opts) => {
+        if (opts?.method === 'POST') {
+          postCalls.push(JSON.parse(opts.body));
+          return { ok: true, json: async () => ({ ...CONFIGURED_ROW, category: 'bedroom' }) };
+        }
+        return { ok: true, json: async () => [CONFIGURED_ROW] };
+      }],
+      ['/api/mockup-templates/categories', () => ({ ok: true, json: async () => ['bedroom'] })],
+    ]);
+    const user = userEvent.setup();
+    render(<MockupTemplates />);
+    await screen.findByText('8x10-portrait');
+
+    const categoryInputs = screen.getAllByPlaceholderText === undefined ? [] : [];
+    const categoryInput = screen.getAllByDisplayValue('')[0];
+    await user.type(categoryInput, 'bedroom');
+    await user.click(screen.getByText('Save'));
+
+    await waitFor(() => expect(postCalls).toHaveLength(1));
+    expect(postCalls[0].category).toBe('bedroom');
   });
 });
