@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import MockupTemplates from './MockupTemplates.jsx';
@@ -168,6 +168,54 @@ describe('MockupTemplates — bulk assign', () => {
 
     await waitFor(() => expect(postCalls).toHaveLength(2));
     expect(postCalls.map((c) => c.mockup_template).sort()).toEqual(['frame-8x10.png', 'mug-white.psd'].sort());
+  });
+});
+
+describe('MockupTemplates — Electron Browse button (Rollout step 5)', () => {
+  afterEach(() => {
+    delete window.mockupTemplatesAPI;
+  });
+
+  it('does not render a Browse button when window.mockupTemplatesAPI is absent (browser path)', async () => {
+    render(<MockupTemplates />);
+    await screen.findByDisplayValue('/templates');
+
+    expect(screen.queryByText('Browse…')).not.toBeInTheDocument();
+  });
+
+  it('renders a Browse button that fills and saves the folder field when window.mockupTemplatesAPI is present (Electron path)', async () => {
+    window.mockupTemplatesAPI = { selectFolder: vi.fn().mockResolvedValue('/Users/me/mockup-packs') };
+    const user = userEvent.setup();
+    render(<MockupTemplates />);
+    await screen.findByDisplayValue('/templates');
+
+    await user.click(screen.getByText('Browse…'));
+
+    expect(window.mockupTemplatesAPI.selectFolder).toHaveBeenCalled();
+    expect(await screen.findByDisplayValue('/Users/me/mockup-packs')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/settings',
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ mockup_templates_dir: '/Users/me/mockup-packs' }),
+        })
+      );
+    });
+  });
+
+  it('leaves the folder field untouched when the user cancels the native dialog', async () => {
+    window.mockupTemplatesAPI = { selectFolder: vi.fn().mockResolvedValue(null) };
+    const user = userEvent.setup();
+    render(<MockupTemplates />);
+    await screen.findByDisplayValue('/templates');
+
+    fetch.mockClear();
+    await user.click(screen.getByText('Browse…'));
+
+    expect(window.mockupTemplatesAPI.selectFolder).toHaveBeenCalled();
+    expect(screen.getByDisplayValue('/templates')).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalledWith('/api/settings', expect.objectContaining({ method: 'PATCH' }));
   });
 });
 
