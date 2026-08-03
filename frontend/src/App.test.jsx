@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 // App.jsx wires five already-independently-tested review/module components
@@ -229,6 +229,29 @@ describe('App', () => {
       'Prompt Helper',
       'Shop Settings & Tags',
     ]);
+  });
+
+  it('collapses the direct/uncurated Pipeline upload lane by default, expanding on click, while the Curation lane stays visible (plan.md Rollout step 7)', async () => {
+    mockFetchByUrl();
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('ok');
+
+    // Curation lane renders expanded immediately, no click needed -- it's the
+    // recommended path and stays untouched by this step.
+    expect(await screen.findByTestId('stub-taste-filter')).toBeInTheDocument();
+
+    const details = document.querySelector('.upload-lane-collapsible');
+    expect(details).not.toBeNull();
+    expect(details.tagName).toBe('DETAILS');
+    expect(details).not.toHaveAttribute('open');
+    expect(screen.getByText(/Direct upload \(skips curation — uploads go straight into the pipeline\)/)).toBeInTheDocument();
+
+    await user.click(screen.getByText(/Direct upload \(skips curation/));
+
+    expect(details).toHaveAttribute('open');
+    expect(within(details).getByRole('heading', { name: 'Pipeline', level: 3 })).toBeInTheDocument();
+    expect(document.querySelector('input[type="file"][accept="image/*"]')).toBeInTheDocument();
   });
 
   it('renders the Taste Filter module on the default Upload view, and Prompt Helper on its own nav item', async () => {
