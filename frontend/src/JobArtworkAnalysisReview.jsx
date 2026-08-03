@@ -12,21 +12,21 @@ function listOrDash(items) {
  */
 function AnalysisSummary({ analysis }) {
   return (
-    <dl style={{ margin: '1rem 0', display: 'grid', gridTemplateColumns: '150px 1fr', gap: '0.5rem 1rem' }}>
-      <dt style={{ fontWeight: 600, color: 'var(--ink)' }}>Subject</dt>
-      <dd style={{ margin: 0, color: 'var(--ink-soft)' }}>{analysis.subject || '—'}</dd>
-      <dt style={{ fontWeight: 600, color: 'var(--ink)' }}>Style</dt>
-      <dd style={{ margin: 0, color: 'var(--ink-soft)' }}>{analysis.style || '—'}</dd>
-      <dt style={{ fontWeight: 600, color: 'var(--ink)' }}>Mood</dt>
-      <dd style={{ margin: 0, color: 'var(--ink-soft)' }}>{analysis.mood || '—'}</dd>
-      <dt style={{ fontWeight: 600, color: 'var(--ink)' }}>Palette</dt>
-      <dd style={{ margin: 0, color: 'var(--ink-soft)' }}>{listOrDash(analysis.palette)}</dd>
-      <dt style={{ fontWeight: 600, color: 'var(--ink)' }}>Themes</dt>
-      <dd style={{ margin: 0, color: 'var(--ink-soft)' }}>{listOrDash(analysis.themes)}</dd>
-      <dt style={{ fontWeight: 600, color: 'var(--ink)' }}>Notable elements</dt>
-      <dd style={{ margin: 0, color: 'var(--ink-soft)' }}>{listOrDash(analysis.notable_elements)}</dd>
-      <dt style={{ fontWeight: 600, color: 'var(--ink)' }}>Suggested categories</dt>
-      <dd style={{ margin: 0, color: 'var(--ink-soft)' }}>{listOrDash(analysis.suggested_categories)}</dd>
+    <dl className="analysis-summary-grid">
+      <dt>Subject</dt>
+      <dd>{analysis.subject || '—'}</dd>
+      <dt>Style</dt>
+      <dd>{analysis.style || '—'}</dd>
+      <dt>Mood</dt>
+      <dd>{analysis.mood || '—'}</dd>
+      <dt>Palette</dt>
+      <dd>{listOrDash(analysis.palette)}</dd>
+      <dt>Themes</dt>
+      <dd>{listOrDash(analysis.themes)}</dd>
+      <dt>Notable elements</dt>
+      <dd>{listOrDash(analysis.notable_elements)}</dd>
+      <dt>Suggested categories</dt>
+      <dd>{listOrDash(analysis.suggested_categories)}</dd>
     </dl>
   );
 }
@@ -115,7 +115,7 @@ export default function JobArtworkAnalysisReview({ jobId }) {
   }
 
   return (
-    <div style={{ background: 'var(--paper-dim)', border: '1px solid var(--hairline-paper)', borderRadius: '6px', padding: '1rem', marginTop: '0.75rem' }}>
+    <div className="artwork-analysis-card">
       <div className="flex-row mb-1">
         <button onClick={loadJobAndAnalysis} disabled={!jobId || loading}>
           {loading ? 'Loading…' : 'Load analysis'}
@@ -125,20 +125,20 @@ export default function JobArtworkAnalysisReview({ jobId }) {
         </button>
       </div>
 
-      {error && <p style={{ color: 'var(--state-danger)' }}>{error}</p>}
+      {error && <p className="text-danger mt-1">{error}</p>}
 
       {analysis ? (
         <AnalysisSummary analysis={analysis} />
       ) : (
-        job && <p className="text-muted" style={{ margin: '0.5rem 0' }}>No analysis yet for this artwork — run it, or use manual notes below.</p>
+        job && <p className="text-muted my-1">No analysis yet for this artwork — run it, or use manual notes below.</p>
       )}
 
       {job && (
-        <div style={{ marginTop: '1rem' }}>
-          <label style={{ display: 'block', fontWeight: 500, fontSize: '13px', color: 'var(--ink)' }}>
+        <div className="manual-notes-section">
+          <label className="manual-notes-label">
             Manual notes (fallback for Module 2 when analysis is skipped or fails)
             <textarea
-              style={{ display: 'block', width: '100%', minHeight: '3rem', marginTop: '0.25rem', marginBottom: '0.5rem' }}
+              className="manual-notes-textarea"
               value={manualNotes}
               onChange={(e) => setManualNotes(e.target.value)}
             />
