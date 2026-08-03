@@ -15,11 +15,25 @@ function StatusBadge({ status }) {
   );
 }
 
+const NAV_ITEMS = [
+  { id: 'pipeline', label: 'Upload & Config', group: 'Pipeline' },
+  { id: 'history', label: 'Listing History', group: 'Pipeline' },
+  { id: 'review', label: 'Review a Job', group: 'Pipeline' },
+  { id: 'prompt-helper', label: 'Prompt Helper', group: 'Modules' },
+  { id: 'taste-filter', label: 'Taste Filter', group: 'Modules' },
+  { id: 'settings', label: 'Shop Settings & Tags', group: 'Configuration' },
+];
+
 // Module 6 — Control Dashboard. See ARCHITECTURE.md -> Module 6 for the target feature
 // set: drag-and-drop artwork, a per-run pipeline config panel, bulk mode, a listing
 // history log, and a settings panel. Individual per-job review screens
 // (JobArtworkAnalysisReview / JobListingReview / JobMockupReview) already existed;
 // this component is the shell that ties them to real upload + orchestration + history.
+//
+// v2: the shell is now a real single-page-app layout — one view renders at a time,
+// chosen by `activeView` and switched by the sidebar/mobile nav buttons — instead of
+// every section being stacked on one long scrolling page with anchor links jumping
+// between them.
 function App() {
   const [health, setHealth] = useState(null);
   const [setupStatus, setSetupStatus] = useState(null);
@@ -41,7 +55,12 @@ function App() {
   const [uploadStatus, setUploadStatus] = useState('');
   const [jobIdInput, setJobIdInput] = useState('');
   const [activeJobId, setActiveJobId] = useState(null);
-  const [showSettings, setShowSettings] = useState(false);
+  const [activeView, setActiveView] = useState('pipeline');
+
+  function goTo(view) {
+    setActiveView(view);
+    if (view === 'settings') refreshRateLimits();
+  }
 
   function refreshJobs() {
     fetch('/api/jobs')
@@ -76,9 +95,9 @@ function App() {
 
   // LLM Provider Layer -> "Rate-limit cooldown tracking": read-only view of the durable
   // llm_rate_limits table (previously only visible by inspecting the DB directly). Polled
-  // on load and whenever the Settings panel is opened, since cooldowns change in the
+  // on load and whenever the Settings view is opened, since cooldowns change in the
   // background as pipeline jobs make LLM calls -- there's no push mechanism for this yet,
-  // so a fresh fetch on panel-open is the cheap way to avoid showing stale state.
+  // so a fresh fetch on view-open is the cheap way to avoid showing stale state.
   function refreshRateLimits() {
     fetch('/api/llm/rate-limits')
       .then((r) => r.json())
@@ -138,6 +157,19 @@ function App() {
     return groups;
   }, [jobs]);
 
+  // Sidebar signature element: a live per-status breakdown of every job the dashboard
+  // knows about, so the nav rail itself carries real pipeline information instead of
+  // being purely decorative chrome.
+  const statusCounts = useMemo(
+    () =>
+      jobs.reduce((acc, j) => {
+        const key = j.overall_status || 'pending';
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {}),
+    [jobs]
+  );
+
   // Runs a batch of jobs' full pipelines via the server-side runner
   // (backend/lib/pipeline-runner.js), one request for the whole batch instead of the
   // dashboard sequencing each module call itself. Each job still proceeds independently
@@ -189,7 +221,7 @@ function App() {
       // block the rest, and — unlike the old client-side sequencing — the run isn't
       // cancelled by closing this tab once the request has been sent.
       await runJobsBatch(jobIds);
-      setUploadStatus(`Done. ${jobIds.length} job${jobIds.length > 1 ? 's' : ''} processed — see history below.`);
+      setUploadStatus(`Done. ${jobIds.length} job${jobIds.length > 1 ? 's' : ''} processed — see history.`);
       if (jobIds.length === 1) setActiveJobId(String(jobIds[0]));
     } catch (err) {
       setUploadStatus(`Upload failed: ${err.message}`);
@@ -272,9 +304,17 @@ function App() {
     refreshTrends();
   }
 
+  function openJob(jobId) {
+    setActiveJobId(String(jobId));
+    setJobIdInput(String(jobId));
+    goTo('review');
+  }
+
+  const navGroups = ['Pipeline', 'Modules', 'Configuration'];
+
   return (
     <div className="app-shell">
-      <header className="app-header">
+      <header className="app-titlebar">
         <div className="wordmark-container">
           <div className="wordmark-crop">
             <h1 className="wordmark">ProEtsy</h1>
@@ -285,48 +325,76 @@ function App() {
           </span>
         </div>
         <div className="header-right">
-          <span className="text-muted" style={{ fontSize: '13px' }}>
-            Backend: <strong style={{ color: health?.status === 'unreachable' ? 'var(--state-danger)' : 'var(--state-success)' }}>{health ? health.status : 'checking...'}</strong>
+          <span className="text-muted mono-sm">
+            Backend:{' '}
+            <strong style={{ color: health?.status === 'unreachable' ? 'var(--state-danger)' : 'var(--state-success)' }}>
+              {health ? health.status : 'checking...'}
+            </strong>
           </span>
-          <button
-            className="btn-secondary"
-            onClick={() => {
-              setShowSettings((s) => !s);
-              if (!showSettings) refreshRateLimits();
-            }}
-          >
-            {showSettings ? 'Close settings' : '⚙ Settings'}
+          <button className="btn-secondary" onClick={() => goTo(activeView === 'settings' ? 'pipeline' : 'settings')}>
+            {activeView === 'settings' ? 'Close settings' : '⚙ Settings'}
           </button>
         </div>
       </header>
 
-      <div className="mobile-tab-strip">
-        <a href="#section-pipeline" className="mobile-tab">Pipeline & Upload</a>
-        <a href="#section-history" className="mobile-tab">History</a>
-        <a href="#section-review" className="mobile-tab">Review Job</a>
-        <a href="#section-prompt-helper" className="mobile-tab">04 Prompt Helper</a>
-        <a href="#section-taste-filter" className="mobile-tab">07 Taste Filter</a>
-        <a href="#section-settings" className="mobile-tab">Settings</a>
+      <div className="mobile-nav-strip">
+        {NAV_ITEMS.map((item) => (
+          <button
+            key={item.id}
+            className={`mobile-nav-item ${activeView === item.id ? 'active' : ''}`}
+            onClick={() => goTo(item.id)}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
 
-      <div className="app-body-layout">
-        <nav className="nav-rail">
-          <div className="nav-section-title">Pipeline Control</div>
-          <a href="#section-pipeline" className="nav-link">Pipeline & Upload</a>
-          <a href="#section-history" className="nav-link">Listing History</a>
-          <a href="#section-review" className="nav-link">Review a Job</a>
-          
-          <div className="nav-section-title">Modules</div>
-          <a href="#section-prompt-helper" className="nav-link">04 Prompt Helper</a>
-          <a href="#section-taste-filter" className="nav-link">07 Taste Filter</a>
+      <div className="app-body">
+        <nav className="sidebar">
+          {navGroups.map((group) => (
+            <div key={group}>
+              <div className="sidebar-group-title">{group}</div>
+              {NAV_ITEMS.filter((item) => item.group === group).map((item) => (
+                <button
+                  key={item.id}
+                  className={`sidebar-nav-item ${activeView === item.id ? 'active' : ''}`}
+                  onClick={() => goTo(item.id)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          ))}
 
-          <div className="nav-section-title">Configuration</div>
-          <a href="#section-settings" className="nav-link" onClick={(e) => { e.preventDefault(); setShowSettings(true); }}>
-            Shop Settings & Tags
-          </a>
+          <div className="sidebar-spacer" />
+
+          <div className="sidebar-pipeline-strip">
+            <div className="sidebar-pipeline-title">Pipeline status</div>
+            <div className="pipeline-bar">
+              {Object.keys(statusCounts).length ? (
+                Object.entries(statusCounts).map(([status, count]) => (
+                  <span key={status} className={`pipeline-segment ${status}`} style={{ flexGrow: count }} />
+                ))
+              ) : (
+                <span className="pipeline-segment empty" style={{ flexGrow: 1 }} />
+              )}
+            </div>
+            <div className="pipeline-legend">
+              {Object.keys(statusCounts).length ? (
+                Object.entries(statusCounts).map(([status, count]) => (
+                  <span key={status} className="pipeline-legend-item">
+                    <span className={`legend-dot ${status}`} aria-hidden="true" />
+                    {status} · {count}
+                  </span>
+                ))
+              ) : (
+                <span className="pipeline-legend-item">No jobs yet</span>
+              )}
+            </div>
+          </div>
         </nav>
 
-        <main className="main-content">
+        <main className="content-pane">
           {health && health.status === 'unreachable' && (
             <div className="backend-banner">
               <span>Backend not running — start it with <code className="mono">npm run dev</code> from the backend/ folder.</span>
@@ -345,8 +413,8 @@ function App() {
             </div>
           )}
 
-          {showSettings && (
-            <section id="section-settings" className="paper-card">
+          {activeView === 'settings' && (
+            <section className="paper-card">
               <h2 style={{ marginTop: 0 }}>Shop Settings & Tag Library</h2>
 
               <h3>Tag library</h3>
@@ -360,14 +428,14 @@ function App() {
                 placeholder={'wall art\nboho decor\nminimalist print\n...'}
               />
               <div className="flex-row mb-2">
-                <button onClick={saveTags} disabled={!tagsText.trim()}>Save tags</button>
-                {tagsSavedMessage && <span className="text-muted" style={{ fontSize: '13px' }}>{tagsSavedMessage}</span>}
+                <button className="btn-primary" onClick={saveTags} disabled={!tagsText.trim()}>Save tags</button>
+                {tagsSavedMessage && <span className="text-muted mono-sm">{tagsSavedMessage}</span>}
               </div>
 
               <p className="text-muted" style={{ marginBottom: '0.25rem' }}>Or import a CSV export from a tag-research tool (needs a <code>tag_text</code>/<code>tag</code>/<code>text</code>/<code>keyword</code> column, and an optional <code>category</code> column):</p>
               <div className="flex-row mb-2">
                 <input type="file" accept=".csv,text/csv" onChange={(e) => importTagsCsv(e.target.files?.[0])} />
-                {tagsCsvMessage && <span className="text-muted" style={{ fontSize: '13px' }}>{tagsCsvMessage}</span>}
+                {tagsCsvMessage && <span className="text-muted mono-sm">{tagsCsvMessage}</span>}
               </div>
 
               <h3>Shop defaults</h3>
@@ -481,7 +549,7 @@ function App() {
                 />
               </label>
               {watchStatus && (
-                <p className="text-muted" style={{ fontSize: '13px' }}>
+                <p className="text-muted mono-sm">
                   {watchStatus.active ? `✅ Watching ${watchStatus.folder}` : '⚠️ Not currently watching'}
                   {watchStatus.category ? ` (category: ${watchStatus.category})` : ''}
                   {watchStatus.pendingCount ? ` — ${watchStatus.pendingCount} pending` : ''}
@@ -511,7 +579,7 @@ function App() {
                         <td className="mono">{r.model}</td>
                         <td>{r.currentlyLimited ? '⚠️ Cooling down' : '✅ OK'}</td>
                         <td>{r.consecutiveHits}</td>
-                        <td className="text-muted mono" style={{ fontSize: '13px' }}>{r.currentlyLimited ? r.limitedUntil : '—'}</td>
+                        <td className="text-muted mono mono-sm">{r.currentlyLimited ? r.limitedUntil : '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -522,170 +590,181 @@ function App() {
             </section>
           )}
 
-          <section id="section-pipeline" className="paper-card">
-            <h2 style={{ marginTop: 0 }}>Pipeline Config & Upload</h2>
-            <p className="text-muted" style={{ marginTop: 0 }}>Defaults come from <code>pipeline.config.json</code>; toggles here apply only to artwork uploaded next.</p>
-            <div className="flex-row flex-wrap" style={{ gap: '1.5rem', marginBottom: '1.5rem' }}>
-              {pipelineDefault?.pipeline?.map((m) => (
-                <label key={m.module} style={{ opacity: m.required ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: m.required ? 'not-allowed' : 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={!!overrides[m.module]}
-                    disabled={m.required}
-                    onChange={() => toggleModule(m.module, m.required)}
-                  />
-                  <span>{m.module}</span>
-                  {m.required ? <span className="text-muted" style={{ fontSize: '12px' }}>(required)</span> : null}
-                </label>
-              ))}
-            </div>
-
-            <div
-              className={`dropzone crop-frame ${dragActive ? 'active' : ''}`}
-              onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-              onDragLeave={() => setDragActive(false)}
-              onDrop={onDrop}
-            >
-              <p style={{ fontWeight: 600, fontSize: '16px', color: 'var(--ink)' }}>Drag and drop artwork here (bulk supported)</p>
-              <p>or browse files from your computer</p>
-              <div style={{ marginTop: '1rem', display: 'inline-block' }}>
-                <input type="file" multiple accept="image/*" onChange={(e) => handleFiles(e.target.files)} />
+          {activeView === 'pipeline' && (
+            <section className="paper-card">
+              <h2 style={{ marginTop: 0 }}>Pipeline Config & Upload</h2>
+              <p className="text-muted" style={{ marginTop: 0 }}>Defaults come from <code>pipeline.config.json</code>; toggles here apply only to artwork uploaded next.</p>
+              <div className="flex-row flex-wrap" style={{ gap: '1.5rem', marginBottom: '1.5rem' }}>
+                {pipelineDefault?.pipeline?.map((m) => (
+                  <label key={m.module} style={{ opacity: m.required ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: m.required ? 'not-allowed' : 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={!!overrides[m.module]}
+                      disabled={m.required}
+                      onChange={() => toggleModule(m.module, m.required)}
+                    />
+                    <span>{m.module}</span>
+                    {m.required ? <span className="text-muted mono-sm">(required)</span> : null}
+                  </label>
+                ))}
               </div>
-              {uploadStatus && <p className="mono" style={{ marginTop: '1rem', color: 'var(--accent)' }}>{uploadStatus}</p>}
-            </div>
-          </section>
 
-          <section id="section-history" className="paper-card">
-            <h2 style={{ marginTop: 0 }}>Listing History</h2>
-            {jobs.length === 0 ? (
-              <p className="empty-state">No jobs yet — drop some artwork above to get started.</p>
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Job</th>
-                      <th>Artwork</th>
-                      <th>Status</th>
-                      <th>Updated</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {groupedJobs.map((entry) => {
-                      if (entry.type === 'single') {
-                        const job = entry.job;
-                        return (
-                          <tr key={job.id}>
-                            <td className="mono">#{job.id}</td>
-                            <td style={{ wordBreak: 'break-all' }}>{job.artwork_file_path?.split('/').pop()}</td>
-                            <td><StatusBadge status={job.overall_status} /></td>
-                            <td className="text-muted mono" style={{ fontSize: '13px' }}>{job.updated_at}</td>
-                            <td>
-                              <button onClick={() => { setActiveJobId(String(job.id)); setJobIdInput(String(job.id)); }}>Review</button>
-                            </td>
-                          </tr>
-                        );
-                      }
+              <div
+                className={`dropzone crop-frame ${dragActive ? 'active' : ''}`}
+                onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                onDragLeave={() => setDragActive(false)}
+                onDrop={onDrop}
+              >
+                <p className="dropzone-title">Drag and drop artwork here (bulk supported)</p>
+                <p>or browse files from your computer</p>
+                <div style={{ marginTop: '1rem', display: 'inline-block' }}>
+                  <input type="file" multiple accept="image/*" onChange={(e) => handleFiles(e.target.files)} />
+                </div>
+                {uploadStatus && <p className="mono taste-status" style={{ marginTop: '1rem' }}>{uploadStatus}</p>}
+              </div>
+            </section>
+          )}
 
-                      // Bulk batch: one summary row (item count + per-status breakdown),
-                      // expandable to the same per-job rows a single upload would show.
-                      const { batchId, jobs: batchJobs } = entry;
-                      const expanded = !!expandedBatches[batchId];
-                      const statusCounts = batchJobs.reduce((acc, j) => {
-                        acc[j.overall_status] = (acc[j.overall_status] || 0) + 1;
-                        return acc;
-                      }, {});
-                      const mostRecentUpdate = batchJobs.reduce(
-                        (latest, j) => (j.updated_at > latest ? j.updated_at : latest),
-                        batchJobs[0].updated_at
-                      );
-                      return (
-                        <>
-                          <tr key={`batch-${batchId}`} style={{ background: 'var(--paper-shade, rgba(0,0,0,0.02))' }}>
-                            <td className="mono">
-                              <button
-                                className="btn-secondary"
-                                style={{ padding: '0.1rem 0.5rem' }}
-                                onClick={() => setExpandedBatches((prev) => ({ ...prev, [batchId]: !prev[batchId] }))}
-                              >
-                                {expanded ? '▾' : '▸'}
-                              </button>
-                            </td>
-                            <td style={{ fontWeight: 600 }}>Batch — {batchJobs.length} artwork{batchJobs.length > 1 ? 's' : ''}</td>
-                            <td>
-                              <div className="flex-row flex-wrap" style={{ gap: '0.35rem' }}>
-                                {Object.entries(statusCounts).map(([status, count]) => (
-                                  <span key={status} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                                    <StatusBadge status={status} /> <span className="text-muted mono" style={{ fontSize: '12px' }}>x{count}</span>
-                                  </span>
-                                ))}
-                              </div>
-                            </td>
-                            <td className="text-muted mono" style={{ fontSize: '13px' }}>{mostRecentUpdate}</td>
-                            <td />
-                          </tr>
-                          {expanded && batchJobs.map((job) => (
-                            <tr key={job.id} style={{ opacity: 0.9 }}>
-                              <td className="mono" style={{ paddingLeft: '1.5rem' }}>#{job.id}</td>
+          {activeView === 'history' && (
+            <section className="paper-card">
+              <h2 style={{ marginTop: 0 }}>Listing History</h2>
+              {jobs.length === 0 ? (
+                <p className="empty-state">No jobs yet — drop some artwork on the Upload & Config view to get started.</p>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Job</th>
+                        <th>Artwork</th>
+                        <th>Status</th>
+                        <th>Updated</th>
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {groupedJobs.map((entry) => {
+                        if (entry.type === 'single') {
+                          const job = entry.job;
+                          return (
+                            <tr key={job.id}>
+                              <td className="mono">#{job.id}</td>
                               <td style={{ wordBreak: 'break-all' }}>{job.artwork_file_path?.split('/').pop()}</td>
                               <td><StatusBadge status={job.overall_status} /></td>
-                              <td className="text-muted mono" style={{ fontSize: '13px' }}>{job.updated_at}</td>
+                              <td className="text-muted mono mono-sm">{job.updated_at}</td>
                               <td>
-                                <button onClick={() => { setActiveJobId(String(job.id)); setJobIdInput(String(job.id)); }}>Review</button>
+                                <button onClick={() => openJob(job.id)}>Review</button>
                               </td>
                             </tr>
-                          ))}
-                        </>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                          );
+                        }
+
+                        // Bulk batch: one summary row (item count + per-status breakdown),
+                        // expandable to the same per-job rows a single upload would show.
+                        const { batchId, jobs: batchJobs } = entry;
+                        const expanded = !!expandedBatches[batchId];
+                        const statusCountsForBatch = batchJobs.reduce((acc, j) => {
+                          acc[j.overall_status] = (acc[j.overall_status] || 0) + 1;
+                          return acc;
+                        }, {});
+                        const mostRecentUpdate = batchJobs.reduce(
+                          (latest, j) => (j.updated_at > latest ? j.updated_at : latest),
+                          batchJobs[0].updated_at
+                        );
+                        return (
+                          <>
+                            <tr key={`batch-${batchId}`} style={{ background: 'rgba(255, 255, 255, 0.02)' }}>
+                              <td className="mono">
+                                <button
+                                  className="btn-secondary btn-sm"
+                                  onClick={() => setExpandedBatches((prev) => ({ ...prev, [batchId]: !prev[batchId] }))}
+                                >
+                                  {expanded ? '▾' : '▸'}
+                                </button>
+                              </td>
+                              <td style={{ fontWeight: 600 }}>Batch — {batchJobs.length} artwork{batchJobs.length > 1 ? 's' : ''}</td>
+                              <td>
+                                <div className="flex-row flex-wrap" style={{ gap: '0.35rem' }}>
+                                  {Object.entries(statusCountsForBatch).map(([status, count]) => (
+                                    <span key={status} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                                      <StatusBadge status={status} /> <span className="text-muted mono mono-sm">x{count}</span>
+                                    </span>
+                                  ))}
+                                </div>
+                              </td>
+                              <td className="text-muted mono mono-sm">{mostRecentUpdate}</td>
+                              <td />
+                            </tr>
+                            {expanded && batchJobs.map((job) => (
+                              <tr key={job.id} style={{ opacity: 0.9 }}>
+                                <td className="mono" style={{ paddingLeft: '1.5rem' }}>#{job.id}</td>
+                                <td style={{ wordBreak: 'break-all' }}>{job.artwork_file_path?.split('/').pop()}</td>
+                                <td><StatusBadge status={job.overall_status} /></td>
+                                <td className="text-muted mono mono-sm">{job.updated_at}</td>
+                                <td>
+                                  <button onClick={() => openJob(job.id)}>Review</button>
+                                </td>
+                              </tr>
+                            ))}
+                          </>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          )}
+
+          {activeView === 'review' && (
+            <section className="paper-card">
+              <h2 style={{ marginTop: 0 }}>Review a Specific Job</h2>
+              <div className="flex-row mb-2">
+                <input
+                  type="number"
+                  placeholder="Job ID"
+                  value={jobIdInput}
+                  onChange={(e) => setJobIdInput(e.target.value)}
+                  style={{ maxWidth: '160px' }}
+                />
+                <button className="btn-primary" onClick={() => setActiveJobId(jobIdInput)} disabled={!jobIdInput}>
+                  Load job
+                </button>
               </div>
-            )}
-          </section>
-
-          <section id="section-review" className="paper-card">
-            <h2 style={{ marginTop: 0 }}>Review a Specific Job</h2>
-            <div className="flex-row mb-2">
-              <input
-                type="number"
-                placeholder="Job ID"
-                value={jobIdInput}
-                onChange={(e) => setJobIdInput(e.target.value)}
-                style={{ maxWidth: '160px' }}
-              />
-              <button onClick={() => setActiveJobId(jobIdInput)} disabled={!jobIdInput}>
-                Load job
-              </button>
-            </div>
-            {activeJobId && (
-              <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                <div>
-                  <h3 style={{ borderBottom: '1px solid var(--hairline-paper)', paddingBottom: '0.4rem' }}>Image Analysis</h3>
-                  <JobArtworkAnalysisReview jobId={activeJobId} />
+              {activeJobId ? (
+                <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  <div>
+                    <h3 style={{ borderBottom: '1px solid var(--hairline-paper)', paddingBottom: '0.4rem' }}>Image Analysis</h3>
+                    <JobArtworkAnalysisReview jobId={activeJobId} />
+                  </div>
+                  <div>
+                    <h3 style={{ borderBottom: '1px solid var(--hairline-paper)', paddingBottom: '0.4rem' }}>Listings</h3>
+                    <JobListingReview jobId={activeJobId} />
+                  </div>
+                  <div>
+                    <h3 style={{ borderBottom: '1px solid var(--hairline-paper)', paddingBottom: '0.4rem' }}>Mockups</h3>
+                    <JobMockupReview jobId={activeJobId} />
+                  </div>
                 </div>
-                <div>
-                  <h3 style={{ borderBottom: '1px solid var(--hairline-paper)', paddingBottom: '0.4rem' }}>Listings</h3>
-                  <JobListingReview jobId={activeJobId} />
-                </div>
-                <div>
-                  <h3 style={{ borderBottom: '1px solid var(--hairline-paper)', paddingBottom: '0.4rem' }}>Mockups</h3>
-                  <JobMockupReview jobId={activeJobId} />
-                </div>
-              </div>
-            )}
-          </section>
+              ) : (
+                <p className="empty-state">Enter a job ID above, or open one from Listing History.</p>
+              )}
+            </section>
+          )}
 
-          <section id="section-prompt-helper" className="paper-card">
-            <h2 style={{ marginTop: 0 }}>04 Trend / Prompt Helper</h2>
-            <PromptHelper />
-          </section>
+          {activeView === 'prompt-helper' && (
+            <section className="paper-card">
+              <h2 style={{ marginTop: 0 }}>Trend / Prompt Helper</h2>
+              <PromptHelper />
+            </section>
+          )}
 
-          <section id="section-taste-filter" className="paper-card">
-            <h2 style={{ marginTop: 0 }}>07 Taste Filter (Curation)</h2>
-            <TasteFilter />
-          </section>
+          {activeView === 'taste-filter' && (
+            <section className="paper-card">
+              <h2 style={{ marginTop: 0 }}>Taste Filter (Curation)</h2>
+              <TasteFilter />
+            </section>
+          )}
         </main>
       </div>
     </div>

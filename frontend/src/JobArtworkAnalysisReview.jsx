@@ -136,7 +136,7 @@ export default function JobArtworkAnalysisReview({ jobId }) {
       {job && (
         <div className="manual-notes-section">
           <label className="manual-notes-label">
-            Manual notes (fallback for Module 2 when analysis is skipped or fails)
+            Manual notes (fallback for the listing generator when analysis is skipped or fails)
             <textarea
               className="manual-notes-textarea"
               value={manualNotes}
