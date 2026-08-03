@@ -206,6 +206,41 @@ describe('waitForBackend', () => {
   });
 });
 
+describe('select-folder IPC handler (Rollout step 5)', () => {
+  it('registers a handler for the \'select-folder\' channel on module load', () => {
+    expect(mockIpcMain.handle).toHaveBeenCalledWith('select-folder', main.selectFolder);
+  });
+
+  it('returns the chosen path when the user picks a folder', async () => {
+    mockDialog.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/Users/me/mockup-packs'] });
+
+    await expect(main.selectFolder()).resolves.toBe('/Users/me/mockup-packs');
+    expect(mockDialog.showOpenDialog).toHaveBeenCalledWith(
+      undefined,
+      expect.objectContaining({ properties: ['openDirectory'] })
+    );
+  });
+
+  it('returns null when the user cancels the dialog', async () => {
+    mockDialog.showOpenDialog.mockResolvedValue({ canceled: true, filePaths: [] });
+
+    await expect(main.selectFolder()).resolves.toBeNull();
+  });
+
+  it('passes the current mainWindow to showOpenDialog once a window exists', async () => {
+    mockDialog.showOpenDialog.mockResolvedValue({ canceled: true, filePaths: [] });
+    mockApp.isPackaged = false;
+    await main.createWindow();
+
+    await main.selectFolder();
+
+    expect(mockDialog.showOpenDialog).toHaveBeenCalledWith(
+      mockBrowserWindowInstance,
+      expect.objectContaining({ properties: ['openDirectory'] })
+    );
+  });
+});
+
 describe('createWindow', () => {
   it('constructs the BrowserWindow with preload/contextIsolation/nodeIntegration options', async () => {
     mockApp.isPackaged = false;
