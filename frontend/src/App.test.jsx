@@ -214,12 +214,19 @@ describe('App', () => {
     expect(await screen.findByTestId('stub-listings')).toHaveTextContent('listings:7');
   });
 
-  it('always renders the Prompt Helper and Taste Filter modules regardless of job state', async () => {
+  it('renders the Taste Filter module on the default Upload view, and Prompt Helper on its own nav item', async () => {
     mockFetchByUrl();
+    const user = userEvent.setup();
     render(<App />);
+    await screen.findByText('ok');
 
+    // Taste Filter is merged into the default 'upload' view (Step 1.6) -- no nav
+    // click needed to see it.
+    expect(await screen.findByTestId('stub-taste-filter')).toBeInTheDocument();
+    expect(screen.queryByTestId('stub-prompt-helper')).not.toBeInTheDocument();
+
+    await user.click(screen.getAllByText('Prompt Helper')[0]);
     expect(await screen.findByTestId('stub-prompt-helper')).toBeInTheDocument();
-    expect(screen.getByTestId('stub-taste-filter')).toBeInTheDocument();
   });
 
   it('uploads a file, creates a job, runs the batch, and shows single-job status', async () => {
