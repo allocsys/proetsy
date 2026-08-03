@@ -533,9 +533,12 @@ setup-status banner per the First-Run Setup section below.
   forbidden words, Midjourney `--v`/`--style`/stylize range) are shown read-only via the
   new `GET /api/config/shop-conventions` route — read-only because these are
   intentionally hardcoded (see Module 2 -> "Must hardcode shop conventions"), not
-  dashboard-editable config. Product-sizes are shown read-only (still
-  config-file-edited, not dashboard-CRUD, since `product-sizes.json`/DB round-tripping
-  is a bigger change than this pass's scope).
+  dashboard-editable config. Product-sizes are shown read-only in this dashboard pass
+  (still not dashboard-CRUD). `GET /api/config/product-sizes` is now DB-backed rather
+  than reading `product-sizes.json` directly (see Module 3's "Dashboard
+  mockup-template-manager plan" note — Rollout step 1), so the underlying data is
+  already live/DB-sourced; a real CRUD UI for it (`MockupTemplates.jsx`, folder scan +
+  thumbnail picker) is a later step of that same plan, not yet built.
 - **Previews/edits generated fields, and copy-to-clipboard/export** — already covered by
   the existing `JobListingReview.jsx` (Copy-for-Etsy button, inline edit) and
   `JobMockupReview.jsx`, wired into the dashboard's "Review a specific job" section; no
