@@ -1,14 +1,45 @@
 import { getDb } from '../../db/init.js';
 import { parseCsv, firstColumn } from '../csv.js';
 
-// v1 implementation: matches the user's pre-made tag library against Module 1's image
-// analysis output. Naive substring overlap for the skeleton stage — refine once Module 1
-// (Image Analyzer) and Module 2 (Listing Generator) are actually being built.
+// v2: still requires the existing substring overlap against Module 1's image analysis
+// output (so behavior for uncategorized tags — the bulk of most libraries today — is
+// unchanged), but now ranks candidates by whether the tag's own `category` corroborates
+// the artwork's detected style/suggested_categories. A tag whose category actively
+// conflicts with the artwork's style is demoted (not dropped — still returned, just later
+// in the list) rather than excluded outright, since `category` is free-text and a mismatch
+// isn't proof the tag is wrong, just weaker evidence than a corroborated match.
 export function getTagCandidates(imageAnalysis = {}) {
   const db = getDb();
   const allTags = db.prepare('SELECT * FROM tags').all();
   const haystack = JSON.stringify(imageAnalysis).toLowerCase();
-  return allTags.filter((tag) => haystack.includes(tag.tag_text.toLowerCase()));
+
+  const style = typeof imageAnalysis.style === 'string' ? imageAnalysis.style.toLowerCase() : null;
+  const suggestedCategories = Array.isArray(imageAnalysis.suggested_categories)
+    ? imageAnalysis.suggested_categories
+        .filter((c) => typeof c === 'string')
+        .map((c) => c.toLowerCase())
+    : [];
+
+  const scored = allTags
+    .filter((tag) => haystack.includes(tag.tag_text.toLowerCase()))
+    .map((tag) => {
+      const category = tag.category ? tag.category.toLowerCase() : null;
+      let score = 1; // baseline: substring match only, no category to corroborate either way
+
+      if (category) {
+        const corroborated = category === style || suggestedCategories.includes(category);
+        score = corroborated ? 2 : 0.5;
+      }
+
+      return { tag, score };
+    });
+
+  // Stable sort: ties (equal score) keep their original DB order rather than being
+  // shuffled, so results stay deterministic across runs.
+  return scored
+    .map((entry, index) => ({ ...entry, index }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map((entry) => entry.tag);
 }
 
 // Turns raw CSV text into the { tagText, category } row shape importTagsFromCsvRows
