@@ -44,9 +44,19 @@ function blobToVector(blob) {
  * @param {'keep' | 'discard'} params.label
  * @param {string | null} [params.category]
  * @param {number | null} [params.promptId] - links to the `prompts` row that generated this candidate, if any
+ * @param {boolean} [params.autoLabeled] - true when this row was written by the auto-compute
+ *   decision rule (plan.md Part 2) rather than a manual Keep/Discard click. Defaults to
+ *   false, so existing callers are unaffected.
  * @returns {number} the new row's id
  */
-export function addImagePreference({ imagePath, embedding, label, category = null, promptId = null }) {
+export function addImagePreference({
+  imagePath,
+  embedding,
+  label,
+  category = null,
+  promptId = null,
+  autoLabeled = false,
+}) {
   if (!VALID_LABELS.has(label)) {
     throw new Error(`Invalid label "${label}" — must be "keep" or "discard"`);
   }
@@ -54,8 +64,8 @@ export function addImagePreference({ imagePath, embedding, label, category = nul
   const db = getDb();
   const result = db
     .prepare(
-      `INSERT INTO image_preferences (image_path, embedding, label, category, prompt_id)
-       VALUES (@image_path, @embedding, @label, @category, @prompt_id)`
+      `INSERT INTO image_preferences (image_path, embedding, label, category, prompt_id, auto_labeled)
+       VALUES (@image_path, @embedding, @label, @category, @prompt_id, @auto_labeled)`
     )
     .run({
       image_path: imagePath,
@@ -63,6 +73,7 @@ export function addImagePreference({ imagePath, embedding, label, category = nul
       label,
       category,
       prompt_id: promptId,
+      auto_labeled: autoLabeled ? 1 : 0,
     });
 
   return result.lastInsertRowid;
