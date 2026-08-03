@@ -35,6 +35,8 @@ function MockupTemplates() {
   const [bulkDimensions, setBulkDimensions] = useState('');
   const [bulkDpi, setBulkDpi] = useState('');
   const [bulkOrientation, setBulkOrientation] = useState('');
+  const [bulkCategory, setBulkCategory] = useState('');
+  const [categoryOptions, setCategoryOptions] = useState([]);
   const [perFileSizeKey, setPerFileSizeKey] = useState({}); // path -> string
   const [perFilePlacementLayer, setPerFilePlacementLayer] = useState({}); // path -> string
   const [assignStatus, setAssignStatus] = useState('');
@@ -57,6 +59,17 @@ function MockupTemplates() {
       .then((s) => setFolder(s.mockup_templates_dir || ''))
       .catch(() => {});
     refreshConfigured();
+    // Merge a small set of common suggestions with whatever's already configured, so the
+    // datalist is useful before any template has been categorized yet -- same "suggest,
+    // don't force an enum" convention as tag-category-options in App.jsx.
+    fetch('/api/mockup-templates/categories')
+      .then((r) => r.json())
+      .then((configuredCategories) => {
+        const defaults = ['bedroom', 'hallway', 'mug', 'nature', 'green space', 'white space'];
+        const merged = Array.from(new Set([...defaults, ...configuredCategories])).sort();
+        setCategoryOptions(merged);
+      })
+      .catch(() => {});
   }, []);
 
   async function saveFolder(value) {
@@ -139,6 +152,7 @@ function MockupTemplates() {
             orientation: bulkOrientation || null,
             mockup_template: file.filename,
             placement_layer: file.kind === 'psd' ? perFilePlacementLayer[file.path] || null : null,
+            category: bulkCategory || null,
           }),
         });
         const data = await res.json();
@@ -177,6 +191,7 @@ function MockupTemplates() {
     const dpi = getConfiguredValue(row, 'dpi');
     const orientation = getConfiguredValue(row, 'orientation');
     const placementLayer = getConfiguredValue(row, 'placement_layer');
+    const category = getConfiguredValue(row, 'category');
     setConfiguredStatus(`Saving ${row.size_key}…`);
     try {
       const res = await fetch('/api/mockup-templates', {
@@ -189,6 +204,7 @@ function MockupTemplates() {
           orientation: orientation || null,
           mockup_template: row.mockup_template_path,
           placement_layer: placementLayer || null,
+          category: category || null,
         }),
       });
       const data = await res.json();
@@ -298,6 +314,15 @@ function MockupTemplates() {
                   <span className="settings-field-label">Orientation</span>
                   <input value={bulkOrientation} onChange={(e) => setBulkOrientation(e.target.value)} placeholder="portrait" />
                 </div>
+                <div className="settings-field">
+                  <span className="settings-field-label">Category</span>
+                  <input
+                    list="mockup-category-options"
+                    value={bulkCategory}
+                    onChange={(e) => setBulkCategory(e.target.value)}
+                    placeholder="e.g. bedroom, mug, nature"
+                  />
+                </div>
                 <button className="btn-primary" onClick={handleBulkAssign} disabled={assigning}>
                   Assign {selectedFiles.length} file{selectedFiles.length === 1 ? '' : 's'}
                 </button>
@@ -339,6 +364,14 @@ function MockupTemplates() {
                       onChange={(e) => updateConfiguredEdit(row.size_key, 'orientation', e.target.value)}
                     />
                   </div>
+                  <div className="settings-field">
+                    <span className="settings-field-label">Category</span>
+                    <input
+                      list="mockup-category-options"
+                      value={getConfiguredValue(row, 'category')}
+                      onChange={(e) => updateConfiguredEdit(row.size_key, 'category', e.target.value)}
+                    />
+                  </div>
                 </div>
                 {row.mockup_template_path && row.mockup_template_path.toLowerCase().endsWith('.psd') && (
                   <div className="settings-field" style={{ marginTop: '0.5rem' }}>
@@ -360,6 +393,12 @@ function MockupTemplates() {
           <p className="empty-state" style={{ margin: 0 }}>No templates configured yet — scan a folder above and assign some.</p>
         )}
       </div>
+
+      <datalist id="mockup-category-options">
+        {categoryOptions.map((c) => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
     </div>
   );
 }
