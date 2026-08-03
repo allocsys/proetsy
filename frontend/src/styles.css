@@ -1,5 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
+/* 
+  DESIGN SYSTEM REDESIGN - SESSION 1 FOUNDATION
+  Surface Paradigm Convention:
+  - Primary / Default Surface: .dark-panel (dark interface background matching the app shell).
+  - Deliberate Accent Surface: .paper-card (tactile editorial light paper card for featured content).
+*/
+
 :root {
   --bg-void: #15130E;
   --bg-panel: #1E1B14;
@@ -20,6 +27,27 @@
   --font-display: 'Fraunces', serif;
   --font-body: 'Inter', sans-serif;
   --font-mono: 'IBM Plex Mono', monospace;
+
+  /* Spacing Scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+
+  /* Border Radius Scale */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-pill: 999px;
+
+  /* Shadow Scale / Elevation */
+  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.15);
+  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.35);
 }
 
 *, *::before, *::after {
@@ -65,7 +93,7 @@ code, pre, .mono {
   font-size: 13px;
   background: rgba(0, 0, 0, 0.2);
   padding: 0.15em 0.4em;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 /* Focus States */
@@ -202,7 +230,7 @@ textarea:focus-visible {
   padding: 0.6rem 0.75rem;
   color: var(--cream-dim);
   text-decoration: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-size: 14px;
   font-weight: 500;
   transition: all 0.15s ease;
@@ -238,7 +266,7 @@ textarea:focus-visible {
   background: transparent;
   border: 1px solid var(--hairline);
   color: var(--cream-dim);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
   text-decoration: none;
 }
@@ -267,10 +295,10 @@ textarea:focus-visible {
   background-color: var(--paper);
   color: var(--ink);
   border: 1px solid var(--hairline-paper);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 24px;
   margin-bottom: 1.5rem;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--shadow-md);
 }
 
 .paper-card h2, .paper-card h3, .paper-card h4 {
@@ -284,7 +312,7 @@ textarea:focus-visible {
 .dark-panel {
   background-color: var(--bg-panel);
   border: 1px solid var(--hairline);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 24px;
   margin-bottom: 1.5rem;
 }
@@ -295,7 +323,7 @@ textarea:focus-visible {
   align-items: center;
   gap: 0.35rem;
   padding: 0.2rem 0.6rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 12px;
   font-family: var(--font-mono);
   font-weight: 500;
@@ -335,7 +363,7 @@ textarea:focus-visible {
 .backend-banner {
   background: rgba(201, 162, 39, 0.1);
   border: 1px solid var(--state-pending);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 0.75rem 1rem;
   margin-bottom: 1.5rem;
   color: var(--cream);
@@ -348,7 +376,7 @@ textarea:focus-visible {
 .setup-alert {
   background: rgba(201, 162, 39, 0.08);
   border: 1px solid rgba(201, 162, 39, 0.4);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 1rem 1.25rem;
   margin-bottom: 1.5rem;
   color: var(--cream);
@@ -365,7 +393,7 @@ button, .btn {
   font-size: 14px;
   font-weight: 500;
   padding: 0.5rem 1rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   border: 1px solid transparent;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
@@ -375,14 +403,26 @@ button, .btn {
   gap: 0.5rem;
 }
 
-button:primary, .btn-primary, button:not([class]) {
+button {
+  background-color: var(--bg-panel);
+  color: var(--cream);
+  border-color: var(--hairline);
+}
+button:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: var(--cream-dim);
+}
+
+.btn-primary {
   background-color: var(--accent);
   color: var(--bg-void);
   font-weight: 600;
+  border-color: transparent;
 }
-button:hover:not(:disabled), .btn-primary:hover:not(:disabled) {
+.btn-primary:hover:not(:disabled) {
   background-color: var(--accent-strong);
 }
+
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -413,7 +453,7 @@ textarea {
   font-family: var(--font-body);
   font-size: 14px;
   padding: 0.5rem 0.75rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--hairline-paper);
   background-color: var(--paper-dim);
   color: var(--ink);
@@ -438,7 +478,7 @@ input:focus, select:focus, textarea:focus {
 .dropzone {
   border: 2px dashed var(--hairline-paper);
   background-color: var(--paper-dim);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 2.5rem 2rem;
   text-align: center;
   cursor: pointer;
@@ -497,7 +537,7 @@ input:focus, select:focus, textarea:focus {
 .taste-card {
   background: var(--paper-dim);
   border: 1px solid var(--hairline-paper);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 0.75rem;
   display: flex;
   flex-direction: column;
@@ -506,7 +546,7 @@ input:focus, select:focus, textarea:focus {
 
 .taste-card img {
   width: 100%;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   display: block;
   object-fit: cover;
   aspect-ratio: 1;
