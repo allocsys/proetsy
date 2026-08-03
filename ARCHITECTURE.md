@@ -127,7 +127,7 @@ since `mockups.product_size_id`'s FK needs a row to point at, and gained a
 for existing dev DBs).
 
 **Dashboard mockup-template-manager plan (folder picker + template selection) — in
-progress, Rollout step 1 of 6 done.** See `plan.md` for the full plan (replaces the
+progress, Rollout step 2 of 6 done.** See `plan.md` for the full plan (replaces the
 hand-edit-JSON workflow for configuring mockup templates with a real dashboard
 feature: pick a folder, browse thumbnails, assign product-size templates). Step 1 landed
 first, with no UI change yet: `backend/config/index.js`'s `getProductSizes()` now reads
@@ -143,10 +143,44 @@ migration, `product-sizes.json` is inert (never read again by `getProductSizes()
 file itself is intentionally left in place as a legacy record rather than deleted. Both
 `getProductSizes()`'s return shape and `GET /api/config/product-sizes`'s response shape
 are unchanged, so every existing caller (`mockup-generator.js`, Module 2's listing
-generator, the dashboard) keeps working without changes of its own. Remaining steps
-(new `mockup-templates` scan/list/create/delete module + routes, dynamic
-`resolveTemplatesBaseDir()`, the `MockupTemplates.jsx` dashboard page, and the Electron
-native folder picker) are not started yet — see `plan.md`'s "Rollout" section.
+generator, the dashboard) keeps working without changes of its own.
+
+Step 2 landed next, still backend-only (no dashboard UI yet — `plan.md`'s rollout step 4
+is what wires a frontend to these routes): a new `backend/lib/mockup-templates/index.js`
+module plus its routes in `server.js`. `scanTemplatesFolder(folder)` lists the flat (not
+recursive) set of `.png`/`.jpg`/`.jpeg`/`.psd` files directly in a folder — cheap
+dimensions for each (Jimp for flat images, `ag-psd`'s `readPsd(..., { skipLayerImageData:
+true })` for PSDs), cross-referenced by filename against `product_sizes.mockup_template_path`
+so already-assigned files are flagged. `generateTemplatePreview(filePath, kind)` produces a
+small flattened thumbnail PNG into a new `MOCKUP_TEMPLATE_PREVIEWS_DIR`-overridable cache
+dir (same env-override convention as `OUTPUT_DIR`/`UPLOADS_DIR`/`CANDIDATES_DIR`), reusing
+`psd-template.js`'s `renderPsdLayers()` (the same paint-order flattening helper
+`composeMockupPsd()` uses) for the PSD case rather than duplicating that logic — the first
+real reuse of `renderPsdLayers()` outside actual mockup generation. Both dimension reads and
+previews are cached in-process by `(path, mtime)`, so re-scanning/re-opening the picker
+against an unchanged folder doesn't re-read or re-flatten every file. `listConfiguredTemplates()`,
+`upsertConfiguredTemplate()`, and `deleteConfiguredTemplate()` read/write `product_sizes`
+directly — `upsertConfiguredTemplate()` validates the referenced file actually exists under
+the current templates dir before writing, and shares the same `ON CONFLICT(size_key) DO
+UPDATE` upsert pattern `generateMockupForJob()` already used inline, so there's only one copy
+of that SQL now. New routes: `GET /api/mockup-templates/scan?folder=<path>` (falls back to
+the saved `mockup_templates_dir` setting when `folder` is omitted, 400s for a missing/
+nonexistent folder), `GET /api/mockup-templates` (each row annotated with a `preview_url`),
+`POST /api/mockup-templates` (upsert-by-`size_key`), `DELETE /api/mockup-templates/:sizeKey`,
+plus a new `/mockup-template-previews` static mount alongside the existing `/mockup-files`
+one. This module's `resolveTemplatesDir()` reads `mockup_templates_dir` from the settings
+table directly (falling back to `MOCKUP_TEMPLATES_DIR`/the backend root) rather than
+importing `mockup-generator.js`'s still-constant `TEMPLATES_BASE_DIR` — step 3 (next) is what
+switches `mockup-generator.js` itself over to a settings-first, restart-free resolution using
+this same fallback chain. Test coverage: `backend/lib/mockup-templates/index.test.js`
+(scan against a fixture folder mixing a flat PNG and the committed PSD test fixture; preview
+generation and its cache-reuse for both kinds; upsert/delete/list against a real temp SQLite
+DB) and `backend/server.mockup-templates-routes.test.js` (Supertest — scan/list/create/
+update/delete route behavior, the missing-folder 400 path, the settings-fallback path, and a
+real fetch of a generated `preview_url`). Remaining steps (dynamic
+`resolveTemplatesBaseDir()` wiring in `mockup-generator.js`, the `MockupTemplates.jsx`
+dashboard page, and the Electron native folder picker) are not started yet — see `plan.md`'s
+"Rollout" section.
 
 **AI-outpainting fallback for large aspect-ratio mismatches and the
 dashboard side-by-side smart-crop/AI-extended review step are now ✅ done too** — see the
