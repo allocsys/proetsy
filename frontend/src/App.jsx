@@ -49,6 +49,8 @@ function App() {
   const [tagsCategory, setTagsCategory] = useState('');
   const [tagsSavedMessage, setTagsSavedMessage] = useState('');
   const [tagsCsvMessage, setTagsCsvMessage] = useState('');
+  const [tagsBackfillMessage, setTagsBackfillMessage] = useState('');
+  const [tagsBackfillRunning, setTagsBackfillRunning] = useState(false);
   const [watchStatus, setWatchStatus] = useState(null);
   const [rateLimits, setRateLimits] = useState([]);
   const [jobs, setJobs] = useState([]);
@@ -294,6 +296,27 @@ function App() {
     refreshTags();
   }
 
+  // plan.md Rollout step 3: one-time admin action that runs uncategorized tags' text
+  // against categories already present elsewhere in the library and backfills any
+  // obvious matches, without requiring a full manual re-tag of the existing library.
+  async function backfillTagCategories() {
+    setTagsBackfillRunning(true);
+    setTagsBackfillMessage('Checking uncategorized tags…');
+    try {
+      const res = await fetch('/api/tags/backfill-categories', { method: 'POST' });
+      const data = await res.json();
+      setTagsBackfillMessage(
+        res.ok
+          ? `Backfilled ${data.updated} of ${data.checked} uncategorized tag(s).`
+          : data.error
+      );
+    } catch (err) {
+      setTagsBackfillMessage(`Backfill failed: ${err.message}`);
+    }
+    setTagsBackfillRunning(false);
+    refreshTags();
+  }
+
   async function saveSettings(updates) {
     const res = await fetch('/api/settings', {
       method: 'PATCH',
@@ -471,6 +494,18 @@ function App() {
               <div className="flex-row mb-2">
                 <input type="file" accept=".csv,text/csv" onChange={(e) => importTagsCsv(e.target.files?.[0])} />
                 {tagsCsvMessage && <span className="text-muted mono-sm">{tagsCsvMessage}</span>}
+              </div>
+
+              <p className="text-muted" style={{ marginBottom: '0.25rem' }}>
+                Or backfill categories on tags already in the library that don't have one yet, by
+                matching their text against categories already in use (won't touch tags that
+                already have a category, and won't invent a brand-new category):
+              </p>
+              <div className="flex-row mb-2">
+                <button onClick={backfillTagCategories} disabled={tagsBackfillRunning}>
+                  Suggest categories for uncategorized tags
+                </button>
+                {tagsBackfillMessage && <span className="text-muted mono-sm">{tagsBackfillMessage}</span>}
               </div>
 
               <h3>Shop defaults</h3>
