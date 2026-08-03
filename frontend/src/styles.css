@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 /* 
-  DESIGN SYSTEM REDESIGN - SESSION 1 FOUNDATION
+  DESIGN SYSTEM REDESIGN - SESSION 1-4 FOUNDATION & AUDIT
   Surface Paradigm Convention:
   - Primary / Default Surface: .dark-panel (dark interface background matching the app shell).
   - Deliberate Accent Surface: .paper-card (tactile editorial light paper card for featured content).
@@ -65,6 +65,19 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Accessibility Utilities */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* Typography */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
@@ -80,12 +93,12 @@ h1 {
 
 h2 {
   font-size: 20px;
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-4);
 }
 
 h3 {
   font-size: 17px;
-  margin-bottom: 0.75rem;
+  margin-bottom: var(--space-3);
 }
 
 code, pre, .mono {
@@ -117,7 +130,7 @@ textarea:focus-visible {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 1.5rem;
+  padding: var(--space-4) var(--space-5);
   background-color: var(--bg-void);
   border-bottom: 1px solid var(--hairline);
   position: sticky;
@@ -128,7 +141,7 @@ textarea:focus-visible {
 .wordmark-container {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: var(--space-4);
 }
 
 .wordmark {
@@ -143,7 +156,7 @@ textarea:focus-visible {
 .header-right {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: var(--space-4);
 }
 
 /* Crop Frame / Signature Elements */
@@ -174,7 +187,7 @@ textarea:focus-visible {
 
 .wordmark-crop {
   position: relative;
-  padding: 0.25rem 0.5rem;
+  padding: var(--space-1) var(--space-2);
 }
 .wordmark-crop::before,
 .wordmark-crop::after {
@@ -207,10 +220,10 @@ textarea:focus-visible {
   width: 240px;
   background-color: var(--bg-panel);
   border-right: 1px solid var(--hairline);
-  padding: 1.5rem 1rem;
+  padding: var(--space-5) var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--space-2);
   position: sticky;
   top: 65px;
   height: calc(100vh - 65px);
@@ -222,12 +235,12 @@ textarea:focus-visible {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--cream-dim);
-  margin: 1rem 0 0.5rem 0.5rem;
+  margin: var(--space-4) 0 var(--space-2) var(--space-2);
 }
 
 .nav-link {
   display: block;
-  padding: 0.6rem 0.75rem;
+  padding: 0.6rem var(--space-3);
   color: var(--cream-dim);
   text-decoration: none;
   border-radius: var(--radius-md);
@@ -244,7 +257,7 @@ textarea:focus-visible {
 
 .main-content {
   flex: 1;
-  padding: 2rem;
+  padding: var(--space-6);
   max-width: 1000px;
   margin: 0 auto;
 }
@@ -254,15 +267,15 @@ textarea:focus-visible {
   display: none;
   background: var(--bg-panel);
   border-bottom: 1px solid var(--hairline);
-  padding: 0.5rem 1rem;
+  padding: var(--space-2) var(--space-4);
   overflow-x: auto;
-  gap: 0.5rem;
+  gap: var(--space-2);
   white-space: nowrap;
 }
 
 .mobile-tab {
   display: inline-block;
-  padding: 0.4rem 0.8rem;
+  padding: 0.4rem var(--space-3);
   background: transparent;
   border: 1px solid var(--hairline);
   color: var(--cream-dim);
@@ -286,7 +299,48 @@ textarea:focus-visible {
     display: flex;
   }
   .main-content {
-    padding: 1rem;
+    padding: var(--space-4);
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    padding: var(--space-3) var(--space-4);
+  }
+  .main-content {
+    padding: var(--space-4);
+  }
+  .taste-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+  .analysis-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+    padding: var(--space-3);
+  }
+  .header-right {
+    justify-content: space-between;
+    width: 100%;
+  }
+  .wordmark-container {
+    justify-content: space-between;
+    width: 100%;
+  }
+  .taste-grid {
+    grid-template-columns: 1fr;
+  }
+  .mockup-variants-row {
+    flex-direction: column;
+  }
+  .flex-row {
+    flex-wrap: wrap;
   }
 }
 
@@ -296,8 +350,8 @@ textarea:focus-visible {
   color: var(--ink);
   border: 1px solid var(--hairline-paper);
   border-radius: var(--radius-lg);
-  padding: 24px;
-  margin-bottom: 1.5rem;
+  padding: var(--space-5);
+  margin-bottom: var(--space-5);
   box-shadow: var(--shadow-md);
 }
 
@@ -313,8 +367,8 @@ textarea:focus-visible {
   background-color: var(--bg-panel);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-lg);
-  padding: 24px;
-  margin-bottom: 1.5rem;
+  padding: var(--space-5);
+  margin-bottom: var(--space-5);
 }
 
 /* Status Badges & Pills */
@@ -364,25 +418,25 @@ textarea:focus-visible {
   background: rgba(201, 162, 39, 0.1);
   border: 1px solid var(--state-pending);
   border-radius: var(--radius-md);
-  padding: 0.75rem 1rem;
-  margin-bottom: 1.5rem;
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-5);
   color: var(--cream);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: var(--space-4);
 }
 
 .setup-alert {
   background: rgba(201, 162, 39, 0.08);
   border: 1px solid rgba(201, 162, 39, 0.4);
   border-radius: var(--radius-md);
-  padding: 1rem 1.25rem;
-  margin-bottom: 1.5rem;
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-5);
   color: var(--cream);
 }
 .setup-alert ul {
-  margin: 0.5rem 0 0 1.25rem;
+  margin: var(--space-2) 0 0 1.25rem;
   padding: 0;
   color: var(--cream-dim);
 }
@@ -392,7 +446,7 @@ button, .btn {
   font-family: var(--font-body);
   font-size: 14px;
   font-weight: 500;
-  padding: 0.5rem 1rem;
+  padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
   cursor: pointer;
@@ -400,7 +454,7 @@ button, .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 button {
@@ -452,7 +506,7 @@ select,
 textarea {
   font-family: var(--font-body);
   font-size: 14px;
-  padding: 0.5rem 0.75rem;
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   border: 1px solid var(--hairline-paper);
   background-color: var(--paper-dim);
@@ -479,7 +533,7 @@ input:focus, select:focus, textarea:focus {
   border: 2px dashed var(--hairline-paper);
   background-color: var(--paper-dim);
   border-radius: var(--radius-lg);
-  padding: 2.5rem 2rem;
+  padding: var(--space-7) var(--space-6);
   text-align: center;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -492,7 +546,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .dropzone p {
-  margin: 0.5rem 0;
+  margin: var(--space-2) 0;
   color: var(--ink-soft);
 }
 
@@ -500,11 +554,11 @@ input:focus, select:focus, textarea:focus {
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 0.5rem;
+  margin-top: var(--space-2);
 }
 
 .data-table th, .data-table td {
-  padding: 0.75rem;
+  padding: var(--space-3);
   text-align: left;
   border-bottom: 1px solid var(--hairline-paper);
   font-size: 14px;
@@ -523,7 +577,7 @@ input:focus, select:focus, textarea:focus {
 .empty-state {
   color: var(--ink-soft);
   font-style: italic;
-  padding: 1.5rem 0;
+  padding: var(--space-5) 0;
 }
 
 /* Taste Filter Grid */
@@ -531,14 +585,14 @@ input:focus, select:focus, textarea:focus {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 1.25rem;
-  margin-top: 1rem;
+  margin-top: var(--space-4);
 }
 
 .taste-card {
   background: var(--paper-dim);
   border: 1px solid var(--hairline-paper);
   border-radius: var(--radius-md);
-  padding: 0.75rem;
+  padding: var(--space-3);
   display: flex;
   flex-direction: column;
   position: relative;
@@ -641,7 +695,7 @@ input:focus, select:focus, textarea:focus {
 
 /* Job Listing Review & Card */
 .listing-card {
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-4);
 }
 .listing-card-title {
   margin-top: 0;
@@ -650,18 +704,18 @@ input:focus, select:focus, textarea:focus {
 }
 .listing-field-label {
   display: block;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
   color: var(--cream-dim);
   font-size: 13px;
 }
 .listing-textarea {
   min-height: 4rem;
-  margin-top: 0.25rem;
+  margin-top: var(--space-1);
 }
 .listing-warnings-list {
   color: var(--state-pending);
   font-size: 13px;
-  margin-top: 0.75rem;
+  margin-top: var(--space-3);
   padding-left: 1.25rem;
 }
 
@@ -669,49 +723,49 @@ input:focus, select:focus, textarea:focus {
 .prompt-filter-row {
   display: flex;
   flex-wrap: wrap;
-  margin-bottom: 1rem;
-  gap: 1rem;
+  margin-bottom: var(--space-4);
+  gap: var(--space-4);
 }
 .prompt-filter-label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 .prompt-add-row {
   display: flex;
   flex-wrap: wrap;
-  margin-bottom: 1rem;
-  gap: 0.5rem;
+  margin-bottom: var(--space-4);
+  gap: var(--space-2);
 }
 .prompt-flex-input {
   flex: 1;
   min-width: 150px;
 }
 .prompt-csv-container {
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-4);
 }
 .prompt-csv-label {
   font-size: 13px;
   color: var(--cream-dim);
 }
 .prompt-csv-message {
-  margin-left: 0.75rem;
+  margin-left: var(--space-3);
   font-size: 13px;
   color: var(--cream-dim);
 }
 .prompt-item-card {
-  margin-bottom: 0.75rem;
-  padding: 0.5rem;
+  margin-bottom: var(--space-3);
+  padding: var(--space-2);
   background: rgba(0, 0, 0, 0.2);
   border-radius: var(--radius-sm);
 }
 .prompt-code-block {
   font-size: 13px;
   display: block;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
 }
 .btn-sm {
-  padding: 0.25rem 0.5rem;
+  padding: var(--space-1) var(--space-2);
   font-size: 12px;
 }
 .btn-xs {
@@ -721,7 +775,7 @@ input:focus, select:focus, textarea:focus {
 .prompt-warnings-list {
   color: var(--state-pending);
   font-size: 12px;
-  margin-top: 0.5rem;
+  margin-top: var(--space-2);
   padding-left: 1.25rem;
 }
 .prompt-history-list {
@@ -730,7 +784,7 @@ input:focus, select:focus, textarea:focus {
   padding-left: 1.25rem;
 }
 .prompt-history-item {
-  margin-bottom: 0.25rem;
+  margin-bottom: var(--space-1);
 }
 .mono-sm {
   font-size: 12px;
@@ -743,7 +797,7 @@ input:focus, select:focus, textarea:focus {
 .taste-field-label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 .input-auto {
   width: auto;
@@ -755,13 +809,13 @@ input:focus, select:focus, textarea:focus {
 }
 .taste-file-input {
   width: auto;
-  margin-top: 0.5rem;
+  margin-top: var(--space-2);
 }
 .taste-status {
   color: var(--accent);
 }
 .taste-card-img-frame {
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
 }
 .taste-card-meta {
   font-size: 13px;
@@ -779,19 +833,19 @@ input:focus, select:focus, textarea:focus {
 /* Utility classes */
 .flex-row {
   display: flex;
-  gap: 1rem;
+  gap: var(--space-4);
   align-items: center;
 }
 .flex-wrap {
   flex-wrap: wrap;
 }
-.mt-1 { margin-top: 0.5rem; }
-.mt-2 { margin-top: 1rem; }
-.mt-3 { margin-top: 1.5rem; }
-.mb-1 { margin-bottom: 0.5rem; }
-.mb-2 { margin-bottom: 1rem; }
-.my-1 { margin-top: 0.5rem; margin-bottom: 0.5rem; }
-.my-2 { margin-top: 1rem; margin-bottom: 1rem; }
+.mt-1 { margin-top: var(--space-2); }
+.mt-2 { margin-top: var(--space-4); }
+.mt-3 { margin-top: var(--space-5); }
+.mb-1 { margin-bottom: var(--space-2); }
+.mb-2 { margin-bottom: var(--space-4); }
+.my-1 { margin-top: var(--space-2); margin-bottom: var(--space-2); }
+.my-2 { margin-top: var(--space-4); margin-bottom: var(--space-4); }
 .text-muted { color: var(--ink-soft); }
 .dark-panel .text-muted { color: var(--cream-dim); }
 .text-danger { color: var(--state-danger); }
