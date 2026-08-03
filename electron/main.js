@@ -24,6 +24,7 @@
 // package.json of its own) parses as ESM.
 
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { autoUpdater } from 'electron-updater';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { get } from 'node:http';
@@ -160,6 +161,61 @@ export async function selectFolder() {
 // loaded, dev or packaged, without needing its own spot in the whenReady() chain below.
 ipcMain.handle('select-folder', selectFolder);
 
+// Auto-update (release.yml already tags+publishes NSIS installers to GitHub Releases --
+// this wires the packaged app up to that same feed via electron-updater's default
+// GitHub provider, driven by root package.json's `build.publish` config rather than an
+// explicit setFeedURL() call). Mirrors the folder-picker's own shape immediately above:
+// a small set of directly-testable exported functions, an unconditional
+// ipcMain.handle() registration per action, and events forwarded to the renderer over
+// their own 'updater:*' channels -- see preload.js's `updaterAPI` bridge and
+// App.jsx's update button for the renderer side.
+//
+// autoDownload is deliberately false: "auto update BUTTON" means the user drives it --
+// checking happens without asking, but the (potentially large, metered-connection-
+// unfriendly) download itself only starts on an explicit click, and install only
+// happens on a second explicit click (quitAndInstall closes the app).
+autoUpdater.autoDownload = false;
+
+function sendToRenderer(channel, payload) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(channel, payload);
+  }
+}
+
+autoUpdater.on('checking-for-update', () => sendToRenderer('updater:checking-for-update'));
+autoUpdater.on('update-available', (info) => sendToRenderer('updater:update-available', info));
+autoUpdater.on('update-not-available', (info) => sendToRenderer('updater:update-not-available', info));
+autoUpdater.on('download-progress', (progress) => sendToRenderer('updater:download-progress', progress));
+autoUpdater.on('update-downloaded', (info) => sendToRenderer('updater:update-downloaded', info));
+autoUpdater.on('error', (err) => sendToRenderer('updater:error', err ? err.message : 'Unknown update error'));
+
+// Dev mode has no `app-update.yml` (electron-builder only writes that into a packaged
+// build) and no published feed to check against, so these short-circuit instead of
+// letting autoUpdater throw a confusing "Cannot find latest.yml" error at a developer
+// who wasn't asking for update behavior in the first place. The renderer-side button
+// only renders when window.updaterAPI exists at all (same feature-detect convention as
+// mockupTemplatesAPI), so in practice these dev-mode branches are mostly a safety net
+// for direct calls (e.g. from a test or a stray IPC invoke), not the normal path.
+export function checkForUpdates() {
+  if (!app.isPackaged) return Promise.resolve({ skipped: true, reason: 'not packaged' });
+  return autoUpdater.checkForUpdates();
+}
+
+export function downloadUpdate() {
+  if (!app.isPackaged) return Promise.resolve({ skipped: true, reason: 'not packaged' });
+  return autoUpdater.downloadUpdate();
+}
+
+export function quitAndInstall() {
+  if (!app.isPackaged) return { skipped: true, reason: 'not packaged' };
+  autoUpdater.quitAndInstall();
+  return { skipped: false };
+}
+
+ipcMain.handle('check-for-updates', checkForUpdates);
+ipcMain.handle('download-update', downloadUpdate);
+ipcMain.handle('quit-and-install', quitAndInstall);
+
 export async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -212,6 +268,14 @@ if (isMainModule) {
       return;
     }
     await createWindow();
+
+    // Silent startup check -- only fires 'checking-for-update'/'update-available'/etc.
+    // events to the renderer (see above); never auto-downloads (autoDownload is false).
+    // Swallowed rather than surfaced as a startup failure: no network / no publish feed
+    // yet / GitHub rate-limited should never block the app from opening, the update
+    // button in the renderer already surfaces its own 'updater:error' event for a
+    // user-triggered check.
+    checkForUpdates().catch(() => {});
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
