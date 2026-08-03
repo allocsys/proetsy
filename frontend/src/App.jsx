@@ -19,8 +19,8 @@ const NAV_ITEMS = [
   { id: 'pipeline', label: 'Upload & Config', group: 'Pipeline' },
   { id: 'history', label: 'Listing History', group: 'Pipeline' },
   { id: 'review', label: 'Review a Job', group: 'Pipeline' },
-  { id: 'prompt-helper', label: '04 Prompt Helper', group: 'Modules' },
-  { id: 'taste-filter', label: '07 Taste Filter', group: 'Modules' },
+  { id: 'prompt-helper', label: 'Prompt Helper', group: 'Modules' },
+  { id: 'taste-filter', label: 'Taste Filter', group: 'Modules' },
   { id: 'settings', label: 'Shop Settings & Tags', group: 'Configuration' },
 ];
 
@@ -754,14 +754,14 @@ function App() {
 
           {activeView === 'prompt-helper' && (
             <section className="paper-card">
-              <h2 style={{ marginTop: 0 }}>04 Trend / Prompt Helper</h2>
+              <h2 style={{ marginTop: 0 }}>Trend / Prompt Helper</h2>
               <PromptHelper />
             </section>
           )}
 
           {activeView === 'taste-filter' && (
             <section className="paper-card">
-              <h2 style={{ marginTop: 0 }}>07 Taste Filter (Curation)</h2>
+              <h2 style={{ marginTop: 0 }}>Taste Filter (Curation)</h2>
               <TasteFilter />
             </section>
           )}
