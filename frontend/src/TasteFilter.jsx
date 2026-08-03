@@ -157,6 +157,45 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
     setStatus(`Recomputed. Global: ${global.keptCount} kept / ${global.discardedCount} discarded.`);
   }
 
+  // Step 2.9 — split into the main grid (needs manual review: autoDecision missing/null,
+  // same set shown today when auto mode is off) and the collapsed Auto-sorted section
+  // (autoDecision === 'keep' | 'discard'). Same card markup and the same Keep/Discard/
+  // Keep & send to pipeline actions render in both, so correcting a wrong auto-decision
+  // is just clicking the same buttons — handleLabel already re-labels via the same
+  // /taste-filter/label route regardless of which section the card came from, and the
+  // backend clears `auto_labeled` on any manual label per Step 2.2.
+  const mainCandidates = candidates.filter((c) => c.autoDecision == null);
+  const autoSortedCandidates = candidates.filter((c) => c.autoDecision != null);
+
+  function renderCandidateCard(c) {
+    return (
+      <div key={c.imagePath} className="taste-card">
+        {c.error ? (
+          <p className="taste-error">{c.error}</p>
+        ) : (
+          <>
+            <div className="crop-frame taste-card-img-frame">
+              <img src={c.imageUrl} alt="" />
+            </div>
+            <p className="taste-card-meta">
+              Global: <ScoreBadge label={c.globalLabel} score={c.globalScore} confident={c.globalConfident} />
+            </p>
+            {c.category && (
+              <p className="taste-card-meta">
+                {c.category}: <ScoreBadge label={c.categoryLabel} score={c.categoryScore} confident={c.categoryConfident} />
+              </p>
+            )}
+            <div className="flex-row taste-card-actions">
+              <button onClick={() => handleLabel(c, 'keep')} className="flex-1">Keep</button>
+              <button className="btn-secondary flex-1" onClick={() => handleLabel(c, 'discard')}>Discard</button>
+              <button className="btn-secondary flex-1" onClick={() => handleKeepAndSendToPipeline(c)}>Keep &amp; send to pipeline</button>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="dark-panel">
       <p className="text-muted taste-intro">
