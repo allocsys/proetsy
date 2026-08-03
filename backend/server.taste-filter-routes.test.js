@@ -340,3 +340,105 @@ describe('POST /api/taste-filter/promote (Step 1.2 route, Step 1.3 tests)', () =
     expect(res.status).toBe(400);
   });
 });
+
+// Step 2.7 (plan.md -> Part 2 -> "Backend: route-level test"). Exercises the Step 2.6
+// wiring in POST /api/taste-filter/import: with `taste_filter_auto_enabled=true` and a
+// centroid pair that's already confident (>= COLD_START_MIN_EXAMPLES total labels), an
+// extreme-score candidate should come back with a non-null `autoDecision` and a
+// corresponding `auto_labeled = 1` row in image_preferences, while a mid-range/uncertain
+// score still comes back `autoDecision: null` (manual review), same as auto mode being
+// off.
+describe('POST /api/taste-filter/import -> auto-compute decision rule (Step 2.6, tested here per Step 2.7)', () => {
+  afterAll(async () => {
+    // Leaves auto mode off so it can't leak into any test file run after this one.
+    await request(app).patch('/api/settings').send({ taste_filter_auto_enabled: 'false' });
+  });
+
+  it('auto-decides extreme scores once confident, and leaves a mid-range score for manual review', async () => {
+    // Seed the GLOBAL centroid pair well past COLD_START_MIN_EXAMPLES (30) with clearly
+    // opposite labeled examples, no category -- so scoring against it later is
+    // unambiguous (kept centroid ~= KEEP_LEANING, discarded centroid ~= DISCARD_LEANING).
+    for (let i = 0; i < 20; i += 1) {
+      await request(app).post('/api/taste-filter/label').send({
+        image_path: `/tmp/auto-seed-keep-${i}.png`,
+        embedding: Array.from(KEEP_LEANING),
+        label: 'keep',
+      });
+      await request(app).post('/api/taste-filter/label').send({
+        image_path: `/tmp/auto-seed-discard-${i}.png`,
+        embedding: Array.from(DISCARD_LEANING),
+        label: 'discard',
+      });
+    }
+
+    const patchRes = await request(app).patch('/api/settings').send({
+      taste_filter_auto_enabled: 'true',
+      taste_filter_auto_threshold: '0.3',
+    });
+    expect(patchRes.status).toBe(200);
+
+    // Three candidates, no category: matches KEEP_LEANING exactly (score ~1, well above
+    // the 0.3 threshold), matches DISCARD_LEANING exactly (score ~-1), and an equal mix
+    // of the two (score ~0, inside the uncertain band around the threshold).
+    const MID_RANGE = new Float32Array([Math.SQRT1_2, Math.SQRT1_2, 0, 0]);
+    embedImageMock.mockImplementationOnce(async () => KEEP_LEANING);
+    embedImageMock.mockImplementationOnce(async () => DISCARD_LEANING);
+    embedImageMock.mockImplementationOnce(async () => MID_RANGE);
+
+    const res = await request(app)
+      .post('/api/taste-filter/import')
+      .attach('files', Buffer.from('fake'), 'extreme-keep.png')
+      .attach('files', Buffer.from('fake'), 'extreme-discard.png')
+      .attach('files', Buffer.from('fake'), 'mid-range.png');
+
+    expect(res.status).toBe(201);
+    const [keepCandidate, discardCandidate, midCandidate] = res.body.candidates;
+
+    expect(keepCandidate.autoDecision).toBe('keep');
+    expect(discardCandidate.autoDecision).toBe('discard');
+    expect(midCandidate.autoDecision).toBeNull();
+
+    const { getDb } = await import('./db/init.js');
+    const db = getDb();
+
+    const keepRow = db
+      .prepare('SELECT auto_labeled, label FROM image_preferences WHERE image_path = ?')
+      .get(keepCandidate.imagePath);
+    expect(keepRow).toBeDefined();
+    expect(keepRow.auto_labeled).toBe(1);
+    expect(keepRow.label).toBe('keep');
+
+    const discardRow = db
+      .prepare('SELECT auto_labeled, label FROM image_preferences WHERE image_path = ?')
+      .get(discardCandidate.imagePath);
+    expect(discardRow).toBeDefined();
+    expect(discardRow.auto_labeled).toBe(1);
+    expect(discardRow.label).toBe('discard');
+
+    // The mid-range candidate must NOT have been auto-labeled -- no row for it at all,
+    // since Step 2.6 only writes image_preferences for a non-null decision.
+    const midRow = db
+      .prepare('SELECT * FROM image_preferences WHERE image_path = ?')
+      .get(midCandidate.imagePath);
+    expect(midRow).toBeUndefined();
+
+    // The underlying candidate files themselves are never deleted, auto-decided or not
+    // (Part 2's "Why" constraint: "Nothing is auto-deleted").
+    expect(fs.existsSync(keepCandidate.imagePath)).toBe(true);
+    expect(fs.existsSync(discardCandidate.imagePath)).toBe(true);
+    expect(fs.existsSync(midCandidate.imagePath)).toBe(true);
+  });
+
+  it('leaves autoDecision null for every candidate when auto mode is off, even for an extreme score', async () => {
+    await request(app).patch('/api/settings').send({ taste_filter_auto_enabled: 'false' });
+
+    embedImageMock.mockImplementationOnce(async () => KEEP_LEANING);
+
+    const res = await request(app)
+      .post('/api/taste-filter/import')
+      .attach('files', Buffer.from('fake'), 'extreme-but-auto-off.png');
+
+    expect(res.status).toBe(201);
+    expect(res.body.candidates[0].autoDecision).toBeNull();
+  });
+});
