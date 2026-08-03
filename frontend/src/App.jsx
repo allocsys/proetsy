@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import JobArtworkAnalysisReview from './JobArtworkAnalysisReview.jsx';
 import JobListingReview from './JobListingReview.jsx';
 import JobMockupReview from './JobMockupReview.jsx';
+import MockupTemplates from './MockupTemplates.jsx';
 import PromptHelper from './PromptHelper.jsx';
 import TasteFilter from './TasteFilter.jsx';
 
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { id: 'review', label: 'Review a Job', group: 'Pipeline' },
   { id: 'prompt-helper', label: 'Prompt Helper', group: 'Modules' },
   { id: 'settings', label: 'Shop Settings & Tags', group: 'Configuration' },
+  { id: 'mockup-templates', label: 'Mockup Templates', group: 'Configuration' },
 ];
 
 // Module 6 — Control Dashboard. See ARCHITECTURE.md -> Module 6 for the target feature
@@ -888,6 +890,12 @@ function App() {
             <section className="paper-card">
               <h2 style={{ marginTop: 0 }}>Trend / Prompt Helper</h2>
               <PromptHelper />
+            </section>
+          )}
+
+          {activeView === 'mockup-templates' && (
+            <section className="paper-card">
+              <MockupTemplates />
             </section>
           )}
 
