@@ -38,10 +38,20 @@ function moduleStatus(job, moduleName) {
  * non-required: a job with mockups for some sizes but not others is still a usable
  * result, not a hard failure).
  *
+ * `options.sizeKeys`, if provided, restricts the mockup-composer loop to just that list
+ * instead of every configured size (plan.md -> "Mockup categories" -> backend changes) —
+ * this is how the curated flow's category-selection step (once wired up) limits mockup
+ * generation to only the categories the user picked for a given artwork. Omitted (the
+ * default), behavior is exactly what it was before this option existed: every configured
+ * `size_key` is attempted, so the existing direct-upload / "run everything" callers
+ * (`POST /api/jobs/:id/run` with no body, `POST /api/jobs/run-batch`) need zero changes
+ * to keep working as-is.
+ *
  * @param {number} jobId
+ * @param {{ sizeKeys?: string[] }} [options]
  * @returns {Promise<{job: object, results: Record<string, any>}>}
  */
-export async function runPendingModulesForJob(jobId) {
+export async function runPendingModulesForJob(jobId, options = {}) {
   const results = {};
   let job = getJobWithModules(jobId);
   if (!job) throw new Error(`Job ${jobId} not found`);
@@ -79,7 +89,7 @@ export async function runPendingModulesForJob(jobId) {
   const mockupComposerStatus = moduleStatus(job, 'mockup_composer');
   if (mockupComposerStatus === 'pending' || mockupComposerStatus === 'failed') {
     setModuleStatus(jobId, 'mockup_composer', 'running', { required: false });
-    const sizeKeys = Object.keys(getProductSizes());
+    const sizeKeys = options.sizeKeys ?? Object.keys(getProductSizes());
     const perSize = {};
     let anySucceeded = false;
     for (const sizeKey of sizeKeys) {
