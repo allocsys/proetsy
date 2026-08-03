@@ -545,6 +545,30 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 2px rgba(255, 77, 130, 0.25);
 }
 
+/* Direct/uncurated Pipeline upload lane, collapsed by default (plan.md Rollout step 7) */
+.upload-lane-collapsible {
+  border: 1px solid var(--hairline-paper);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5);
+  margin-top: var(--space-5);
+}
+
+.upload-lane-collapsible summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+
+.upload-lane-collapsible[open] summary {
+  margin-bottom: var(--space-4);
+  color: var(--ink);
+}
+
+.upload-lane-collapsible .upload-lane {
+  margin-top: 0;
+}
+
 /* Upload & Dropzone */
 .dropzone {
   border: 2px dashed var(--hairline-paper);
