@@ -8,6 +8,7 @@ import { readPsd } from 'ag-psd';
 import pureimage from 'pureimage';
 import { getDb } from '../db/init.js';
 import { getProductSizes } from '../config/index.js';
+import { resolveTemplatesDir } from './mockup-templates/index.js';
 import { ensurePsdCanvasInitialized } from './psd-canvas.js';
 import { generateImage } from './llm/index.js';
 import {
@@ -24,9 +25,22 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // where `node server.js` happens to be launched from.
 const BACKEND_ROOT = path.join(__dirname, '..');
 
-const TEMPLATES_BASE_DIR = process.env.MOCKUP_TEMPLATES_DIR
-  ? path.resolve(process.cwd(), process.env.MOCKUP_TEMPLATES_DIR)
-  : BACKEND_ROOT;
+/**
+ * Resolves the current mockup templates base directory -- settings-first (the
+ * `mockup_templates_dir` value the dashboard folder picker saves, see plan.md ->
+ * "Backend changes" -> "2."), falling back to MOCKUP_TEMPLATES_DIR/BACKEND_ROOT if
+ * unset. Was a module-load-time constant (`TEMPLATES_BASE_DIR`) before Rollout step 3;
+ * now a function, called fresh on every composeMockup() invocation rather than cached
+ * once at import time, so picking a folder from the dashboard takes effect immediately
+ * -- no server restart -- same principle syncWatcherFromSettings() already established
+ * for Module 7's watched folder. Delegates to lib/mockup-templates/index.js's
+ * resolveTemplatesDir() (built in Rollout step 2 for exactly this reuse -- see that
+ * module's own doc comment) rather than duplicating the fallback chain here.
+ * @returns {string}
+ */
+export function resolveTemplatesBaseDir() {
+  return resolveTemplatesDir();
+}
 // Exported so server.js can serve this directory statically for the dashboard review UI
 // (step 7) without duplicating the env-var-driven path resolution here.
 export const OUTPUT_DIR = process.env.MOCKUP_OUTPUT_DIR
@@ -349,7 +363,7 @@ export async function composeMockup(artworkPath, sizeKey) {
   }
 
   const resolvedArtworkPath = resolveBackendPath(artworkPath);
-  const templatePath = path.join(TEMPLATES_BASE_DIR, sizeEntry.mockup_template);
+  const templatePath = path.join(resolveTemplatesBaseDir(), sizeEntry.mockup_template);
 
   if (!fs.existsSync(resolvedArtworkPath)) {
     throw new Error(`Artwork file not found: ${resolvedArtworkPath}`);
