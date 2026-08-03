@@ -215,6 +215,22 @@ describe('App', () => {
     expect(await screen.findByTestId('stub-listings')).toHaveTextContent('listings:7');
   });
 
+  it('renders the sidebar nav in group order, with Mockup Templates under Pipeline right after Upload (plan.md -> "Nav: move Mockup Templates under Upload")', async () => {
+    mockFetchByUrl();
+    render(<App />);
+    await screen.findByText('ok');
+
+    const sidebarLabels = Array.from(document.querySelectorAll('.sidebar-nav-item')).map((el) => el.textContent);
+    expect(sidebarLabels).toEqual([
+      'Upload',
+      'Mockup Templates',
+      'Listing History',
+      'Review a Job',
+      'Prompt Helper',
+      'Shop Settings & Tags',
+    ]);
+  });
+
   it('renders the Taste Filter module on the default Upload view, and Prompt Helper on its own nav item', async () => {
     mockFetchByUrl();
     const user = userEvent.setup();
