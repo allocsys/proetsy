@@ -30,7 +30,13 @@ function ScoreBadge({ label, score, confident }) {
 // import call are held in local component state only; nothing is persisted server-side
 // until the user clicks Keep/Discard on it (see backend/server.js -> "Module 7 (Taste
 // Filter) routes" for why).
-function TasteFilter() {
+// `onPromoteToPipeline` (optional): callback from App.jsx, called with the candidate
+// after it's been labeled 'keep' here. Owns the promote + create-job + refreshJobs
+// sequence itself (see App.jsx's promoteCandidateToPipeline) since that needs the
+// current pipeline `overrides` state and refreshJobs(), both of which already live in
+// App.jsx for the direct-upload dropzone -- TasteFilter stays unaware of jobs/pipeline
+// config beyond firing this one callback.
+function TasteFilter({ onPromoteToPipeline } = {}) {
   const [category, setCategory] = useState('');
   const [promptId, setPromptId] = useState('');
   const [candidates, setCandidates] = useState([]);
@@ -107,6 +113,23 @@ function TasteFilter() {
       setCandidates((prev) => prev.filter((c) => c.imagePath !== candidate.imagePath));
     } catch {
       setStatus('Failed to save label — try again.');
+    }
+  }
+
+  // Does everything Keep does (records the training-signal label, removes the card),
+  // then also promotes the candidate straight into the pipeline as a real artwork + job
+  // via the parent's callback -- see backend/server.js's POST /api/taste-filter/promote
+  // (Step 1.2) for the copy-into-UPLOADS_DIR + insertArtworkRecord behavior this kicks
+  // off. Nothing enters the pipeline as a side effect of Keep alone; this is a separate,
+  // explicit opt-in per image.
+  async function handleKeepAndSendToPipeline(candidate) {
+    await handleLabel(candidate, 'keep');
+    if (onPromoteToPipeline) {
+      try {
+        await onPromoteToPipeline(candidate);
+      } catch {
+        setStatus('Kept, but failed to send to pipeline — try again from Upload & Config.');
+      }
     }
   }
 
@@ -189,6 +212,7 @@ function TasteFilter() {
                   <div className="flex-row taste-card-actions">
                     <button onClick={() => handleLabel(c, 'keep')} className="flex-1">Keep</button>
                     <button className="btn-secondary flex-1" onClick={() => handleLabel(c, 'discard')}>Discard</button>
+                    <button className="btn-secondary flex-1" onClick={() => handleKeepAndSendToPipeline(c)}>Keep &amp; send to pipeline</button>
                   </div>
                 </>
               )}
