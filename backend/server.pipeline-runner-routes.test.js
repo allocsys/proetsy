@@ -127,6 +127,31 @@ describe('POST /api/jobs/:id/run (server-side pipeline runner)', () => {
   });
 });
 
+describe('POST /api/jobs/:id/run size_keys filter (Rollout step 4)', () => {
+  it('passes a given size_keys list through, restricting the mockup composer loop to just those sizes', async () => {
+    const { generateMockupForJob } = await import('./lib/mockup-generator.js');
+    generateMockupForJob.mockClear();
+    const jobId = createJob(artworkId);
+
+    const res = await request(app)
+      .post(`/api/jobs/${jobId}/run`)
+      .send({ size_keys: ['bedroom-8x10', 'mug-white'] });
+
+    expect(res.status).toBe(200);
+    expect(generateMockupForJob.mock.calls.map(([, sizeKey]) => sizeKey)).toEqual(['bedroom-8x10', 'mug-white']);
+    expect(Object.keys(res.body.results.mockup_composer.perSize)).toEqual(['bedroom-8x10', 'mug-white']);
+  });
+
+  it('omitting size_keys still runs every configured size, unchanged from before this option existed', async () => {
+    const jobId = createJob(artworkId);
+
+    const res = await request(app).post(`/api/jobs/${jobId}/run`).send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body.results.mockup_composer.status).toBe('success');
+  });
+});
+
 describe('POST /api/jobs/run-batch', () => {
   it('runs multiple jobs independently and reports a per-job outcome for each', async () => {
     const jobA = createJob(artworkId);
