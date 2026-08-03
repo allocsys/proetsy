@@ -18,6 +18,8 @@ const mockBrowserWindowInstance = {
   loadFile: vi.fn().mockResolvedValue(undefined),
   loadURL: vi.fn().mockResolvedValue(undefined),
   on: vi.fn(),
+  webContents: { send: vi.fn() },
+  isDestroyed: vi.fn(() => false),
 };
 // A plain function expression, not an arrow function -- arrow functions are never
 // constructible, and vi.fn's `construct` trap (used when this mock is invoked via
@@ -40,6 +42,22 @@ vi.mock('electron', () => ({
   ipcMain: mockIpcMain,
   dialog: mockDialog,
 }));
+
+// Auto-update: a real EventEmitter (not a plain vi.fn() object) so main.js's
+// `autoUpdater.on('checking-for-update', ...)`-style wiring at module scope attaches
+// real listeners this test file can then `.emit()` against, the same way the real
+// electron-updater package's autoUpdater does. Kept as ONE persistent object across
+// tests (mirroring mockApp/mockBrowserWindowInstance's own singleton-mock pattern) --
+// vi.resetModules() re-executes main.js's module-scope `.on()` calls on every import,
+// so beforeEach below must call removeAllListeners() first or listeners would pile up
+// test over test.
+const mockAutoUpdater = new EventEmitter();
+mockAutoUpdater.autoDownload = true;
+mockAutoUpdater.checkForUpdates = vi.fn(() => Promise.resolve({}));
+mockAutoUpdater.downloadUpdate = vi.fn(() => Promise.resolve({}));
+mockAutoUpdater.quitAndInstall = vi.fn();
+
+vi.mock('electron-updater', () => ({ autoUpdater: mockAutoUpdater }));
 
 // Fake child process: enough of Node's ChildProcess surface (an EventEmitter with
 // .killed) for spawnBackend()'s own `.on('exit', ...)` wiring to attach without error.
@@ -67,8 +85,14 @@ beforeEach(async () => {
   MockBrowserWindow.mockClear();
   mockBrowserWindowInstance.loadFile.mockClear();
   mockBrowserWindowInstance.loadURL.mockClear();
+  mockBrowserWindowInstance.webContents.send.mockClear();
+  mockBrowserWindowInstance.isDestroyed.mockReset().mockReturnValue(false);
   mockIpcMain.handle.mockClear();
   mockDialog.showOpenDialog.mockReset();
+  mockAutoUpdater.removeAllListeners();
+  mockAutoUpdater.checkForUpdates.mockClear().mockResolvedValue({});
+  mockAutoUpdater.downloadUpdate.mockClear().mockResolvedValue({});
+  mockAutoUpdater.quitAndInstall.mockClear();
   main = await import('./main.js');
 });
 
@@ -271,5 +295,104 @@ describe('createWindow', () => {
       path.join(__dirname, '..', 'frontend', 'dist', 'index.html')
     );
     expect(mockBrowserWindowInstance.loadURL).not.toHaveBeenCalled();
+  });
+});
+
+describe('auto-update (electron-updater wiring)', () => {
+  it('disables autoDownload so downloads only start on an explicit click', () => {
+    expect(mockAutoUpdater.autoDownload).toBe(false);
+  });
+
+  it('registers ipcMain handlers for check-for-updates, download-update, and quit-and-install', () => {
+    expect(mockIpcMain.handle).toHaveBeenCalledWith('check-for-updates', main.checkForUpdates);
+    expect(mockIpcMain.handle).toHaveBeenCalledWith('download-update', main.downloadUpdate);
+    expect(mockIpcMain.handle).toHaveBeenCalledWith('quit-and-install', main.quitAndInstall);
+  });
+
+  describe('checkForUpdates', () => {
+    it('skips without calling autoUpdater in dev mode', async () => {
+      mockApp.isPackaged = false;
+      await expect(main.checkForUpdates()).resolves.toEqual({ skipped: true, reason: 'not packaged' });
+      expect(mockAutoUpdater.checkForUpdates).not.toHaveBeenCalled();
+    });
+
+    it('delegates to autoUpdater.checkForUpdates() when packaged', async () => {
+      mockApp.isPackaged = true;
+      await main.checkForUpdates();
+      expect(mockAutoUpdater.checkForUpdates).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('downloadUpdate', () => {
+    it('skips without calling autoUpdater in dev mode', async () => {
+      mockApp.isPackaged = false;
+      await expect(main.downloadUpdate()).resolves.toEqual({ skipped: true, reason: 'not packaged' });
+      expect(mockAutoUpdater.downloadUpdate).not.toHaveBeenCalled();
+    });
+
+    it('delegates to autoUpdater.downloadUpdate() when packaged', async () => {
+      mockApp.isPackaged = true;
+      await main.downloadUpdate();
+      expect(mockAutoUpdater.downloadUpdate).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('quitAndInstall', () => {
+    it('skips without calling autoUpdater in dev mode', () => {
+      mockApp.isPackaged = false;
+      expect(main.quitAndInstall()).toEqual({ skipped: true, reason: 'not packaged' });
+      expect(mockAutoUpdater.quitAndInstall).not.toHaveBeenCalled();
+    });
+
+    it('delegates to autoUpdater.quitAndInstall() when packaged', () => {
+      mockApp.isPackaged = true;
+      expect(main.quitAndInstall()).toEqual({ skipped: false });
+      expect(mockAutoUpdater.quitAndInstall).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('forwarding autoUpdater events to the renderer', () => {
+    it('does nothing (no throw) if no window has been created yet', () => {
+      expect(() => mockAutoUpdater.emit('checking-for-update')).not.toThrow();
+      expect(mockBrowserWindowInstance.webContents.send).not.toHaveBeenCalled();
+    });
+
+    it('sends each lifecycle event to the renderer over its own updater:* channel once a window exists', async () => {
+      await main.createWindow();
+
+      mockAutoUpdater.emit('checking-for-update');
+      expect(mockBrowserWindowInstance.webContents.send).toHaveBeenCalledWith('updater:checking-for-update', undefined);
+
+      mockAutoUpdater.emit('update-available', { version: '1.2.3' });
+      expect(mockBrowserWindowInstance.webContents.send).toHaveBeenCalledWith('updater:update-available', { version: '1.2.3' });
+
+      mockAutoUpdater.emit('update-not-available', {});
+      expect(mockBrowserWindowInstance.webContents.send).toHaveBeenCalledWith('updater:update-not-available', {});
+
+      mockAutoUpdater.emit('download-progress', { percent: 50 });
+      expect(mockBrowserWindowInstance.webContents.send).toHaveBeenCalledWith('updater:download-progress', { percent: 50 });
+
+      mockAutoUpdater.emit('update-downloaded', { version: '1.2.3' });
+      expect(mockBrowserWindowInstance.webContents.send).toHaveBeenCalledWith('updater:update-downloaded', { version: '1.2.3' });
+
+      mockAutoUpdater.emit('error', new Error('boom'));
+      expect(mockBrowserWindowInstance.webContents.send).toHaveBeenCalledWith('updater:error', 'boom');
+    });
+
+    it('falls back to a generic message when the error event has no Error object', async () => {
+      await main.createWindow();
+
+      mockAutoUpdater.emit('error', null);
+      expect(mockBrowserWindowInstance.webContents.send).toHaveBeenCalledWith('updater:error', 'Unknown update error');
+    });
+
+    it('does not send once the window has been destroyed', async () => {
+      await main.createWindow();
+      mockBrowserWindowInstance.isDestroyed.mockReturnValue(true);
+
+      mockAutoUpdater.emit('checking-for-update');
+
+      expect(mockBrowserWindowInstance.webContents.send).not.toHaveBeenCalled();
+    });
   });
 });
