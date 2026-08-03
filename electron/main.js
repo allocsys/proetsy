@@ -44,7 +44,7 @@ const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
 const DEV_FRONTEND_URL = process.env.ELECTRON_START_URL || 'http://localhost:5173';
 
 let backendProcess = null;
-let mainWindow = null;
+let mainWindow;
 
 // Packaged-mode data directories (sub-step 2). Dev mode leaves these unset so the
 // backend falls back to its own existing defaults (backend/data/... resolved against
