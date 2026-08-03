@@ -19,3 +19,44 @@ import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('mockupTemplatesAPI', {
   selectFolder: () => ipcRenderer.invoke('select-folder'),
 });
+
+// Auto-update bridge (see main.js's autoUpdater wiring). Actions are invoke/response;
+// updater lifecycle events are one-way main -> renderer, so each `on*` subscriber wraps
+// ipcRenderer.on and unwraps the (event, payload) signature down to just `payload` for
+// the renderer, and returns an unsubscribe function -- App.jsx's effect cleanup calls it
+// on unmount so listeners don't pile up across re-renders/hot reloads.
+contextBridge.exposeInMainWorld('updaterAPI', {
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  downloadUpdate: () => ipcRenderer.invoke('download-update'),
+  quitAndInstall: () => ipcRenderer.invoke('quit-and-install'),
+  onCheckingForUpdate: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on('updater:checking-for-update', listener);
+    return () => ipcRenderer.removeListener('updater:checking-for-update', listener);
+  },
+  onUpdateAvailable: (cb) => {
+    const listener = (_event, info) => cb(info);
+    ipcRenderer.on('updater:update-available', listener);
+    return () => ipcRenderer.removeListener('updater:update-available', listener);
+  },
+  onUpdateNotAvailable: (cb) => {
+    const listener = (_event, info) => cb(info);
+    ipcRenderer.on('updater:update-not-available', listener);
+    return () => ipcRenderer.removeListener('updater:update-not-available', listener);
+  },
+  onDownloadProgress: (cb) => {
+    const listener = (_event, progress) => cb(progress);
+    ipcRenderer.on('updater:download-progress', listener);
+    return () => ipcRenderer.removeListener('updater:download-progress', listener);
+  },
+  onUpdateDownloaded: (cb) => {
+    const listener = (_event, info) => cb(info);
+    ipcRenderer.on('updater:update-downloaded', listener);
+    return () => ipcRenderer.removeListener('updater:update-downloaded', listener);
+  },
+  onError: (cb) => {
+    const listener = (_event, message) => cb(message);
+    ipcRenderer.on('updater:error', listener);
+    return () => ipcRenderer.removeListener('updater:error', listener);
+  },
+});
