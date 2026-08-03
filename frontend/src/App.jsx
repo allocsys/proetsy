@@ -497,9 +497,9 @@ function App() {
               </div>
 
               <p className="text-muted" style={{ marginBottom: '0.25rem' }}>
-                Or backfill categories on tags already in the library that don't have one yet, by
-                matching their text against categories already in use (won't touch tags that
-                already have a category, and won't invent a brand-new category):
+                Or backfill categories on tags already in the library that don&apos;t have one yet, by
+                matching their text against categories already in use (won&apos;t touch tags that
+                already have a category, and won&apos;t invent a brand-new category):
               </p>
               <div className="flex-row mb-2">
                 <button onClick={backfillTagCategories} disabled={tagsBackfillRunning}>
