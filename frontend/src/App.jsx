@@ -703,38 +703,41 @@ function App() {
                 <TasteFilter overrides={overrides} refreshJobs={refreshJobs} />
               </div>
 
-              <div className="upload-lane">
-                <h3>Pipeline</h3>
-                <p className="text-muted" style={{ marginTop: 0 }}>Defaults come from <code>pipeline.config.json</code>; toggles here apply only to artwork uploaded next.</p>
-                <div className="flex-row flex-wrap" style={{ gap: '1.5rem', marginBottom: '1.5rem' }}>
-                  {pipelineDefault?.pipeline?.map((m) => (
-                    <label key={m.module} style={{ opacity: m.required ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: m.required ? 'not-allowed' : 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={!!overrides[m.module]}
-                        disabled={m.required}
-                        onChange={() => toggleModule(m.module, m.required)}
-                      />
-                      <span>{m.module}</span>
-                      {m.required ? <span className="text-muted mono-sm">(required)</span> : null}
-                    </label>
-                  ))}
-                </div>
-
-                <div
-                  className={`dropzone crop-frame ${dragActive ? 'active' : ''}`}
-                  onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-                  onDragLeave={() => setDragActive(false)}
-                  onDrop={onDrop}
-                >
-                  <p className="dropzone-title">Drag and drop artwork here (bulk supported)</p>
-                  <p>or browse files from your computer</p>
-                  <div style={{ marginTop: '1rem', display: 'inline-block' }}>
-                    <input type="file" multiple accept="image/*" onChange={(e) => handleFiles(e.target.files)} />
+              <details className="upload-lane-collapsible">
+                <summary>Direct upload (skips curation — uploads go straight into the pipeline)</summary>
+                <div className="upload-lane">
+                  <h3>Pipeline</h3>
+                  <p className="text-muted" style={{ marginTop: 0 }}>Defaults come from <code>pipeline.config.json</code>; toggles here apply only to artwork uploaded next.</p>
+                  <div className="flex-row flex-wrap" style={{ gap: '1.5rem', marginBottom: '1.5rem' }}>
+                    {pipelineDefault?.pipeline?.map((m) => (
+                      <label key={m.module} style={{ opacity: m.required ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: m.required ? 'not-allowed' : 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={!!overrides[m.module]}
+                          disabled={m.required}
+                          onChange={() => toggleModule(m.module, m.required)}
+                        />
+                        <span>{m.module}</span>
+                        {m.required ? <span className="text-muted mono-sm">(required)</span> : null}
+                      </label>
+                    ))}
                   </div>
-                  {uploadStatus && <p className="mono taste-status" style={{ marginTop: '1rem' }}>{uploadStatus}</p>}
+
+                  <div
+                    className={`dropzone crop-frame ${dragActive ? 'active' : ''}`}
+                    onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                    onDragLeave={() => setDragActive(false)}
+                    onDrop={onDrop}
+                  >
+                    <p className="dropzone-title">Drag and drop artwork here (bulk supported)</p>
+                    <p>or browse files from your computer</p>
+                    <div style={{ marginTop: '1rem', display: 'inline-block' }}>
+                      <input type="file" multiple accept="image/*" onChange={(e) => handleFiles(e.target.files)} />
+                    </div>
+                    {uploadStatus && <p className="mono taste-status" style={{ marginTop: '1rem' }}>{uploadStatus}</p>}
+                  </div>
                 </div>
-              </div>
+              </details>
             </section>
           )}
 
