@@ -176,6 +176,21 @@ app.get('/api/llm/rate-limits', (req, res) => {
   );
 });
 
+// Shared by POST /api/artworks/upload and POST /api/taste-filter/promote -- both end
+// with the same thing: a file already sitting in UPLOADS_DIR becoming an `artworks` row.
+// Kept as a plain insert (no move/copy logic here) so callers are explicit about getting
+// the file into UPLOADS_DIR themselves first.
+function insertArtworkRecord(filePath, originalFilename) {
+  const db = getDb();
+  const { lastInsertRowid } = db
+    .prepare('INSERT INTO artworks (file_path, original_filename) VALUES (?, ?)')
+    .run(filePath, originalFilename || null);
+  return {
+    ...db.prepare('SELECT * FROM artworks WHERE id = ?').get(lastInsertRowid),
+    file_url: `/artwork-files/${path.basename(filePath)}`,
+  };
+}
+
 // Module 6 -> "Lets the user drag-and-drop artwork" / "Supports bulk mode (multiple
 // artworks through the pipeline at once)". Accepts one or many files under the `files`
 // field (a single drop and a bulk drop are the same request shape) and creates one
@@ -185,15 +200,7 @@ app.post('/api/artworks/upload', upload.array('files', 50), (req, res) => {
   const files = req.files || [];
   if (!files.length) return res.status(400).json({ error: 'No files uploaded (expected multipart field "files")' });
 
-  const db = getDb();
-  const insert = db.prepare('INSERT INTO artworks (file_path, original_filename) VALUES (?, ?)');
-  const artworks = files.map((file) => {
-    const { lastInsertRowid } = insert.run(file.path, file.originalname);
-    return {
-      ...db.prepare('SELECT * FROM artworks WHERE id = ?').get(lastInsertRowid),
-      file_url: `/artwork-files/${path.basename(file.path)}`,
-    };
-  });
+  const artworks = files.map((file) => insertArtworkRecord(file.path, file.originalname));
   res.status(201).json({ artworks });
 });
 
