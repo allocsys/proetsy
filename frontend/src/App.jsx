@@ -18,11 +18,11 @@ function StatusBadge({ status }) {
 
 const NAV_ITEMS = [
   { id: 'upload', label: 'Upload', group: 'Pipeline' },
+  { id: 'mockup-templates', label: 'Mockup Templates', group: 'Pipeline' },
   { id: 'history', label: 'Listing History', group: 'Pipeline' },
   { id: 'review', label: 'Review a Job', group: 'Pipeline' },
   { id: 'prompt-helper', label: 'Prompt Helper', group: 'Modules' },
   { id: 'settings', label: 'Shop Settings & Tags', group: 'Configuration' },
-  { id: 'mockup-templates', label: 'Mockup Templates', group: 'Configuration' },
 ];
 
 // Module 6 — Control Dashboard. See ARCHITECTURE.md -> Module 6 for the target feature
