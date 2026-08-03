@@ -128,35 +128,39 @@ export default function PromptHelper() {
 
   return (
     <div className="dark-panel">
-      <div className="flex-row flex-wrap" style={{ marginBottom: '1rem', gap: '1rem' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div className="prompt-filter-row">
+        <label className="prompt-filter-label" htmlFor="prompt-category-select">
           Category:
-          <select value={category} onChange={(e) => setCategory(e.target.value)}>
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
         </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <select id="prompt-category-select" value={category} onChange={(e) => setCategory(e.target.value)}>
+          {CATEGORIES.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+        <label className="prompt-filter-label" htmlFor="prompt-trend-select">
           Trend:
-          <select value={selectedTrendId} onChange={(e) => setSelectedTrendId(e.target.value)} disabled={loadingTrends}>
-            <option value="">(none)</option>
-            {trends.map((t) => (
-              <option key={t.id} value={t.id}>{t.term}{t.category ? ` (${t.category})` : ''}</option>
-            ))}
-          </select>
         </label>
+        <select id="prompt-trend-select" value={selectedTrendId} onChange={(e) => setSelectedTrendId(e.target.value)} disabled={loadingTrends}>
+          <option value="">(none)</option>
+          {trends.map((t) => (
+            <option key={t.id} value={t.id}>{t.term}{t.category ? ` (${t.category})` : ''}</option>
+          ))}
+        </select>
       </div>
 
-      <div className="flex-row flex-wrap" style={{ marginBottom: '1rem', gap: '0.5rem' }}>
+      <div className="prompt-add-row">
         <input
-          style={{ flex: 1, minWidth: '150px' }}
+          id="new-trend-term-input"
+          className="prompt-flex-input"
+          aria-label="Add a new trend"
           placeholder="Add a new trend"
           value={newTrendTerm}
           onChange={(e) => setNewTrendTerm(e.target.value)}
         />
         <input
-          style={{ flex: 1, minWidth: '150px' }}
+          id="new-trend-category-input"
+          className="prompt-flex-input"
+          aria-label="Trend category"
           placeholder="Trend category"
           value={newTrendCategory}
           onChange={(e) => setNewTrendCategory(e.target.value)}
@@ -166,29 +170,29 @@ export default function PromptHelper() {
         </button>
       </div>
 
-      <div style={{ marginBottom: '1rem' }}>
-        <label style={{ fontSize: '13px', color: 'var(--cream-dim)' }}>
+      <div className="prompt-csv-container">
+        <label className="prompt-csv-label" htmlFor="csv-file-input">
           Or import a CSV export (<code>term</code> column, optional <code>category</code>):{' '}
-          <input type="file" accept=".csv,text/csv" onChange={(e) => importTrendsCsv(e.target.files?.[0])} />
         </label>
-        {csvMessage && <span style={{ marginLeft: '0.75rem', fontSize: '13px', color: 'var(--cream-dim)' }}>{csvMessage}</span>}
+        <input id="csv-file-input" type="file" accept=".csv,text/csv" onChange={(e) => importTrendsCsv(e.target.files?.[0])} />
+        {csvMessage && <span className="prompt-csv-message">{csvMessage}</span>}
       </div>
 
       <button onClick={generate} disabled={generating}>
         {generating ? 'Generating…' : 'Generate prompts'}
       </button>
 
-      {error && <p style={{ color: 'var(--state-danger)', marginTop: '0.5rem' }}>{error}</p>}
+      {error && <p className="text-danger mt-1">{error}</p>}
 
       {generated.length > 0 && (
-        <div style={{ marginTop: '1.5rem' }}>
-          <h4 style={{ color: 'var(--cream)' }}>Generated prompts</h4>
+        <div className="mt-3">
+          <h4 className="prompt-section-title">Generated prompts</h4>
           {generated.map((p) => (
-            <div key={p.id} style={{ marginBottom: '0.75rem', padding: '0.5rem', background: 'rgba(0,0,0,0.2)', borderRadius: '4px' }}>
-              <code style={{ fontSize: '13px', display: 'block', marginBottom: '0.5rem' }}>{p.prompt_text}</code>
-              <button className="btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '12px' }} onClick={() => copyToClipboard(p.prompt_text)}>Copy</button>
+            <div key={p.id} className="prompt-item-card">
+              <code className="prompt-code-block">{p.prompt_text}</code>
+              <button className="btn-secondary btn-sm" onClick={() => copyToClipboard(p.prompt_text)}>Copy</button>
               {p.warnings.length > 0 && (
-                <ul style={{ color: 'var(--state-pending)', fontSize: '12px', marginTop: '0.5rem', paddingLeft: '1.25rem' }}>
+                <ul className="prompt-warnings-list">
                   {p.warnings.map((w, i) => <li key={i}>{w}</li>)}
                 </ul>
               )}
@@ -198,12 +202,12 @@ export default function PromptHelper() {
       )}
 
       {history.length > 0 && (
-        <div style={{ marginTop: '1.5rem' }}>
-          <h4 style={{ color: 'var(--cream)' }}>History for &quot;{category}&quot;</h4>
-          <ul style={{ fontSize: '13px', color: 'var(--cream-dim)', paddingLeft: '1.25rem' }}>
+        <div className="mt-3">
+          <h4 className="prompt-section-title">History for &quot;{category}&quot;</h4>
+          <ul className="prompt-history-list">
             {history.map((p) => (
-              <li key={p.id} style={{ marginBottom: '0.25rem' }}>
-                <code style={{ fontSize: '12px' }}>{p.prompt_text}</code> <button className="btn-secondary" style={{ padding: '0.1rem 0.4rem', fontSize: '11px' }} onClick={() => copyToClipboard(p.prompt_text)}>Copy</button>
+              <li key={p.id} className="prompt-history-item">
+                <code className="mono-sm">{p.prompt_text}</code> <button className="btn-secondary btn-xs" onClick={() => copyToClipboard(p.prompt_text)}>Copy</button>
               </li>
             ))}
           </ul>
