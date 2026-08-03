@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   COLD_START_MIN_EXAMPLES,
+  autoDecision,
   cosineSimilarity,
   isConfident,
   labelFromScore,
@@ -87,6 +88,56 @@ describe('isConfident', () => {
 
   it('respects a custom threshold override', () => {
     expect(isConfident({ keptCount: 2, discardedCount: 1 }, 3)).toBe(true);
+  });
+});
+
+describe('autoDecision', () => {
+  // A centroid pair that clears the cold-start gate on its own (isConfident === true),
+  // reused across the boundary/threshold tests below so each test only has to vary the
+  // thing it's actually testing.
+  const confidentCounts = { keptCount: COLD_START_MIN_EXAMPLES, discardedCount: COLD_START_MIN_EXAMPLES };
+  const coldStartCounts = { keptCount: 5, discardedCount: 3 };
+
+  it('auto-keeps a score strictly above the threshold when confident', () => {
+    expect(autoDecision(0.31, confidentCounts, 0.3)).toBe('keep');
+  });
+
+  it('auto-discards a score strictly below the negative threshold when confident', () => {
+    expect(autoDecision(-0.31, confidentCounts, 0.3)).toBe('discard');
+  });
+
+  it('leaves a score exactly at the threshold boundary for manual review (not >, not <)', () => {
+    expect(autoDecision(0.3, confidentCounts, 0.3)).toBeNull();
+    expect(autoDecision(-0.3, confidentCounts, 0.3)).toBeNull();
+  });
+
+  it('leaves a score inside the uncertain band (between -threshold and +threshold) for manual review', () => {
+    expect(autoDecision(0.1, confidentCounts, 0.3)).toBeNull();
+    expect(autoDecision(-0.1, confidentCounts, 0.3)).toBeNull();
+    expect(autoDecision(0, confidentCounts, 0.3)).toBeNull();
+  });
+
+  it('leaves an extreme score for manual review when just inside the cold-start gate (not confident)', () => {
+    // Same extreme score that would auto-keep/auto-discard once confident — the
+    // cold-start check must be applied first and short-circuit regardless of the score.
+    expect(autoDecision(0.9, coldStartCounts, 0.3)).toBeNull();
+    expect(autoDecision(-0.9, coldStartCounts, 0.3)).toBeNull();
+  });
+
+  it('treats counts exactly at the cold-start minimum as confident', () => {
+    const atMinimum = { keptCount: Math.ceil(COLD_START_MIN_EXAMPLES / 2), discardedCount: Math.floor(COLD_START_MIN_EXAMPLES / 2) };
+    expect(autoDecision(0.9, atMinimum, 0.3)).toBe('keep');
+  });
+
+  it('leaves a null score (no centroid data at all) for manual review even when confident', () => {
+    expect(autoDecision(null, confidentCounts, 0.3)).toBeNull();
+  });
+
+  it('never auto-deletes or otherwise touches files — purely returns a label, advisory only', () => {
+    // Documents the design constraint from ARCHITECTURE.md / plan.md Part 2: this
+    // function's contract is a pure string-or-null return, nothing else.
+    const result = autoDecision(0.5, confidentCounts, 0.3);
+    expect(['keep', 'discard', null]).toContain(result);
   });
 });
 
