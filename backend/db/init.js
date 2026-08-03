@@ -55,6 +55,9 @@ function runDefensiveMigrations(db) {
     // image_preferences row as written by the auto-sort decision rule rather than a
     // manual Keep/Discard. See schema.sql's auto_labeled comment.
     'ALTER TABLE image_preferences ADD COLUMN auto_labeled INTEGER DEFAULT 0',
+    // Mockup categories (plan.md -> "Mockup categories") -- tags a product_sizes row as
+    // "bedroom," "hallway," "mug," etc. See schema.sql's category comment.
+    'ALTER TABLE product_sizes ADD COLUMN category TEXT',
   ];
   for (const sql of migrations) {
     try {

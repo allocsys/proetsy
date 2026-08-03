@@ -47,7 +47,12 @@ CREATE TABLE IF NOT EXISTS product_sizes (
   mockup_template_path TEXT,
   -- Nullable — only meaningful for .psd templates; names the PSD layer whose bounds the
   -- artwork is placed into. See ARCHITECTURE.md -> Module 3 -> "Template formats".
-  placement_layer TEXT
+  placement_layer TEXT,
+  -- Nullable, freeform (no CHECK constraint — same reasoning as orientation's existing
+  -- freeform string). Tags a template as "bedroom," "hallway," "mug," "nature," etc. so
+  -- the curated mockup flow's category-selection gate can group size_keys by scene/type.
+  -- See plan.md -> "Mockup categories".
+  category TEXT
 );
 
 CREATE TABLE IF NOT EXISTS listings (

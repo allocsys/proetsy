@@ -110,6 +110,7 @@ describe('runDefensiveMigrations (via getDb — not exported separately)', () =>
 
     const productSizeColumns = db.prepare('PRAGMA table_info(product_sizes)').all().map((c) => c.name);
     expect(productSizeColumns).toContain('placement_layer');
+    expect(productSizeColumns).toContain('category');
 
     const centroidColumns = db.prepare('PRAGMA table_info(taste_centroids)').all().map((c) => c.name);
     expect(centroidColumns).toEqual(expect.arrayContaining(['kept_count', 'discarded_count']));
@@ -138,6 +139,25 @@ describe('runDefensiveMigrations (via getDb — not exported separately)', () =>
     const centroid = db.prepare('SELECT * FROM taste_centroids').get();
     expect(centroid.kept_count).toBe(0);
     expect(centroid.discarded_count).toBe(0);
+
+    const productSize = db.prepare('SELECT * FROM product_sizes WHERE size_key = ?').get('test-size');
+    expect(productSize.category).toBeNull();
+  });
+
+  it('lets product_sizes.category be set on insert or update, freeform (no CHECK constraint)', async () => {
+    process.env.DB_PATH = path.join(tmpRoot, 'proetsy.db');
+    const { getDb } = await import('./init.js');
+    const db = getDb();
+
+    db.prepare('INSERT INTO product_sizes (size_key, category) VALUES (?, ?)').run('mug-11oz', 'mug');
+    expect(db.prepare('SELECT category FROM product_sizes WHERE size_key = ?').get('mug-11oz').category).toBe(
+      'mug'
+    );
+
+    db.prepare('UPDATE product_sizes SET category = ? WHERE size_key = ?').run('green space', 'mug-11oz');
+    expect(db.prepare('SELECT category FROM product_sizes WHERE size_key = ?').get('mug-11oz').category).toBe(
+      'green space'
+    );
   });
 
   it('re-running getDb() in a fresh module instance against an already-migrated on-disk DB does not throw', async () => {
