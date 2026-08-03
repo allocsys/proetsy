@@ -174,7 +174,11 @@ describe('App', () => {
 
   it('shows the empty-history state with no jobs', async () => {
     mockFetchByUrl({ '/api/jobs': [] });
+    const user = userEvent.setup();
     render(<App />);
+    await screen.findByText('ok');
+
+    await user.click(screen.getAllByText('Listing History')[0]);
 
     expect(await screen.findByText(/No jobs yet/)).toBeInTheDocument();
   });
@@ -183,6 +187,9 @@ describe('App', () => {
     mockFetchByUrl({ '/api/jobs': [JOB] });
     const user = userEvent.setup();
     render(<App />);
+    await screen.findByText('ok');
+
+    await user.click(screen.getAllByText('Listing History')[0]);
 
     expect(await screen.findByText('#42')).toBeInTheDocument();
     expect(screen.getByText('fox.png')).toBeInTheDocument();
@@ -200,6 +207,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
+    await user.click(screen.getAllByText('Review a Job')[0]);
     await user.type(screen.getByPlaceholderText('Job ID'), '7');
     await user.click(screen.getByText('Load job'));
 
