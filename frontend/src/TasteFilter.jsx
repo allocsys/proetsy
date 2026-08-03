@@ -39,6 +39,12 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
   const [promptId, setPromptId] = useState('');
   const [candidates, setCandidates] = useState([]);
   const [status, setStatus] = useState('');
+  // Step 2.9 — candidates the backend auto-decided (Step 2.6's `autoDecision` field on
+  // each candidate, set only when taste_filter_auto_enabled is on and the score clears
+  // the confidence + threshold bars from the Step 2.4 decision rule) render into their
+  // own collapsed section instead of the main grid. Collapsed by default so a big
+  // auto-sorted batch doesn't bury the candidates that actually need manual review.
+  const [autoSortedExpanded, setAutoSortedExpanded] = useState(false);
   // Tracks every imagePath already shown (imported manually, polled in from the
   // watcher, or already labeled-and-removed) so a re-poll of /pending doesn't re-add a
   // candidate that's already on screen or was just labeled a moment ago -- the pending
@@ -200,34 +206,25 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
       </div>
       {status && <p className="mono taste-status">{status}</p>}
 
-      {candidates.length > 0 && (
+      {mainCandidates.length > 0 && (
         <div className="taste-grid">
-          {candidates.map((c) => (
-            <div key={c.imagePath} className="taste-card">
-              {c.error ? (
-                <p className="taste-error">{c.error}</p>
-              ) : (
-                <>
-                  <div className="crop-frame taste-card-img-frame">
-                    <img src={c.imageUrl} alt="" />
-                  </div>
-                  <p className="taste-card-meta">
-                    Global: <ScoreBadge label={c.globalLabel} score={c.globalScore} confident={c.globalConfident} />
-                  </p>
-                  {c.category && (
-                    <p className="taste-card-meta">
-                      {c.category}: <ScoreBadge label={c.categoryLabel} score={c.categoryScore} confident={c.categoryConfident} />
-                    </p>
-                  )}
-                  <div className="flex-row taste-card-actions">
-                    <button onClick={() => handleLabel(c, 'keep')} className="flex-1">Keep</button>
-                    <button className="btn-secondary flex-1" onClick={() => handleLabel(c, 'discard')}>Discard</button>
-                    <button className="btn-secondary flex-1" onClick={() => handleKeepAndSendToPipeline(c)}>Keep &amp; send to pipeline</button>
-                  </div>
-                </>
-              )}
+          {mainCandidates.map((c) => renderCandidateCard(c))}
+        </div>
+      )}
+
+      {autoSortedCandidates.length > 0 && (
+        <div className="taste-auto-sorted-section">
+          <button
+            className="btn-secondary"
+            onClick={() => setAutoSortedExpanded((prev) => !prev)}
+          >
+            {autoSortedExpanded ? '▾' : '▸'} Auto-sorted ({autoSortedCandidates.length})
+          </button>
+          {autoSortedExpanded && (
+            <div className="taste-grid" style={{ marginTop: '0.75rem' }}>
+              {autoSortedCandidates.map((c) => renderCandidateCard(c))}
             </div>
-          ))}
+          )}
         </div>
       )}
     </div>
