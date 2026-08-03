@@ -51,6 +51,10 @@ function runDefensiveMigrations(db) {
     // must run after this column exists on a pre-existing dev DB.
     'ALTER TABLE jobs ADD COLUMN batch_id TEXT',
     'CREATE INDEX IF NOT EXISTS idx_jobs_batch_id ON jobs(batch_id)',
+    // Auto-compute taste threshold (plan.md Part 2, Step 2.1) -- flags an
+    // image_preferences row as written by the auto-sort decision rule rather than a
+    // manual Keep/Discard. See schema.sql's auto_labeled comment.
+    'ALTER TABLE image_preferences ADD COLUMN auto_labeled INTEGER DEFAULT 0',
   ];
   for (const sql of migrations) {
     try {
