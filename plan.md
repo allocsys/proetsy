@@ -1,6 +1,6 @@
 # Plan: Merge Upload & Taste Filter, and Auto-Compute Taste Threshold
 
-Status: proposed, not yet implemented.
+Status: Part 1 (Steps 1.1-1.7) implemented. Part 2 not yet implemented.
 Source branch for current behavior: `redesign/v2-overhaul`.
 
 Steps within each part are meant to be done **in order** — each one should
@@ -33,7 +33,7 @@ problems (pre-pipeline curation vs. pipeline entry). The merge closes the gap
 between them so a kept candidate can flow straight into the pipeline without
 a manual re-upload.
 
-### Step 1.1 — Backend: shared artwork-insert helper
+### Step 1.1 — Backend: shared artwork-insert helper ✅ done
 
 Before anything else, factor the artwork-insert logic that currently lives
 inline in the `POST /api/artworks/upload` handler in `backend/server.js`
@@ -42,7 +42,7 @@ Update `/api/artworks/upload` to call it. No request/response shape changes
 for this route. This is pure refactor — land it and confirm existing upload
 tests still pass before touching anything else.
 
-### Step 1.2 — Backend: promote-candidate route
+### Step 1.2 — Backend: promote-candidate route ✅ done
 
 New route in `backend/server.js`, adjacent to the existing Module 7 routes:
 
@@ -60,14 +60,14 @@ Behavior:
 4. Returns `{ artwork }` in the same shape `POST /api/artworks/upload`
    returns per-file (`{ ...row, file_url: '/artwork-files/...' }`).
 
-### Step 1.3 — Backend: promote-route tests
+### Step 1.3 — Backend: promote-route tests ✅ done
 
 New backend test for `POST /api/taste-filter/promote`: candidate file
 copied into `UPLOADS_DIR`, `artworks` row created, 400 on a path outside
 `CANDIDATES_DIR`. Land and confirm green before touching the frontend —
 Steps 1.4+ depend on this route existing and behaving correctly.
 
-### Step 1.4 — Frontend: "Keep & send to pipeline" button
+### Step 1.4 — Frontend: "Keep & send to pipeline" button ✅ done
 
 In `TasteFilter.jsx`, add a second action button alongside the existing
 Keep/Discard pair on each candidate card:
@@ -90,7 +90,7 @@ This keeps "Keep" as a pure training-signal action (no behavior change) and
 makes pipeline-promotion an explicit, separate opt-in per image — nothing
 enters the pipeline as a side effect of curation alone.
 
-### Step 1.5 — Frontend: button tests
+### Step 1.5 — Frontend: button tests ✅ done
 
 `frontend/src/TasteFilter.test.jsx` — add coverage for the new "Keep &
 send to pipeline" button: asserts `/taste-filter/label`,
@@ -99,7 +99,7 @@ and the card is removed from the grid afterward. Land and confirm green
 before the nav/layout merge in Step 1.6 — that way any regression found
 next is isolated to the nav change, not the new button logic.
 
-### Step 1.6 — Frontend: merge the nav views
+### Step 1.6 — Frontend: merge the nav views ✅ done (commit 2a734f9)
 
 - Collapse the two `NAV_ITEMS` entries (`pipeline`, `taste-filter`) into one:
   `{ id: 'upload', label: 'Upload', group: 'Pipeline' }`.
@@ -115,7 +115,7 @@ next is isolated to the nav change, not the new button logic.
   `JobMockupReview.jsx`, `PromptHelper.jsx`, or the `history`/`review`/
   `settings` views.
 
-### Step 1.7 — Frontend: nav tests
+### Step 1.7 — Frontend: nav tests ✅ done (commit 8bc38df)
 
 `frontend/src/App.test.jsx` — update nav-click assertions for the merged
 `'upload'` view id/label.
