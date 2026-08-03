@@ -552,6 +552,93 @@ input:focus, select:focus, textarea:focus {
   aspect-ratio: 1;
 }
 
+/* Artwork Analysis Review */
+.artwork-analysis-card {
+  background: var(--paper-dim);
+  border: 1px solid var(--hairline-paper);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin-top: var(--space-3);
+}
+
+.analysis-summary-grid {
+  display: grid;
+  grid-template-columns: minmax(120px, 200px) 1fr;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-4) 0;
+}
+
+.analysis-summary-grid dt {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.analysis-summary-grid dd {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.manual-notes-section {
+  margin-top: var(--space-4);
+}
+
+.manual-notes-label {
+  display: block;
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.manual-notes-textarea {
+  display: block;
+  width: 100%;
+  min-height: 3rem;
+  margin-top: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+/* Job Mockup Review */
+.mockup-card {
+  margin-bottom: var(--space-4);
+}
+
+.mockup-review-status {
+  color: var(--state-pending);
+  margin-top: 0;
+  font-size: 13px;
+}
+
+.mockup-variants-row {
+  display: flex;
+  gap: var(--space-5);
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.mockup-variant-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.mockup-variant-label {
+  color: var(--cream-dim);
+  font-size: 12px;
+}
+
+.mockup-selected-label {
+  color: var(--cream-dim);
+  font-size: 13px;
+}
+
+.mockup-variant-image {
+  width: clamp(120px, 20vw, 200px);
+  border-radius: var(--radius-sm);
+  display: block;
+  object-fit: cover;
+}
+
 /* Utility classes */
 .flex-row {
   display: flex;
@@ -566,5 +653,9 @@ input:focus, select:focus, textarea:focus {
 .mt-3 { margin-top: 1.5rem; }
 .mb-1 { margin-bottom: 0.5rem; }
 .mb-2 { margin-bottom: 1rem; }
+.my-1 { margin-top: 0.5rem; margin-bottom: 0.5rem; }
+.my-2 { margin-top: 1rem; margin-bottom: 1rem; }
 .text-muted { color: var(--ink-soft); }
 .dark-panel .text-muted { color: var(--cream-dim); }
+.text-danger { color: var(--state-danger); }
+.text-pending { color: var(--state-pending); }
