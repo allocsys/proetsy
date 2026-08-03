@@ -115,6 +115,63 @@ describe('TasteFilter', () => {
     expect(await screen.findByText('Not a valid image')).toBeInTheDocument();
     expect(screen.getByText('Keep')).toBeInTheDocument();
   });
+
+  it('"Keep & send to pipeline" labels, promotes, creates a job (in order), and removes the card', async () => {
+    fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ candidates: [CANDIDATE] }) });
+    const user = userEvent.setup();
+    const refreshJobs = vi.fn();
+    const overrides = { listing_generator: true, mockup_composer: false };
+    render(<TasteFilter overrides={overrides} refreshJobs={refreshJobs} />);
+
+    const input = document.querySelector('input[type="file"]');
+    await user.upload(input, makeFile());
+    await screen.findByText('Keep & send to pipeline');
+
+    fetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // /taste-filter/label
+    fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ artwork: { id: 42 } }) }); // /taste-filter/promote
+    fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ id: 99 }) }); // /api/jobs
+
+    await user.click(screen.getByText('Keep & send to pipeline'));
+
+    const calledUrls = fetch.mock.calls.slice(1).map(([url]) => url);
+    expect(calledUrls).toEqual(['/api/taste-filter/label', '/api/taste-filter/promote', '/api/jobs']);
+
+    expect(fetch.mock.calls[2][1]).toEqual(
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ image_path: CANDIDATE.imagePath }),
+      })
+    );
+    expect(fetch.mock.calls[3][1]).toEqual(
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ artwork_id: 42, pipeline_overrides: overrides }),
+      })
+    );
+
+    expect(refreshJobs).toHaveBeenCalled();
+    expect(screen.queryByText('Keep & send to pipeline')).not.toBeInTheDocument();
+  });
+
+  it('"Keep & send to pipeline" still keeps the label if promote fails, and surfaces an error', async () => {
+    fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ candidates: [CANDIDATE] }) });
+    const user = userEvent.setup();
+    const refreshJobs = vi.fn();
+    render(<TasteFilter overrides={{}} refreshJobs={refreshJobs} />);
+
+    const input = document.querySelector('input[type="file"]');
+    await user.upload(input, makeFile());
+    await screen.findByText('Keep & send to pipeline');
+
+    fetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // /taste-filter/label
+    fetch.mockResolvedValueOnce({ ok: false, json: async () => ({ error: 'image_path must be inside the taste-filter candidates directory' }) }); // /taste-filter/promote fails
+
+    await user.click(screen.getByText('Keep & send to pipeline'));
+
+    expect(await screen.findByText(/Kept, but failed to send to pipeline/)).toBeInTheDocument();
+    expect(screen.queryByText('Keep & send to pipeline')).not.toBeInTheDocument();
+    expect(refreshJobs).not.toHaveBeenCalled();
+  });
 });
 
 describe('TasteFilter — watched-folder auto-import polling (Module 7 -> "Auto-import via watched folder", step 7)', () => {
