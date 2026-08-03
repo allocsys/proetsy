@@ -257,7 +257,7 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
             className="btn-secondary"
             onClick={() => setAutoSortedExpanded((prev) => !prev)}
           >
-            {autoSortedExpanded ? '▾' : '▸'} Auto-sorted ({autoSortedCandidates.length})
+            <span aria-hidden="true">{autoSortedExpanded ? '▾' : '▸'}</span> Auto-sorted ({autoSortedCandidates.length})
           </button>
           {autoSortedExpanded && (
             <div className="taste-grid" style={{ marginTop: '0.75rem' }}>
