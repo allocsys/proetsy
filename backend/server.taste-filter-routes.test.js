@@ -25,6 +25,11 @@ beforeAll(async () => {
   tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'proetsy-taste-filter-routes-'));
   process.env.DB_PATH = path.join(tmpRoot, 'test.db');
   process.env.TASTE_FILTER_CANDIDATES_DIR = path.join(tmpRoot, 'candidates');
+  // Step 1.3 (plan.md) -- POST /api/taste-filter/promote copies a candidate file into
+  // UPLOADS_DIR, so this needs its own tmp dir here too, same pattern as
+  // TASTE_FILTER_CANDIDATES_DIR above, rather than falling through to server.js's
+  // default (backend/data/uploads on disk).
+  process.env.ARTWORK_UPLOADS_DIR = path.join(tmpRoot, 'uploads');
 
   embedImageMock = vi.fn(async () => KEEP_LEANING);
   vi.doMock('./lib/taste-filter/embeddings.js', () => ({
