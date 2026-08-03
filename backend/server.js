@@ -24,6 +24,19 @@ import { scoreCandidate } from './lib/taste-filter/scoring.js';
 import { getCentroids, addImagePreference, recomputeCentroids, tallyPromptTermsForLabel } from './lib/taste-filter/store.js';
 import { syncWatcherFromSettings, getPendingCandidates, removePendingCandidate, getWatcherStatus } from './lib/taste-filter/watcher.js';
 
+// Module 7 -> Part 2 (plan.md) -> Step 2.3: settings-table keys for the auto-compute
+// taste threshold, same key/value `settings` table as everything else (no dedicated
+// columns/migration needed to add these -- see the `/api/settings` route below). Unlike
+// most settings keys, GET /api/settings explicitly fills in defaults for these two when
+// unset, since the Step 2.4 decision rule (scoring.js, wired in Step 2.6) needs a real
+// enabled/threshold value to apply, not just "missing".
+const SETTING_AUTO_ENABLED = 'taste_filter_auto_enabled';
+const SETTING_AUTO_THRESHOLD = 'taste_filter_auto_threshold';
+const AUTO_SETTING_DEFAULTS = {
+  [SETTING_AUTO_ENABLED]: 'false',
+  [SETTING_AUTO_THRESHOLD]: '0.3',
+};
+
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -212,7 +225,7 @@ app.post('/api/artworks/upload', upload.array('files', 50), (req, res) => {
 app.get('/api/settings', (req, res) => {
   const db = getDb();
   const rows = db.prepare('SELECT key, value FROM settings').all();
-  const settings = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  const settings = { ...AUTO_SETTING_DEFAULTS, ...Object.fromEntries(rows.map((r) => [r.key, r.value])) };
   res.json(settings);
 });
 
@@ -236,7 +249,7 @@ app.patch('/api/settings', (req, res) => {
   // see syncWatcherFromSettings). Takes effect immediately, no server restart needed.
   syncWatcherFromSettings(CANDIDATES_DIR);
   const rows = db.prepare('SELECT key, value FROM settings').all();
-  res.json(Object.fromEntries(rows.map((r) => [r.key, r.value])));
+  res.json({ ...AUTO_SETTING_DEFAULTS, ...Object.fromEntries(rows.map((r) => [r.key, r.value])) });
 });
 
 // Module 6 -> First-Run Setup -> "Required for Module 2 (core): a starter tag list —
