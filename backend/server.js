@@ -715,6 +715,41 @@ app.post('/api/taste-filter/label', (req, res) => {
   }
 });
 
+// Promotes a taste-filter candidate into the pipeline as a real artwork -- closes the
+// gap described at the top of insertArtworkRecord: a kept candidate otherwise never
+// becomes an `artworks` row on its own. Body: { image_path, original_filename? }.
+// `image_path` must resolve inside CANDIDATES_DIR (never UPLOADS_DIR or an arbitrary
+// path -- this only promotes files that actually came through the taste-filter import
+// flow). The file is copied, not moved, into UPLOADS_DIR using the same naming scheme
+// as uploadStorage.filename above, so the original candidate file (and its taste-filter
+// history/label) is untouched. Does not itself label or delete the candidate -- pairing
+// this with a 'keep' label is the caller's responsibility (see TasteFilter.jsx's "Keep &
+// send to pipeline" action).
+app.post('/api/taste-filter/promote', (req, res) => {
+  const { image_path, original_filename } = req.body || {};
+  if (!image_path) return res.status(400).json({ error: 'image_path is required' });
+
+  const resolvedCandidatePath = path.resolve(image_path);
+  const resolvedCandidatesDir = path.resolve(CANDIDATES_DIR);
+  const isInsideCandidatesDir =
+    resolvedCandidatePath === resolvedCandidatesDir ||
+    resolvedCandidatePath.startsWith(resolvedCandidatesDir + path.sep);
+  if (!isInsideCandidatesDir) {
+    return res.status(400).json({ error: 'image_path must be inside the taste-filter candidates directory' });
+  }
+  if (!fs.existsSync(resolvedCandidatePath)) {
+    return res.status(400).json({ error: 'No candidate file found at image_path' });
+  }
+
+  const safeName = path.basename(resolvedCandidatePath).replace(/[^a-zA-Z0-9_.-]/g, '_');
+  const destFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}-${safeName}`;
+  const destPath = path.join(UPLOADS_DIR, destFilename);
+  fs.copyFileSync(resolvedCandidatePath, destPath);
+
+  const artwork = insertArtworkRecord(destPath, original_filename || path.basename(resolvedCandidatePath));
+  res.status(201).json({ artwork });
+});
+
 // Module 7 -> "Auto-import via watched folder" (step 7). The dashboard polls this to pick
 // up whatever the watcher has detected + scored since the last poll -- same response
 // shape as POST /api/taste-filter/import's own `{ candidates }`, so TasteFilter.jsx can
