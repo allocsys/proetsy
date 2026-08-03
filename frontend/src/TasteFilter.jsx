@@ -15,9 +15,10 @@ const LABEL_CLASS = {
 
 function ScoreBadge({ label, score, confident }) {
   if (score === null || score === undefined) return <span className="text-muted mono">—</span>;
+  const text = `${label} (${score.toFixed(3)})${confident === false ? ' · cold start' : ''}`;
   return (
-    <span className={`status-pill ${LABEL_CLASS[label] || 'skipped'}`}>
-      <span className="status-dot" />
+    <span className={`status-pill ${LABEL_CLASS[label] || 'skipped'}`} aria-label={`Score: ${text}`}>
+      <span className="status-dot" aria-hidden="true" />
       {label} ({score.toFixed(3)}){confident === false ? ' · cold start' : ''}
     </span>
   );
