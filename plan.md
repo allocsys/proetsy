@@ -215,7 +215,7 @@ is off. For each auto-decided candidate:
 No change to `POST /api/taste-filter/label` — manual correction of an
 auto-sorted candidate goes through the same route it already does.
 
-### Step 2.7 — Backend: route-level test
+### Step 2.7 — Backend: route-level test ✅ done
 
 Backend route test — `taste_filter_auto_enabled=true` with a seeded
 confident centroid pair produces `autoDecision` on extreme-score
