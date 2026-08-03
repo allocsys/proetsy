@@ -180,7 +180,7 @@ describe('App', () => {
 
     await user.click(screen.getAllByText('Listing History')[0]);
 
-    expect(await screen.findByText(/No jobs yet/)).toBeInTheDocument();
+    expect(await screen.findByText(/No jobs yet — drop some artwork/)).toBeInTheDocument();
   });
 
   it('renders the job history table and loads a job into review on click', async () => {
