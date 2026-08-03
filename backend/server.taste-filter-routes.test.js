@@ -250,3 +250,93 @@ describe('GET /api/taste-filter/pending + /watch-status (Module 7 -> "Auto-impor
     await request(app).patch('/api/settings').send({ taste_filter_watch_enabled: 'false' });
   });
 });
+
+// Step 1.3 (plan.md -> Part 1 -> "Backend: promote-route tests"). Exercises the route
+// added in Step 1.2 -- server.js's insertArtworkRecord/UPLOADS_DIR comment describes the
+// contract this is checking: a candidate file gets copied (not moved) into UPLOADS_DIR
+// and turned into a real `artworks` row, and only files that actually live inside
+// CANDIDATES_DIR are eligible.
+describe('POST /api/taste-filter/promote (Step 1.2 route, Step 1.3 tests)', () => {
+  it('copies a candidate file into UPLOADS_DIR and creates an artworks row for it', async () => {
+    const importRes = await request(app)
+      .post('/api/taste-filter/import')
+      .attach('files', Buffer.from('fake-png-bytes'), 'promote-me.png');
+    const [candidate] = importRes.body.candidates;
+    expect(candidate.error).toBeUndefined();
+
+    const promoteRes = await request(app)
+      .post('/api/taste-filter/promote')
+      .send({ image_path: candidate.imagePath, original_filename: 'promote-me.png' });
+
+    expect(promoteRes.status).toBe(201);
+    const { artwork } = promoteRes.body;
+    expect(artwork.id).toBeDefined();
+    expect(artwork.original_filename).toBe('promote-me.png');
+    expect(artwork.file_url).toMatch(/^\/artwork-files\//);
+
+    // Copied, not moved -- the original candidate file must still be there.
+    expect(fs.existsSync(candidate.imagePath)).toBe(true);
+    // The new artwork file lives under ARTWORK_UPLOADS_DIR (this test's tmp uploads dir),
+    // not CANDIDATES_DIR.
+    expect(artwork.file_path.startsWith(process.env.ARTWORK_UPLOADS_DIR)).toBe(true);
+    expect(fs.existsSync(artwork.file_path)).toBe(true);
+
+    const getRes = await request(app).get(`/api/artworks/${artwork.id}`);
+    expect(getRes.status).toBe(200);
+    expect(getRes.body.file_path).toBe(artwork.file_path);
+  });
+
+  it('falls back to the candidate\'s own basename when original_filename is omitted', async () => {
+    const importRes = await request(app)
+      .post('/api/taste-filter/import')
+      .attach('files', Buffer.from('fake-png-bytes'), 'no-name-given.png');
+    const [candidate] = importRes.body.candidates;
+
+    const promoteRes = await request(app)
+      .post('/api/taste-filter/promote')
+      .send({ image_path: candidate.imagePath });
+
+    expect(promoteRes.status).toBe(201);
+    expect(promoteRes.body.artwork.original_filename).toBe(path.basename(candidate.imagePath));
+  });
+
+  it('400s when image_path is missing', async () => {
+    const res = await request(app).post('/api/taste-filter/promote').send({});
+    expect(res.status).toBe(400);
+  });
+
+  it('400s on a path outside CANDIDATES_DIR', async () => {
+    const outsidePath = path.join(tmpRoot, 'not-a-candidate.png');
+    fs.writeFileSync(outsidePath, 'fake-png-bytes');
+
+    const res = await request(app)
+      .post('/api/taste-filter/promote')
+      .send({ image_path: outsidePath });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/candidates directory/i);
+
+    // Nothing should have been created.
+    const artworksListRes = await request(app).get('/api/jobs');
+    expect(artworksListRes.status).toBe(200);
+  });
+
+  it('400s on a directory-traversal attempt using a path outside CANDIDATES_DIR', async () => {
+    const res = await request(app)
+      .post('/api/taste-filter/promote')
+      .send({ image_path: path.join(process.env.TASTE_FILTER_CANDIDATES_DIR, '..', 'escape.png') });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/candidates directory/i);
+  });
+
+  it('400s when the candidate file does not exist on disk', async () => {
+    const missingPath = path.join(process.env.TASTE_FILTER_CANDIDATES_DIR, 'never-existed.png');
+
+    const res = await request(app)
+      .post('/api/taste-filter/promote')
+      .send({ image_path: missingPath });
+
+    expect(res.status).toBe(400);
+  });
+});
