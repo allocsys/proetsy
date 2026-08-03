@@ -9,6 +9,7 @@ let getDb;
 let getTagCandidates;
 let tagRowsFromCsvText;
 let importTagsFromCsvRows;
+let suggestCategoriesForUncategorizedTags;
 let tmpRoot;
 
 beforeAll(async () => {
@@ -16,7 +17,12 @@ beforeAll(async () => {
   process.env.DB_PATH = path.join(tmpRoot, 'test.db');
 
   ({ getDb } = await import('../../db/init.js'));
-  ({ getTagCandidates, tagRowsFromCsvText, importTagsFromCsvRows } = await import('./user-list.js'));
+  ({
+    getTagCandidates,
+    tagRowsFromCsvText,
+    importTagsFromCsvRows,
+    suggestCategoriesForUncategorizedTags,
+  } = await import('./user-list.js'));
 });
 
 afterAll(() => {
@@ -132,6 +138,108 @@ describe('getTagCandidates (ARCHITECTURE.md -> Tags Provider Layer, v1 user-list
 
     const matches = getTagCandidates({ subject: 'a fox', style: 'watercolor' });
     expect(matches.map((t) => t.tag_text).sort()).toEqual(['Fox', 'watercolor'].sort());
+  });
+});
+
+describe('suggestCategoriesForUncategorizedTags (plan.md Rollout step 3)', () => {
+  it('backfills an uncategorized tag whose text contains an already-in-use category', () => {
+    const db = getDb();
+    db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)').run(
+      'fern print',
+      'botanical',
+      'manual'
+    );
+    db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)').run(
+      'botanical wall art',
+      null,
+      'manual'
+    );
+
+    const result = suggestCategoriesForUncategorizedTags();
+
+    expect(result).toEqual({
+      checked: 1,
+      updated: 1,
+      updates: [{ tagText: 'botanical wall art', category: 'botanical' }],
+    });
+    const row = db.prepare('SELECT * FROM tags WHERE tag_text = ?').get('botanical wall art');
+    expect(row.category).toBe('botanical');
+  });
+
+  it('leaves a tag uncategorized when no known category matches its text', () => {
+    const db = getDb();
+    db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)').run(
+      'fern print',
+      'botanical',
+      'manual'
+    );
+    db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)').run(
+      'cityscape at night',
+      null,
+      'manual'
+    );
+
+    const result = suggestCategoriesForUncategorizedTags();
+
+    expect(result).toEqual({ checked: 1, updated: 0, updates: [] });
+    const row = db.prepare('SELECT * FROM tags WHERE tag_text = ?').get('cityscape at night');
+    expect(row.category).toBeNull();
+  });
+
+  it('never overwrites a tag that already has a category', () => {
+    const db = getDb();
+    db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)').run(
+      'botanical print',
+      'botanical',
+      'manual'
+    );
+    db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)').run(
+      'boho botanical mashup',
+      'boho',
+      'manual'
+    );
+
+    const result = suggestCategoriesForUncategorizedTags();
+
+    expect(result).toEqual({ checked: 0, updated: 0, updates: [] });
+    const row = db.prepare('SELECT * FROM tags WHERE tag_text = ?').get('boho botanical mashup');
+    expect(row.category).toBe('boho');
+  });
+
+  it('prefers the longer/more specific matching category when more than one substring-matches', () => {
+    const db = getDb();
+    db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)').run(
+      'wreath',
+      'decor',
+      'manual'
+    );
+    db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)').run(
+      'crib mobile',
+      'nursery decor',
+      'manual'
+    );
+    db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)').run(
+      'nursery decor accent',
+      null,
+      'manual'
+    );
+
+    const result = suggestCategoriesForUncategorizedTags();
+
+    expect(result.updated).toBe(1);
+    expect(result.updates).toEqual([{ tagText: 'nursery decor accent', category: 'nursery decor' }]);
+  });
+
+  it('returns all-zero results when the library has no uncategorized tags or is empty', () => {
+    expect(suggestCategoriesForUncategorizedTags()).toEqual({ checked: 0, updated: 0, updates: [] });
+
+    const db = getDb();
+    db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)').run(
+      'fully tagged',
+      'style',
+      'manual'
+    );
+    expect(suggestCategoriesForUncategorizedTags()).toEqual({ checked: 0, updated: 0, updates: [] });
   });
 });
 
