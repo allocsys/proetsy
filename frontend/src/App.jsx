@@ -582,25 +582,6 @@ function App() {
                   </div>
                 </div>
 
-                <div className="settings-subsection" style={{ marginBottom: 0 }}>
-                  <div className="settings-readonly-box">
-                    <div className="settings-readonly-header">
-                      <h4 className="settings-readonly-title">Product sizes / mockup templates</h4>
-                      <span className="read-only-badge">Read-only</span>
-                    </div>
-                    {sizeKeys.length ? (
-                      <ul className="settings-compact-list">
-                        {sizeKeys.map((k) => (
-                          <li key={k}>
-                            <code>{k}</code> — {productSizes[k].dimensions} @ {productSizes[k].dpi}dpi ({productSizes[k].orientation})
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="empty-state" style={{ margin: 0 }}>None configured — edit <code>backend/config/product-sizes.json</code>.</p>
-                    )}
-                  </div>
-                </div>
               </div>
 
               <div className="settings-section-card">
