@@ -111,9 +111,9 @@ describe('App', () => {
   it('shows the backend-unreachable banner when health fetch fails', async () => {
     global.fetch = vi.fn((url) => {
       if (url === '/api/health') return Promise.reject(new Error('network error'));
-      // Array-returning routes need an array back, or App's jobs.map()/trends.map()
-      // crashes on an object.
-      if (url === '/api/jobs' || url === '/api/trends') return Promise.resolve({ ok: true, json: async () => [] });
+      // Array-returning routes need an array back, or App's jobs.map()/trends.map()/
+      // tagCategories' tags.map() crashes on an object.
+      if (url === '/api/jobs' || url === '/api/trends' || url === '/api/tags') return Promise.resolve({ ok: true, json: async () => [] });
       return Promise.resolve({ ok: true, json: async () => ({}) });
     });
     render(<App />);
