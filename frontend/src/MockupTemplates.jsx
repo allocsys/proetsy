@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 
 // plan.md -> "Frontend changes" -> new component `frontend/src/MockupTemplates.jsx`.
 // Not job-scoped -- mirrors TasteFilter.jsx/PromptHelper.jsx's shape, not
-// JobListingReview.jsx's. Rollout step 4: folder field + scan/select grid + bulk-assign
-// + configured-templates grid, with a plain text input for the folder path only -- the
-// Electron native "Browse…" button (window.mockupTemplatesAPI) is Rollout step 5, not
-// this one, so `window.mockupTemplatesAPI` is intentionally never referenced here yet.
+// JobListingReview.jsx's. Rollout step 4 built the folder field + scan/select grid +
+// bulk-assign + configured-templates grid with a plain text input only. Rollout step 5
+// (this pass) adds the Electron native "Browse…" button: window.mockupTemplatesAPI only
+// exists when the preload bridge has actually run (electron/preload.js), so it's
+// feature-detected here rather than assumed -- dev-in-browser (no Electron) simply never
+// renders the button and the plain text field keeps working exactly as it did in step 4.
 
 function slugify(filename) {
   const base = filename.replace(/\.[^/.]+$/, '');
@@ -64,6 +66,19 @@ function MockupTemplates() {
       body: JSON.stringify({ mockup_templates_dir: value }),
     }).catch(() => {});
     setFolderSavedMessage('Saved.');
+  }
+
+  // Rollout step 5: calls the native OS folder picker via the preload bridge
+  // (electron/main.js's 'select-folder' IPC handler), fills the field, and saves it the
+  // same way a manual edit's onBlur would -- a cancelled dialog (selectFolder() resolves
+  // null) leaves the field untouched.
+  async function handleBrowse() {
+    if (!window.mockupTemplatesAPI) return;
+    const picked = await window.mockupTemplatesAPI.selectFolder();
+    if (!picked) return;
+    setFolder(picked);
+    setFolderSavedMessage('');
+    await saveFolder(picked);
   }
 
   async function handleScan() {
@@ -217,6 +232,9 @@ function MockupTemplates() {
                 placeholder="/home/you/etsy-mockup-packs"
               />
             </div>
+            {typeof window !== 'undefined' && window.mockupTemplatesAPI && (
+              <button className="btn-secondary" onClick={handleBrowse}>Browse…</button>
+            )}
             <button className="btn-primary" onClick={handleScan}>Scan folder</button>
             {folderSavedMessage && <span className="text-muted mono-sm">{folderSavedMessage}</span>}
           </div>
