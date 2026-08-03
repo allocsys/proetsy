@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 // Using CSS classes.
 
@@ -75,6 +75,109 @@ function MockupCard({ mockup, onVariantChange }) {
 }
 
 /**
+ * Manual category-selection gate for the curated flow (plan.md -> "Mockup categories").
+ * A job created from the curated (Taste Filter promote) path has already had Image
+ * Analyzer + Listing Generator run for it, but hasn't had mockups generated yet since
+ * the direct/uncurated lane is the only caller of POST /api/jobs/:id/run today — this is
+ * that missing "generate" trigger for the curated path, gated by category rather than
+ * blanket-generating every configured size.
+ *
+ * Fetches the distinct configured categories plus every configured template, resolves
+ * whichever categories are checked to their underlying size_keys client-side (a template
+ * with no category set is never reachable here — only from the direct-upload lane's
+ * unfiltered "run everything" behavior), and on submit calls POST /api/jobs/:id/run with
+ * just those size_keys. Additive only: a job that never visits this step keeps getting
+ * mockups for every configured size, exactly as before this step existed.
+ */
+function MockupCategorySelector({ jobId, onGenerated }) {
+  const [categories, setCategories] = useState([]);
+  const [templates, setTemplates] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+  const [checked, setChecked] = useState({}); // category -> boolean
+  const [running, setRunning] = useState(false);
+  const [status, setStatus] = useState('');
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    setLoaded(false);
+    Promise.all([
+      fetch('/api/mockup-templates/categories').then((r) => r.json()),
+      fetch('/api/mockup-templates').then((r) => r.json()),
+    ])
+      .then(([cats, tpls]) => {
+        setCategories(cats);
+        setTemplates(tpls);
+        setLoaded(true);
+      })
+      .catch((err) => setError(err.message));
+  }, [jobId]);
+
+  function toggleCategory(category) {
+    setChecked((prev) => ({ ...prev, [category]: !prev[category] }));
+  }
+
+  const resolvedSizeKeys = useMemo(() => {
+    const checkedCategories = new Set(Object.keys(checked).filter((c) => checked[c]));
+    if (!checkedCategories.size) return [];
+    // Uncategorized templates (category: null) are deliberately excluded — they're only
+    // reachable via the direct-upload lane's unfiltered "run everything" behavior.
+    return templates.filter((t) => t.category && checkedCategories.has(t.category)).map((t) => t.size_key);
+  }, [checked, templates]);
+
+  async function handleGenerate() {
+    if (!jobId || !resolvedSizeKeys.length) return;
+    setRunning(true);
+    setStatus('Generating mockups…');
+    setError(null);
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ size_keys: resolvedSizeKeys }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to generate mockups');
+      setStatus(`Generated mockups for ${resolvedSizeKeys.length} template${resolvedSizeKeys.length === 1 ? '' : 's'}.`);
+      onGenerated?.();
+    } catch (err) {
+      setError(err.message);
+      setStatus('');
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  if (!loaded) return null;
+
+  return (
+    <div className="dark-panel mockup-category-selector">
+      <h4 style={{ marginTop: 0 }}>Choose mockup categories</h4>
+      {categories.length ? (
+        <>
+          <div className="mockup-category-checklist">
+            {categories.map((c) => (
+              <label key={c} className="settings-checkbox-row">
+                <input type="checkbox" checked={!!checked[c]} onChange={() => toggleCategory(c)} />
+                <span>{c}</span>
+              </label>
+            ))}
+          </div>
+          <button className="btn-primary" onClick={handleGenerate} disabled={running || !resolvedSizeKeys.length}>
+            {running ? 'Generating…' : 'Generate mockups for selected categories'}
+          </button>
+        </>
+      ) : (
+        <p className="empty-state" style={{ margin: 0 }}>
+          No mockup categories configured yet — tag templates with a category in Mockup Templates.
+        </p>
+      )}
+      {status && <p className="mono taste-status">{status}</p>}
+      {error && <p className="text-danger mt-1">{error}</p>}
+    </div>
+  );
+}
+
+/**
  * Loads and reviews a job's mockups. Takes a jobId as a prop rather than doing its own
  * job lookup/selection UI — Module 6 (the real dashboard, still a skeleton per
  * ARCHITECTURE.md) owns that; this component only covers the review step itself.
@@ -107,6 +210,7 @@ export default function JobMockupReview({ jobId }) {
 
   return (
     <div>
+      <MockupCategorySelector jobId={jobId} onGenerated={loadMockups} />
       <button onClick={loadMockups} disabled={!jobId || loading}>
         {loading ? 'Loading…' : 'Load mockups'}
       </button>
