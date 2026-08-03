@@ -32,6 +32,7 @@ import {
   listConfiguredTemplates,
   upsertConfiguredTemplate,
   deleteConfiguredTemplate,
+  listConfiguredCategories,
   getTemplatesDirSetting,
   PREVIEW_DIR as MOCKUP_TEMPLATE_PREVIEW_DIR,
 } from './lib/mockup-templates/index.js';
@@ -619,6 +620,16 @@ app.get('/api/mockup-templates/scan', async (req, res) => {
 app.get('/api/mockup-templates', async (req, res) => {
   const templates = await listConfiguredTemplates();
   res.json(templates);
+});
+
+// Distinct, non-null `category` values currently configured (plan.md -> "Mockup
+// categories" -> "New route"). Registered ahead of no other :param route on this prefix
+// conflicts with it -- /api/mockup-templates/scan is the only sibling literal segment,
+// and DELETE's :sizeKey param is a different HTTP method entirely. Backs both the
+// curated flow's category-selection checklist and MockupTemplates.jsx's category
+// `<datalist>` suggestions, so neither hardcodes a fixed taxonomy.
+app.get('/api/mockup-templates/categories', (req, res) => {
+  res.json(listConfiguredCategories());
 });
 
 // Body matches upsertConfiguredTemplate's shape; used both for creating a new entry and
