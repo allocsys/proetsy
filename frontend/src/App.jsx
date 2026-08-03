@@ -40,7 +40,6 @@ function App() {
   const [setupStatus, setSetupStatus] = useState(null);
   const [pipelineDefault, setPipelineDefault] = useState(null);
   const [overrides, setOverrides] = useState({});
-  const [productSizes, setProductSizes] = useState({});
   const [shopConventions, setShopConventions] = useState(null);
   const [settings, setSettings] = useState({});
   const [trends, setTrends] = useState([]);
@@ -134,7 +133,6 @@ function App() {
       })
       .catch(() => {});
 
-    fetch('/api/config/product-sizes').then((r) => r.json()).then(setProductSizes).catch(() => {});
     fetch('/api/config/shop-conventions').then((r) => r.json()).then(setShopConventions).catch(() => {});
     fetch('/api/settings').then((r) => r.json()).then(setSettings).catch(() => {});
     refreshSetupStatus();
@@ -144,8 +142,6 @@ function App() {
     refreshWatchStatus();
     refreshRateLimits();
   }, []);
-
-  const sizeKeys = useMemo(() => Object.keys(productSizes || {}), [productSizes]);
 
   // plan.md step 2: distinct categories already present in the tag library, offered as
   // suggestions (not a hard enum) in the category input next to the tag-paste textarea.
