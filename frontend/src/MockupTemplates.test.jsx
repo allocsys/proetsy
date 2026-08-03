@@ -154,8 +154,7 @@ describe('MockupTemplates — bulk assign', () => {
     await user.click(checkboxes[0]);
     await user.click(checkboxes[1]);
 
-    const user2 = user;
-    await user2.type(screen.getByPlaceholderText('e.g. bedroom, mug, nature'), 'mug');
+    await user.type(screen.getByPlaceholderText('e.g. bedroom, mug, nature'), 'mug');
 
     const postCalls = [];
     global.fetch = makeFetchQueue([
@@ -288,7 +287,6 @@ describe('MockupTemplates — configured templates', () => {
     render(<MockupTemplates />);
     await screen.findByText('8x10-portrait');
 
-    const categoryInputs = screen.getAllByPlaceholderText === undefined ? [] : [];
     const categoryInput = screen.getAllByDisplayValue('')[0];
     await user.type(categoryInput, 'bedroom');
     await user.click(screen.getByText('Save'));
