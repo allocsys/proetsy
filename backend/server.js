@@ -408,8 +408,14 @@ app.get('/api/jobs/:id', (req, res) => {
 // still the right tool for a targeted manual retry of just one module.
 app.post('/api/jobs/:id/run', async (req, res) => {
   const jobId = Number(req.params.id);
+  // Optional (plan.md -> "Mockup categories" -> backend changes): when provided,
+  // restricts the mockup-composer loop to just these size_keys instead of every
+  // configured size -- how the curated flow's category-selection step limits mockup
+  // generation to only the categories picked for a given artwork. Omitted, behavior is
+  // unchanged (every configured size, same as POST /api/jobs/run-batch still does).
+  const { size_keys } = req.body || {};
   try {
-    const { job, results } = await runPendingModulesForJob(jobId);
+    const { job, results } = await runPendingModulesForJob(jobId, { sizeKeys: size_keys });
     res.json({ job, results });
   } catch (err) {
     res.status(400).json({ error: err.message });
