@@ -174,6 +174,98 @@ describe('TasteFilter', () => {
   });
 });
 
+describe('TasteFilter — Step 2.9: collapsed Auto-sorted section for autoDecision candidates', () => {
+  const AUTO_KEEP = {
+    ...CANDIDATE,
+    imagePath: '/data/candidates/auto-keep.png',
+    autoDecision: 'keep',
+  };
+  const AUTO_DISCARD = {
+    ...CANDIDATE,
+    imagePath: '/data/candidates/auto-discard.png',
+    autoDecision: 'discard',
+  };
+  const NEEDS_REVIEW = {
+    ...CANDIDATE,
+    imagePath: '/data/candidates/needs-review.png',
+    autoDecision: null,
+  };
+
+  it('renders autoDecision candidates in a collapsed Auto-sorted section, not the main grid', async () => {
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ candidates: [NEEDS_REVIEW, AUTO_KEEP, AUTO_DISCARD] }),
+    });
+    const user = userEvent.setup();
+    render(<TasteFilter />);
+    const input = document.querySelector('input[type="file"]');
+    await user.upload(input, makeFile());
+
+    expect(await screen.findByText('Auto-sorted (2)')).toBeInTheDocument();
+    // Only the needs-review card's actions are visible before expanding.
+    expect(screen.getAllByText('Keep')).toHaveLength(1);
+  });
+
+  it('expands the Auto-sorted section on click, showing each card with its actions', async () => {
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ candidates: [NEEDS_REVIEW, AUTO_KEEP, AUTO_DISCARD] }),
+    });
+    const user = userEvent.setup();
+    render(<TasteFilter />);
+    const input = document.querySelector('input[type="file"]');
+    await user.upload(input, makeFile());
+    await screen.findByText('Auto-sorted (2)');
+
+    await user.click(screen.getByText('Auto-sorted (2)'));
+
+    // needs-review's card + both auto-sorted cards now all show Keep/Discard actions.
+    expect(screen.getAllByText('Keep')).toHaveLength(3);
+    expect(screen.getAllByText('Discard')).toHaveLength(3);
+  });
+
+  it('correcting an auto-sorted candidate calls the same /taste-filter/label route and removes the card', async () => {
+    fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ candidates: [AUTO_KEEP] }) });
+    const user = userEvent.setup();
+    render(<TasteFilter />);
+    const input = document.querySelector('input[type="file"]');
+    await user.upload(input, makeFile());
+    await screen.findByText('Auto-sorted (1)');
+
+    await user.click(screen.getByText('Auto-sorted (1)'));
+    await screen.findByText('Discard');
+
+    fetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+    await user.click(screen.getByText('Discard'));
+
+    expect(fetch).toHaveBeenLastCalledWith(
+      '/api/taste-filter/label',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          image_path: AUTO_KEEP.imagePath,
+          embedding: AUTO_KEEP.embedding,
+          label: 'discard',
+          category: AUTO_KEEP.category,
+          prompt_id: AUTO_KEEP.promptId,
+        }),
+      })
+    );
+    expect(screen.queryByText('Auto-sorted (1)')).not.toBeInTheDocument();
+  });
+
+  it('does not render an Auto-sorted section when no candidate has an autoDecision', async () => {
+    fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ candidates: [CANDIDATE] }) });
+    const user = userEvent.setup();
+    render(<TasteFilter />);
+    const input = document.querySelector('input[type="file"]');
+    await user.upload(input, makeFile());
+    await screen.findByText('Keep');
+
+    expect(screen.queryByText(/Auto-sorted/)).not.toBeInTheDocument();
+  });
+});
+
 describe('TasteFilter — watched-folder auto-import polling (Module 7 -> "Auto-import via watched folder", step 7)', () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
