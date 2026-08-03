@@ -556,6 +556,34 @@ function App() {
                 </p>
               )}
 
+              <h3>Auto-sort taste filter candidates</h3>
+              <p className="text-muted" style={{ marginTop: 0 }}>
+                When enabled, sufficiently confident, sufficiently extreme taste-filter
+                scores are auto-sorted into keep/discard without a manual click. Everything
+                else still requires manual review. Off by default.
+              </p>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0.5rem 0' }}>
+                <input
+                  type="checkbox"
+                  checked={settings.taste_filter_auto_enabled === 'true'}
+                  onChange={(e) => {
+                    const enabled = e.target.checked;
+                    setSettings((s) => ({ ...s, taste_filter_auto_enabled: String(enabled) }));
+                    saveSettings({ taste_filter_auto_enabled: enabled });
+                  }}
+                />
+                Auto-compute taste threshold
+              </label>
+              <label style={{ display: 'block', margin: '0.5rem 0' }}>
+                Auto threshold (absolute score cutoff):{' '}
+                <input
+                  value={settings.taste_filter_auto_threshold ?? ''}
+                  onChange={(e) => setSettings((s) => ({ ...s, taste_filter_auto_threshold: e.target.value }))}
+                  onBlur={(e) => saveSettings({ taste_filter_auto_threshold: e.target.value })}
+                  placeholder="0.3"
+                />
+              </label>
+
               <h3>LLM rate-limit status</h3>
               <p className="text-muted" style={{ marginTop: 0 }}>
                 Which Gemini key × model pairs are currently in cooldown (see ARCHITECTURE.md, LLM Provider Layer). Read-only — key index only, never the actual API key.
