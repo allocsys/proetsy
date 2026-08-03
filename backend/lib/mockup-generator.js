@@ -14,7 +14,7 @@ import {
   DEFAULT_PLACEMENT_LAYER,
   detectTemplateKind,
   findPlacementLayer,
-  flattenPaintOrder,
+  renderPsdLayers,
   resolvePlacementBounds,
 } from './psd-template.js';
 
@@ -305,51 +305,24 @@ async function composeMockupPsd(artwork, templatePath, sizeEntry, sizeKey) {
   const warnings = [];
   const { smartCrop, aiExtended } = await resolveArtworkVariants(artwork, bounds.width, bounds.height, mismatch, sizeKey, warnings);
 
-  const canvas = paintPsdCanvas(psd, placementLayer, bounds, jimpToPureimageBitmap(smartCrop));
+  // Layer-flattening itself now lives in psd-template.js's renderPsdLayers() (shared with
+  // the mockup-templates module's template-preview generation, see plan.md -> "New
+  // module" -> generateTemplatePreview) -- this call substitutes the artwork bitmap in
+  // for the placement layer, same as the former local paintPsdCanvas did.
+  const canvas = renderPsdLayers(psd, {
+    substituteLayer: placementLayer,
+    substituteBitmap: jimpToPureimageBitmap(smartCrop),
+    substituteBounds: bounds,
+  });
   const canvasAiExtended = aiExtended
-    ? paintPsdCanvas(psd, placementLayer, bounds, jimpToPureimageBitmap(aiExtended))
+    ? renderPsdLayers(psd, {
+        substituteLayer: placementLayer,
+        substituteBitmap: jimpToPureimageBitmap(aiExtended),
+        substituteBounds: bounds,
+      })
     : null;
 
   return { canvas, canvasAiExtended, warnings };
-}
-
-/**
- * Renders every visible PSD layer, in stacking order, onto a fresh canvas the size of the
- * full document, substituting `artworkBitmap` in for the placement layer's own pixel data
- * — the actual compositing step shared by both composeMockupPsd variants (smart-crop and
- * AI-extended). Split out of composeMockupPsd in outpainting sub-step 6 so it can be
- * called once per variant instead of duplicating the paint loop inline.
- *
- * @param {object} psd - parsed PSD document (from ag-psd's readPsd)
- * @param {object} placementLayer - the PSD layer node being substituted
- * @param {{ left: number, top: number, width: number, height: number }} bounds - placementLayer's resolved bounds
- * @param {import('pureimage').Bitmap} artworkBitmap - artwork already sized to (bounds.width, bounds.height)
- * @returns {import('pureimage').Bitmap}
- */
-function paintPsdCanvas(psd, placementLayer, bounds, artworkBitmap) {
-  const outputCanvas = pureimage.make(psd.width, psd.height);
-  const outputCtx = outputCanvas.getContext('2d');
-
-  // Paint in stacking order (bottom-most first) so later layers correctly cover earlier
-  // ones — see flattenPaintOrder's doc comment for the array-order convention.
-  for (const layer of flattenPaintOrder(psd.children)) {
-    const left = layer.left ?? 0;
-    const top = layer.top ?? 0;
-    outputCtx.globalAlpha = layer.opacity ?? 1;
-
-    if (layer === placementLayer) {
-      // Substitute the artwork bitmap for this layer's own pixel data, positioned at the
-      // *original* placement layer's bounds — this is the actual placement step.
-      outputCtx.drawImage(artworkBitmap, 0, 0, bounds.width, bounds.height, bounds.left, bounds.top, bounds.width, bounds.height);
-    } else {
-      const layerWidth = (layer.right ?? 0) - (layer.left ?? 0);
-      const layerHeight = (layer.bottom ?? 0) - (layer.top ?? 0);
-      outputCtx.drawImage(layer.canvas, 0, 0, layerWidth, layerHeight, left, top, layerWidth, layerHeight);
-    }
-  }
-  outputCtx.globalAlpha = 1;
-
-  return outputCanvas;
 }
 
 function writePureimagePng(canvas, outputPath) {
