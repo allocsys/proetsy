@@ -118,7 +118,7 @@ export default function PromptHelper() {
       </h2>
       <div className="settings-field-row mb-3">
         <div className="settings-field flex-1">
-          <label className="settings-field-label" htmlFor="prompt-category-select">Category</label>
+          <label className="settings-field-label" htmlFor="prompt-category-select">Category:</label>
           <select 
             className="glass-input" 
             id="prompt-category-select" 
