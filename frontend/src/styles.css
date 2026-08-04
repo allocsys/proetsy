@@ -153,6 +153,7 @@ textarea:focus-visible {
   top: 0;
   z-index: 100;
   height: 56px;
+  box-shadow: var(--shadow-sm);
 }
 
 .wordmark-container {
@@ -219,7 +220,7 @@ textarea:focus-visible {
 }
 
 .sidebar {
-  width: 232px;
+  width: 240px;
   flex-shrink: 0;
   background-color: var(--surface);
   border-right: 1px solid var(--hairline);
@@ -230,6 +231,7 @@ textarea:focus-visible {
   position: sticky;
   top: 56px;
   height: calc(100vh - 56px);
+  box-shadow: inset -1px 0 0 var(--hairline);
 }
 
 .sidebar-group-title {
@@ -245,10 +247,12 @@ textarea:focus-visible {
 }
 
 .sidebar-nav-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   width: 100%;
   text-align: left;
-  padding: 0.55rem var(--space-3);
+  padding: 0.6rem var(--space-3);
   color: var(--ink-soft);
   background: transparent;
   text-decoration: none;
@@ -270,6 +274,20 @@ textarea:focus-visible {
   color: var(--ink);
   background-color: rgba(255, 77, 130, 0.12);
   border-color: rgba(255, 77, 130, 0.35);
+}
+
+.nav-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  opacity: 0.65;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-nav-item:hover .nav-icon,
+.sidebar-nav-item.active .nav-icon {
+  opacity: 1;
+  color: var(--accent);
 }
 
 .sidebar-spacer {
@@ -337,7 +355,7 @@ textarea:focus-visible {
 .content-pane {
   flex: 1;
   padding: var(--space-6);
-  max-width: 920px;
+  max-width: 960px;
   margin: 0 auto;
   min-width: 0;
   width: 100%;
@@ -355,8 +373,10 @@ textarea:focus-visible {
 }
 
 .mobile-nav-item {
-  display: inline-block;
-  padding: 0.4rem var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.45rem var(--space-3);
   background: transparent;
   border: 1px solid var(--hairline);
   color: var(--ink-soft);
@@ -402,16 +422,13 @@ textarea:focus-visible {
 }
 
 /* ============ SURFACES ============ */
-/* .paper-card / .dark-panel now share one unified dark surface family via the
-   variable aliases above — kept as two class names only so existing markup
-   doesn't need renaming, not because they diverge visually anymore. */
 .paper-card {
   background-color: var(--paper);
   color: var(--ink);
   border: 1px solid var(--hairline-paper);
   border-radius: var(--radius-lg);
-  padding: var(--space-5);
-  margin-bottom: var(--space-5);
+  padding: var(--space-6);
+  margin-bottom: var(--space-6);
   box-shadow: var(--shadow-sm);
 }
 
@@ -847,10 +864,7 @@ input:focus, select:focus, textarea:focus {
   letter-spacing: 0.05em;
 }
 
-/* Mockup Template Manager (plan.md Rollout step 4) — reuses .taste-grid/.taste-card's
-   card-grid shape (same convention TasteFilter.jsx already established), new class
-   names only where the content genuinely differs (a thumbnail + select checkbox +
-   inline-editable fields, vs. a scored candidate + keep/discard actions). */
+/* Mockup Template Manager (plan.md Rollout step 4) */
 .mockup-template-card {
   gap: var(--space-2);
 }
