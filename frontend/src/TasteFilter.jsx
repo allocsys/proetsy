@@ -150,12 +150,16 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
   return (
     <div className="module-panel">
       <div className="control-row">
+        <label htmlFor="taste-category-input" className="sr-only">Category</label>
         <input
+          id="taste-category-input"
           value={category}
           onChange={(e) => setCategory(e.target.value)}
           placeholder="e.g. square-canvas"
         />
+        <label htmlFor="taste-prompt-id-input" className="sr-only">Prompt ID</label>
         <input
+          id="taste-prompt-id-input"
           value={promptId}
           onChange={(e) => setPromptId(e.target.value)}
           placeholder="links to Module 4"
@@ -169,7 +173,7 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
         onDrop={(e) => { e.preventDefault(); handleImport(e.dataTransfer.files); }}
       >
         <p className="dropzone-title">Drag and drop a batch of candidate images here</p>
-        <input type="file" multiple accept="image/*" onChange={(e) => handleImport(e.target.files)} />
+        <input type="file" multiple accept="image/*" aria-label="Upload candidate images" onChange={(e) => handleImport(e.target.files)} />
       </div>
       {status && <p className="text-muted mono-sm mb-2">{status}</p>}
 
