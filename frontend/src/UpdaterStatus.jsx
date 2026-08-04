@@ -59,20 +59,20 @@ function UpdaterStatus() {
   }
 
   if (phase === 'checking') {
-    return <span className="text-muted mono-sm">Checking…</span>;
+    return <span className="text-muted mono-sm">Checking for updates…</span>;
   }
 
   if (phase === 'available') {
     return (
       <div className="flex-row items-center" style={{ gap: '0.5rem' }}>
         <span className="status-pill pending">Update {version ? `v${version}` : ''} available</span>
-        <button className="btn-primary btn-sm" onClick={handleDownload}>Download</button>
+        <button className="btn-primary btn-sm" onClick={handleDownload}>Download update</button>
       </div>
     );
   }
 
   if (phase === 'downloading') {
-    return <span className="text-muted mono-sm">Downloading… {percent}%</span>;
+    return <span className="text-muted mono-sm">Downloading update… {percent}%</span>;
   }
 
   if (phase === 'downloaded') {
@@ -88,7 +88,7 @@ function UpdaterStatus() {
     return (
       <div className="flex-row items-center" style={{ gap: '0.5rem' }}>
         <span className="status-pill success">Up to date</span>
-        <button className="btn-ghost btn-sm" onClick={handleCheck}>Re-check</button>
+        <button className="btn-ghost btn-sm" onClick={handleCheck}>Check again</button>
       </div>
     );
   }
