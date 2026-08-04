@@ -27,9 +27,9 @@ function pipelineEnabledSettingKey(moduleName) {
 /**
  * One-time migration: for each module in pipeline.config.json, if its
  * `pipeline_module_<name>_enabled` settings key doesn't exist yet, seed it from the
- * JSON file's `enabled` value. Meant to be called once on backend startup (server.js,
- * alongside migrateProductSizesSeed()) so an existing hand-edited pipeline.config.json
- * doesn't lose its configured toggles when upgrading to the dashboard-editable flow.
+ * JSON file's `enabled` value. Meant to be called once on backend startup (server.js)
+ * so an existing hand-edited pipeline.config.json doesn't lose its configured toggles
+ * when upgrading to the dashboard-editable flow.
  *
  * Safe to call on every startup -- only inserts a settings row the first time each
  * module is seen (ON CONFLICT DO NOTHING), so a restart never overwrites a
