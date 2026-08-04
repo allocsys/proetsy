@@ -1,8 +1,8 @@
 // Dashboard-editable API key store (plan.md -> "Editable Settings & API Keys from
-// Dashboard"). Source of truth is the `api_keys` DB table; backend/.env's
-// GEMINI_API_KEYS / CLAUDE_API_KEY are only used as a fallback when this table has no
-// enabled rows for a given provider, so an existing local-dev .env setup keeps working
-// unchanged until someone adds a key via the dashboard.
+// Dashboard"). Source of truth is the `api_keys` DB table -- this is the ONLY source;
+// per plan.md Rollout step 5, the earlier .env fallback (GEMINI_API_KEYS / CLAUDE_API_KEY)
+// has been removed now that the DB-backed path is confirmed working. `.env` is no longer
+// read here at all -- add/manage keys from the dashboard Settings panel instead.
 //
 // Full key values are only ever read here and inside the provider modules that actually
 // call the LLM APIs (gemini.js / claude.js) -- every other caller (routes, the frontend)
@@ -10,20 +10,10 @@
 
 import { getDb } from '../../db/init.js';
 
-const ENV_KEYS_BY_PROVIDER = {
-  gemini: () =>
-    (process.env.GEMINI_API_KEYS || '')
-      .split(',')
-      .map((k) => k.trim())
-      .filter(Boolean),
-  claude: () => (process.env.CLAUDE_API_KEY ? [process.env.CLAUDE_API_KEY.trim()] : []),
-};
-
 /**
  * Returns the ordered list of enabled key values for a provider ('gemini' | 'claude'),
- * DB rows first (oldest first, so an existing key pool's rotation order doesn't shuffle
- * every time a new key is added), falling back to the corresponding .env variable(s)
- * only when the DB has zero enabled rows for that provider.
+ * DB rows only, oldest first (so an existing key pool's rotation order doesn't shuffle
+ * every time a new key is added). No .env fallback -- see the module comment above.
  *
  * @returns {string[]}
  */
@@ -32,10 +22,7 @@ export function getKeysForProvider(provider) {
   const rows = db
     .prepare('SELECT key_value FROM api_keys WHERE provider = ? AND enabled = 1 ORDER BY id')
     .all(provider);
-  if (rows.length) return rows.map((r) => r.key_value);
-
-  const envFn = ENV_KEYS_BY_PROVIDER[provider];
-  return envFn ? envFn() : [];
+  return rows.map((r) => r.key_value);
 }
 
 // Last 4 chars visible, everything else replaced -- enough for a user to tell keys
