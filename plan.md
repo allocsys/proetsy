@@ -25,7 +25,7 @@ review and revert independently.
 - [x] **4. JobMockupReview.jsx**
   - Apply glass classes to mockup review cards/panels
 
-- [ ] **5. MockupTemplates.jsx**
+- [x] **5. MockupTemplates.jsx**
   - Apply glass classes to template list/grid and detail panels
 
 - [ ] **6. PromptHelper.jsx**
