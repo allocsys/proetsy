@@ -140,7 +140,7 @@ All four test files verified passing locally on this branch: 21 backend tests
 Confirm whether the dashboard has (or needs) an auth layer before exposing API key
 management — this changes the security posture of step 3 above.
 
-**Still unresolved as of this status update.** Proceeding with routes now on the
-assumption the dashboard is single-user/local (consistent with the rest of the app —
-no auth middleware exists anywhere in `backend/server.js` today), but this should be
-revisited before any multi-user or hosted deployment.
+**Resolved (2026-08-04): no auth layer needed.** Decided the dashboard stays
+single-user/local, consistent with the rest of the app (no auth middleware exists
+anywhere in `backend/server.js` today, and none is being added). This plan is now fully
+closed out — every implementation step, test, and open question is done.
