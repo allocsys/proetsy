@@ -139,11 +139,13 @@ export default function PromptHelper() {
       <div className="control-row" style={{ marginTop: '1rem' }}>
         <input
           placeholder="Add a new trend"
+          aria-label="Add a new trend"
           value={newTrendTerm}
           onChange={(e) => setNewTrendTerm(e.target.value)}
         />
         <input
           placeholder="Category"
+          aria-label="Trend category"
           value={newTrendCategory}
           onChange={(e) => setNewTrendCategory(e.target.value)}
         />
