@@ -184,7 +184,3 @@ export function getProductSizes() {
   }
   return result;
 }
-
-export function getTrendsSeed() {
-  return loadJsonConfig('trends.json');
-}
