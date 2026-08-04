@@ -83,27 +83,33 @@ export function invalidatePipelineConfigCache() {
  * `enabled`.
  */
 export function getPipelineConfig() {
-  if (pipelineConfigCache) return pipelineConfigCache;
+  if (!pipelineConfigCache) {
+    const jsonConfig = loadPipelineConfigJsonSeed();
+    const db = getDb();
+    const modules = jsonConfig?.pipeline || [];
+    const rows = db
+      .prepare(
+        `SELECT key, value FROM settings WHERE key IN (${modules.map(() => '?').join(',') || "''"})`
+      )
+      .all(...modules.map((m) => pipelineEnabledSettingKey(m.module)));
+    const overrides = Object.fromEntries(rows.map((r) => [r.key, r.value]));
 
-  const jsonConfig = loadPipelineConfigJsonSeed();
-  const db = getDb();
-  const modules = jsonConfig?.pipeline || [];
-  const rows = db
-    .prepare(
-      `SELECT key, value FROM settings WHERE key IN (${modules.map(() => '?').join(',') || "''"})`
-    )
-    .all(...modules.map((m) => pipelineEnabledSettingKey(m.module)));
-  const overrides = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+    pipelineConfigCache = {
+      ...jsonConfig,
+      pipeline: modules.map((entry) => {
+        const key = pipelineEnabledSettingKey(entry.module);
+        const enabled = key in overrides ? overrides[key] === 'true' : Boolean(entry.enabled);
+        return { ...entry, enabled };
+      }),
+    };
+  }
 
-  pipelineConfigCache = {
-    ...jsonConfig,
-    pipeline: modules.map((entry) => {
-      const key = pipelineEnabledSettingKey(entry.module);
-      const enabled = key in overrides ? overrides[key] === 'true' : Boolean(entry.enabled);
-      return { ...entry, enabled };
-    }),
-  };
-  return pipelineConfigCache;
+  // Fresh shallow copy on every call, even when served from cache -- preserves the
+  // pre-caching contract (existing test: "returns a fresh object each call, no
+  // shared-reference mutation risk") so a caller mutating what it got back (e.g.
+  // pushing into `.pipeline`) can't corrupt the cache for the next caller. The DB
+  // round-trip above is still skipped on a cache hit, which is the actual point.
+  return { ...pipelineConfigCache, pipeline: pipelineConfigCache.pipeline.map((entry) => ({ ...entry })) };
 }
 
 /**
