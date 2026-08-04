@@ -111,7 +111,7 @@ export default function JobArtworkAnalysisReview({ jobId }) {
           {loading ? 'Loading…' : 'Load analysis'}
         </button>
         <button className="btn-secondary" onClick={runAnalysis} disabled={!jobId || running}>
-          {running ? 'Analyzing AI…' : '✦ Run image analyzer'}
+          {running ? 'Running...' : 'Run image analyzer'}
         </button>
       </div>
 
@@ -126,7 +126,7 @@ export default function JobArtworkAnalysisReview({ jobId }) {
           <AnalysisSummary analysis={analysis} />
         </div>
       ) : (
-        job && <p className="text-muted my-3 empty-state">No AI analysis yet for this artwork — run it above, or use manual notes below.</p>
+        job && <p className="text-muted my-3 empty-state">No analysis yet for this artwork</p>
       )}
 
       {job && (
