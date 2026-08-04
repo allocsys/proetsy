@@ -431,7 +431,7 @@ function App() {
 
   return (
     <div className="app-shell">
-      <header className="app-titlebar">
+      <header className="app-titlebar glass-nav">
         <div className="wordmark-container">
           <div className="wordmark-crop">
             <h1 className="wordmark">ProEtsy</h1>
@@ -455,7 +455,7 @@ function App() {
         </div>
       </header>
 
-      <div className="mobile-nav-strip">
+      <div className="mobile-nav-strip glass-nav">
         {NAV_ITEMS.map((item) => (
           <button
             key={item.id}
@@ -469,7 +469,7 @@ function App() {
       </div>
 
       <div className="app-body">
-        <nav className="sidebar">
+        <nav className="sidebar glass-sidebar">
           {navGroups.map((group) => (
             <div key={group}>
               <div className="sidebar-group-title">{group}</div>
@@ -537,14 +537,14 @@ function App() {
             <div>
               <h2 style={{ marginTop: 0, marginBottom: '1.5rem' }}>Shop Settings & Tag Library</h2>
 
-              <div className="settings-section-card">
+              <div className="settings-section-card glass-card">
                 <h3 className="settings-section-title">Tags & Trends</h3>
 
                 <div className="settings-subsection">
                   <h4 className="settings-sub-heading">Tag library</h4>
                   <textarea
                     rows={5}
-                    className="mono"
+                    className="mono glass-input"
                     style={{ width: '100%', marginBottom: '0.75rem' }}
                     value={tagsText}
                     onChange={(e) => setTagsText(e.target.value)}
@@ -614,7 +614,7 @@ function App() {
                 </div>
               </div>
 
-              <div className="settings-section-card">
+              <div className="settings-section-card glass-card">
                 <h3 className="settings-section-title">Shop Defaults & Conventions</h3>
 
                 <div className="settings-subsection">
@@ -662,7 +662,7 @@ function App() {
 
               </div>
 
-              <div className="settings-section-card">
+              <div className="settings-section-card glass-card">
                 <h3 className="settings-section-title">API Keys</h3>
 
                 <div className="settings-subsection">
@@ -734,7 +734,7 @@ function App() {
                 </div>
               </div>
 
-              <div className="settings-section-card">
+              <div className="settings-section-card glass-card">
                 <h3 className="settings-section-title">Pipeline Modules</h3>
 
                 <div className="settings-subsection" style={{ marginBottom: 0 }}>
@@ -762,7 +762,7 @@ function App() {
                 </div>
               </div>
 
-              <div className="settings-section-card">
+              <div className="settings-section-card glass-card">
                 <h3 className="settings-section-title">Automation & Diagnostics</h3>
 
                 <div className="settings-subsection">
@@ -873,7 +873,7 @@ function App() {
           )}
 
           {activeView === 'upload' && (
-            <section className="paper-card">
+            <section className="paper-card glass-card">
               <h2 style={{ marginTop: 0 }}>Upload & Curation Pipeline</h2>
 
               <div className="upload-lane">
@@ -920,7 +920,7 @@ function App() {
           )}
 
           {activeView === 'history' && (
-            <section className="paper-card">
+            <section className="paper-card glass-card">
               <h2 style={{ marginTop: 0 }}>Listing History</h2>
               {jobs.length === 0 ? (
                 <p className="empty-state">No jobs yet — drop some artwork on the Upload view to get started.</p>
@@ -1009,7 +1009,7 @@ function App() {
           )}
 
           {activeView === 'review' && (
-            <section className="paper-card">
+            <section className="paper-card glass-card">
               <h2 style={{ marginTop: 0 }}>Review a Specific Job</h2>
               <div className="flex-row mb-2">
                 <input
@@ -1026,15 +1026,15 @@ function App() {
               {activeJobId ? (
                 <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                   <div>
-                    <h3 style={{ borderBottom: '1px solid var(--hairline-paper)', paddingBottom: '0.4rem' }}>Image Analysis</h3>
+                    <h3 style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.4rem' }}>Image Analysis</h3>
                     <JobArtworkAnalysisReview jobId={activeJobId} />
                   </div>
                   <div>
-                    <h3 style={{ borderBottom: '1px solid var(--hairline-paper)', paddingBottom: '0.4rem' }}>Listings</h3>
+                    <h3 style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.4rem' }}>Listings</h3>
                     <JobListingReview jobId={activeJobId} />
                   </div>
                   <div>
-                    <h3 style={{ borderBottom: '1px solid var(--hairline-paper)', paddingBottom: '0.4rem' }}>Mockups</h3>
+                    <h3 style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.4rem' }}>Mockups</h3>
                     <JobMockupReview jobId={activeJobId} />
                   </div>
                 </div>
@@ -1045,14 +1045,14 @@ function App() {
           )}
 
           {activeView === 'prompt-helper' && (
-            <section className="paper-card">
+            <section className="paper-card glass-card">
               <h2 style={{ marginTop: 0 }}>Trend / Prompt Helper</h2>
               <PromptHelper />
             </section>
           )}
 
           {activeView === 'mockup-templates' && (
-            <section className="paper-card">
+            <section className="paper-card glass-card">
               <MockupTemplates />
             </section>
           )}
