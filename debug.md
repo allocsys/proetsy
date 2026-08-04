@@ -1,3 +1,60 @@
+# Debug log — Logic/flow bugs found in product_sizes DB migration review (2026-08-04)
+
+Review scope: `remove-product-sizes-json-seed` branch (merged into `main`
+2026-08-04) and related backend config/provider code. Found via manual review +
+delegated multi-file investigation, not yet fixed.
+
+## 1. `backend/config/index.js` — `getProductSizes()` has no validation
+
+**Problem:** Reads raw rows from the `product_sizes` table and returns them
+unvalidated. That table is now dashboard-editable (no longer a static JSON seed),
+so a bad edit — empty `dimensions`, missing/zero `dpi` — flows straight through to
+`mockup-generator.js` with no guardrail.
+
+**Fix direction:** Add a schema check (e.g. Zod/Joi, or hand-rolled) in
+`getProductSizes()` before returning `result`, rejecting or logging rows missing
+required fields.
+
+## 2. `backend/server.js` — `PATCH /api/jobs/:id/listings/:listingId` race condition
+
+**Problem:** The route does a `SELECT`, merges the partial request body in JS, runs
+it through `enforceConventions()`, then issues a separate `UPDATE`. The
+select+merge+update isn't atomic, so two concurrent PATCHes on the same listing can
+overwrite each other (lost-update anomaly).
+
+**Fix direction:** Wrap the read-merge-write in `db.transaction(() => { ... })` so
+the whole operation is atomic.
+
+## 3. `backend/server.js` — `/api/setup-status` uses row *count* as "configured" proxy
+
+**Problem:** `hasProductSize` is computed as `COUNT(*) FROM product_sizes > 0`. Any
+row — including an invalid or placeholder one — makes the dashboard report "ready to
+run" even when nothing usable is configured.
+
+**Fix direction:** Check for at least one row with required fields populated
+(`dimensions`, `mockup_template_path` not null) instead of a bare count.
+
+## 4. `backend/config/index.js` — `getPipelineConfig()` re-queries on every call
+
+**Problem:** Every call does a fresh `SELECT ... FROM settings` and re-joins against
+the JSON seed. Not wrong, but a needless DB round-trip on a function likely called
+frequently.
+
+**Fix direction:** Memoize the result, invalidating the cache only when
+`PATCH /api/settings` updates a pipeline-related key.
+
+## 5. `backend/lib/llm/claude.js` — `generateImage` stub throws instead of not existing
+
+**Problem:** `generateImage` is exported purely to throw "no image-generation
+fallback." If any caller mis-routes an image request to the Claude provider, it's a
+hard 500 instead of being filtered out earlier by capability checks.
+
+**Fix direction:** Remove `generateImage` from `claude.js` entirely; have the
+calling code in `llm/index.js` check provider capabilities before routing, instead
+of relying on a defensive stub per-provider.
+
+---
+
 # Debug log — Windows install: installer prompts for C:\ dir, then clicking the app does nothing but spawns background processes
 
 Reported symptom: on Windows, the NSIS installer prompts to choose an install
