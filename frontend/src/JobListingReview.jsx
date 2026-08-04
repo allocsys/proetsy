@@ -119,10 +119,10 @@ function ListingCard({ listing, onSaved }) {
 
       <div className="flex-row">
         <button className="btn-primary" onClick={save} disabled={saving}>
-          {saving ? 'Saving changes…' : 'Save listing'}
+          {saving ? 'Saving changes…' : 'Save'}
         </button>
         <button className="btn-secondary" data-testid="copy-for-etsy" onClick={copyForEtsy}>
-          {copied ? '✓ Copied to clipboard' : '📋 Copy for Etsy'}
+          {copied ? 'Copied!' : 'Copy for Etsy'}
         </button>
       </div>
 
@@ -170,7 +170,7 @@ export default function JobListingReview({ jobId }) {
     <div>
       <div className="mb-4">
         <button className="btn-primary" onClick={loadListings} disabled={!jobId || loading}>
-          {loading ? 'Loading listings…' : 'Load generated listings'}
+          {loading ? 'Loading listings…' : 'Load listings'}
         </button>
       </div>
       {error && <p className="text-danger mb-3">{error}</p>}
@@ -178,7 +178,7 @@ export default function JobListingReview({ jobId }) {
         <ListingCard key={l.id} listing={l} onSaved={handleSaved} />
       ))}
       {listings.length === 0 && !loading && !error && (
-        <p className="empty-state">No listings generated or loaded yet for this job.</p>
+        <p className="empty-state">No listings loaded yet.</p>
       )}
     </div>
   );
