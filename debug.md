@@ -7,19 +7,18 @@ delegated multi-file investigation.
 Sequenced in the order to fix them — each step is picked so it doesn't get
 re-touched or invalidated by a later step.
 
-## Step 1 — `backend/server.js`: `PATCH /api/jobs/:id/listings/:listingId` race condition
+## Step 1 — ✅ DONE (commit 684c4df) — `backend/server.js`: `PATCH /api/jobs/:id/listings/:listingId`
 
-**Why first:** the only one of these that can actually lose user data right now
-(concurrent requests overwriting each other). Highest severity, fix before anything
-else.
+**Correction after reading the actual code:** this was flagged as a race condition,
+but the handler is fully synchronous — no `await` between the `SELECT` and the
+`UPDATE` — so on Node's single-threaded event loop, nothing can interleave in that
+gap on today's single-process server. Not an active bug as written.
 
-**Problem:** The route does a `SELECT`, merges the partial request body in JS, runs
-it through `enforceConventions()`, then issues a separate `UPDATE`. Not atomic —
-two concurrent PATCHes on the same listing can overwrite each other (lost-update
-anomaly).
-
-**Fix direction:** Wrap the read-merge-write in `db.transaction(() => { ... })` so
-the whole operation is atomic.
+**What was done anyway:** wrapped the read-merge-write in
+`db.transaction(() => { ... })`. This is future-proofing, not a fix for a live bug —
+it guarantees atomicity stays true even if async work (e.g. an `await`) is later
+added to the merge/validation step, which would otherwise silently reopen the
+interleaving window without anyone noticing.
 
 ## Step 2 — `backend/server.js`: `/api/setup-status` uses row *count* as "configured" proxy
 
