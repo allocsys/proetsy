@@ -191,7 +191,12 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: release-builds/*.exe
+          # latest.yml is the update-feed manifest electron-updater's GitHub provider
+          # polls to detect new versions -- it must be attached alongside the
+          # installer or auto-update silently never finds anything newer.
+          files: |
+            release-builds/*.exe
+            release-builds/latest.yml
           generate_release_notes: true
           body: |
             Windows installer for ${{ github.ref_name }}. Run the installer, then launch
