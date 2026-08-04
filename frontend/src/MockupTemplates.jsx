@@ -385,7 +385,7 @@ function MockupTemplates() {
                   <div className="settings-field" style={{ marginTop: '0.5rem' }}>
                     <span className="settings-field-label">Placement layer</span>
                     <input
-                      className="glassmorphism-input glass-input"
+                      className="glass-input"
                       value={getConfiguredValue(row, 'placement_layer')}
                       onChange={(e) => updateConfiguredEdit(row.size_key, 'placement_layer', e.target.value)}
                     />
