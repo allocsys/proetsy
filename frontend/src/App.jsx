@@ -104,6 +104,7 @@ function App() {
   const [jobIdInput, setJobIdInput] = useState('');
   const [activeJobId, setActiveJobId] = useState(null);
   const [activeView, setActiveView] = useState('upload');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
 
   function goTo(view) {
     setActiveView(view);
@@ -469,7 +470,17 @@ function App() {
       </div>
 
       <div className="app-body">
-        <nav className="sidebar glass-sidebar">
+        <nav className={`sidebar glass-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
+          <div className="sidebar-toggle-row">
+            <button
+              className="sidebar-toggle-btn"
+              onClick={() => setSidebarCollapsed((c) => !c)}
+              aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {sidebarCollapsed ? '»' : '«'}
+            </button>
+          </div>
           {navGroups.map((group) => (
             <div key={group}>
               <div className="sidebar-group-title">{group}</div>
@@ -478,6 +489,7 @@ function App() {
                   key={item.id}
                   className={`sidebar-nav-item ${activeView === item.id ? 'active' : ''}`}
                   onClick={() => goTo(item.id)}
+                  title={item.label}
                 >
                   <NavIcon name={item.icon} />
                   <span>{item.label}</span>
