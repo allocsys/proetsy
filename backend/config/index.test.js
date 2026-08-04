@@ -12,6 +12,7 @@ let getPipelineConfig;
 let getProductSizes;
 let getTrendsSeed;
 let migrateProductSizesSeed;
+let migratePipelineConfigSeed;
 let getDb;
 let tmpRoot;
 
@@ -20,7 +21,9 @@ beforeAll(async () => {
   process.env.DB_PATH = path.join(tmpRoot, 'test.db');
 
   ({ getDb } = await import('../db/init.js'));
-  ({ getPipelineConfig, getProductSizes, getTrendsSeed, migrateProductSizesSeed } = await import('./index.js'));
+  ({ getPipelineConfig, getProductSizes, getTrendsSeed, migrateProductSizesSeed, migratePipelineConfigSeed } = await import(
+    './index.js'
+  ));
 });
 
 afterAll(() => {
