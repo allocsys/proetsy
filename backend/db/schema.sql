@@ -163,6 +163,22 @@ CREATE TABLE IF NOT EXISTS prompt_terms (
   updated_at TEXT DEFAULT (datetime('now'))
 );
 
+-- Dashboard-editable API keys (plan.md -> "Editable Settings & API Keys from Dashboard").
+-- Source of truth for LLM provider keys going forward; backend/.env's GEMINI_API_KEYS /
+-- CLAUDE_API_KEY remain a fallback for local dev only (used when this table has no
+-- enabled rows for that provider -- see lib/llm/key-store.js). Full key values are
+-- stored here (required to actually call the provider APIs) -- never returned from the
+-- API un-masked, see GET /api/settings/api-keys.
+CREATE TABLE IF NOT EXISTS api_keys (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  provider TEXT NOT NULL,
+  key_value TEXT NOT NULL,
+  label TEXT,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_api_keys_provider ON api_keys(provider);
+
 -- Durable backing store for the LLM provider layer's in-process cooldown cache. See
 -- ARCHITECTURE.md -> LLM Provider Layer -> "Rate-limit cooldown tracking" / "Cooldown
 -- escalation instead". Rows are keyed by a key's positional index in GEMINI_API_KEYS
