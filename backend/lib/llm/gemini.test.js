@@ -3,13 +3,16 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-// gemini.js reads GEMINI_API_KEYS / GEMINI_MODELS / GEMINI_IMAGE_MODEL as module-level
-// constants at import time, and keeps keyStartIndex as module-level state — so each test
-// gets its own fresh module via vi.resetModules() + dynamic import, same pattern as
-// queue.test.js/rate-limits.test.js. rate-limits.js and queue.js are mocked out entirely:
-// this suite is about the cascade/loop-order/error-shape logic in gemini.js itself, not
-// the real cooldown persistence (rate-limits.test.js) or pacing (queue.test.js) behavior,
-// which already have their own dedicated suites.
+// gemini.js reads GEMINI_MODELS / GEMINI_IMAGE_MODEL as module-level constants at import
+// time, and keeps keyStartIndex as module-level state — so each test gets its own fresh
+// module via vi.resetModules() + dynamic import, same pattern as
+// queue.test.js/rate-limits.test.js. rate-limits.js, queue.js, and key-store.js are all
+// mocked out entirely: this suite is about the cascade/loop-order/error-shape logic in
+// gemini.js itself, not the real cooldown persistence (rate-limits.test.js), pacing
+// (queue.test.js), or DB-backed key storage (key-store.test.js) behavior, which already
+// have their own dedicated suites. key-store.js is mocked (rather than relying on
+// GEMINI_API_KEYS) since key-store.js no longer has any .env fallback -- see plan.md
+// Rollout step 5.
 function mockResponse({ ok = true, status = 200, jsonBody, textBody, retryAfterHeader } = {}) {
   const bodyText = textBody !== undefined ? textBody : JSON.stringify(jsonBody ?? {});
   return {
@@ -50,7 +53,6 @@ let withRequestSlot;
 
 async function freshGemini({ keys = 'key1,key2', models = 'model-a,model-b', imageModel } = {}) {
   vi.resetModules();
-  process.env.GEMINI_API_KEYS = keys;
   process.env.GEMINI_MODELS = models;
   if (imageModel) process.env.GEMINI_IMAGE_MODEL = imageModel;
   else delete process.env.GEMINI_IMAGE_MODEL;
@@ -61,8 +63,11 @@ async function freshGemini({ keys = 'key1,key2', models = 'model-a,model-b', ima
   recordSuccess = vi.fn();
   withRequestSlot = vi.fn((keyIndex, fn) => fn());
 
+  const keyList = keys === '' ? [] : keys.split(',').map((k) => k.trim()).filter(Boolean);
+
   vi.doMock('./rate-limits.js', () => ({ isInCooldown, getCooldownUntil, recordFailure, recordSuccess }));
   vi.doMock('./queue.js', () => ({ withRequestSlot }));
+  vi.doMock('./key-store.js', () => ({ getKeysForProvider: () => keyList }));
 
   global.fetch = vi.fn();
   return import('./gemini.js');
@@ -71,6 +76,7 @@ async function freshGemini({ keys = 'key1,key2', models = 'model-a,model-b', ima
 afterEach(() => {
   vi.doUnmock('./rate-limits.js');
   vi.doUnmock('./queue.js');
+  vi.doUnmock('./key-store.js');
   vi.restoreAllMocks();
 });
 
@@ -279,7 +285,7 @@ describe('generateImage', () => {
 });
 
 describe('no keys / no models configured', () => {
-  it('throws a clear setup error when GEMINI_API_KEYS is empty', async () => {
+  it('throws a clear setup error when no keys are configured', async () => {
     const { generateText } = await freshGemini({ keys: '' });
     await expect(generateText('a prompt')).rejects.toThrow(/No Gemini API keys configured/);
   });
