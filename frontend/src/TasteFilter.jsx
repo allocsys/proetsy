@@ -14,7 +14,7 @@ function ScoreBadge({ label, score, confident }) {
   return (
     <span className={`status-pill ${LABEL_CLASS[label] || 'skipped'}`} aria-label={`Score: ${text}`}>
       <span className="status-dot" aria-hidden="true" />
-      {label} ({score.toFixed(3)}){confident === false ? ' · cold start' : ''}
+      {label} ({score.toFixed(3)})${confident === false ? ' · cold start' : ''}
     </span>
   );
 }
@@ -120,12 +120,12 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
 
   function renderCandidateCard(c) {
     return (
-      <div key={c.imagePath} className="settings-section-card">
+      <div key={c.imagePath} className="glass-card p-4">
         {c.error ? (
           <p className="text-danger">{c.error}</p>
         ) : (
           <>
-            <div className="crop-frame mb-2" style={{ aspectRatio: '1/1', background: '#000' }}>
+            <div className="crop-frame mb-2" style={{ aspectRatio: '1/1', background: '#000', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
               <img src={c.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </div>
             <div className="mb-2">
@@ -148,21 +148,25 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
   }
 
   return (
-    <div className="module-panel">
-      <div className="control-row">
+    <div className="glass-panel p-5">
+      <div className="control-row mb-4" style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
         <label htmlFor="taste-category-input" className="sr-only">Category</label>
         <input
           id="taste-category-input"
+          className="glass-input"
           value={category}
           onChange={(e) => setCategory(e.target.value)}
           placeholder="e.g. square-canvas"
+          style={{ flex: '1', minWidth: '160px' }}
         />
         <label htmlFor="taste-prompt-id-input" className="sr-only">Prompt ID</label>
         <input
           id="taste-prompt-id-input"
+          className="glass-input"
           value={promptId}
           onChange={(e) => setPromptId(e.target.value)}
           placeholder="links to Module 4"
+          style={{ flex: '1', minWidth: '160px' }}
         />
         <button className="btn-secondary" onClick={handleRecompute}>Recompute now</button>
       </div>
