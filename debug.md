@@ -57,14 +57,22 @@ corresponding stub test from `claude.test.js` (`c1b953a`), since `claude.js` no
 longer exports it. No change needed in `llm/index.js` — its existing hardcoded
 routing to `gemini.js` already is the capability check; there was nothing to add.
 
-## Step 5 — `backend/config/index.js`: `getPipelineConfig()` re-queries on every call
+## Step 5 — ✅ DONE (commits 1b22aba, 26affde, b5c063f) — `backend/config/index.js`: `getPipelineConfig()` re-queries on every call
 
-**Why last:** pure performance optimization, no correctness impact — do it last so
-it doesn't need to be redone if steps 1–3 change adjacent code in the same file.
-
-**Problem:** Every call does a fresh `SELECT ... FROM settings` and re-joins against
+**Problem:** Every call did a fresh `SELECT ... FROM settings` and re-joined against
 the JSON seed. Not wrong, but a needless DB round-trip on a function likely called
 frequently.
 
-**Fix direction:** Memoize the result, invalidating the cache only when
-`PATCH /api/settings` updates a pipeline-related key.
+**Fix applied:** Added a module-level `pipelineConfigCache`, populated on first call
+and invalidated by `invalidatePipelineConfigCache()` (`1b22aba`). Wired that
+invalidation into `migratePipelineConfigSeed()` (whenever it actually inserts rows)
+and into `server.js`'s `PATCH /api/settings` (unconditionally, since any settings
+PATCH could touch a pipeline toggle) (`b5c063f`).
+
+**Test-compatibility fix (`26affde`):** the existing test suite has a test asserting
+`getPipelineConfig()` returns a fresh object every call (mutating one call's result
+must not affect the next call's result). A naive "return the cached object" approach
+would have broken that. Fixed by caching the computed data internally but always
+returning a shallow copy (`{ ...cache, pipeline: cache.pipeline.map(e => ({...e})) }`)
+on every call -- the DB round-trip is still skipped on a cache hit, which was the
+actual goal, without changing the function's external contract.
