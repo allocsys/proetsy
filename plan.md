@@ -22,7 +22,7 @@ review and revert independently.
 - [x] **3. JobListingReview.jsx**
   - Apply glass classes to listing review cards/panels
 
-- [ ] **4. JobMockupReview.jsx**
+- [x] **4. JobMockupReview.jsx**
   - Apply glass classes to mockup review cards/panels
 
 - [ ] **5. MockupTemplates.jsx**
