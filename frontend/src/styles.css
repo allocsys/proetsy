@@ -322,6 +322,58 @@ textarea:focus-visible {
   top: 56px;
   height: calc(100vh - 56px);
   box-shadow: inset -1px 0 0 var(--glass-border);
+  overflow-x: hidden;
+  transition: width 0.18s ease, padding 0.18s ease;
+}
+
+.sidebar-toggle-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-2);
+}
+
+.sidebar-toggle-btn {
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  color: var(--ink-soft);
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.sidebar-toggle-btn:hover {
+  color: var(--ink);
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.sidebar.collapsed {
+  width: 56px;
+  padding-left: var(--space-2);
+  padding-right: var(--space-2);
+}
+
+.sidebar.collapsed .sidebar-toggle-row {
+  justify-content: center;
+}
+
+.sidebar.collapsed .sidebar-group-title,
+.sidebar.collapsed .sidebar-nav-item span,
+.sidebar.collapsed .sidebar-pipeline-strip {
+  display: none;
+}
+
+.sidebar.collapsed .sidebar-nav-item {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.sidebar.collapsed .sidebar-spacer {
+  flex: 1;
 }
 
 .sidebar-group-title {
