@@ -156,7 +156,17 @@ app.get('/api/health', (req, res) => {
 app.get('/api/setup-status', (req, res) => {
   const db = getDb();
   const geminiKeyConfigured = getKeysForProvider('gemini').length > 0;
-  const hasProductSize = db.prepare('SELECT COUNT(*) AS n FROM product_sizes').get().n > 0;
+  // "Configured" means at least one row with the fields mockup-generator.js actually
+  // needs to compose a mockup -- a bare row count would treat an empty/placeholder
+  // dashboard entry as ready. Same required-field definition getProductSizes() should
+  // use when it adds validation (debug.md step 3), so the two checks can't drift apart.
+  const hasProductSize = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM product_sizes
+       WHERE dimensions IS NOT NULL AND dimensions != ''
+         AND mockup_template_path IS NOT NULL AND mockup_template_path != ''`
+    )
+    .get().n > 0;
   const hasTagLibrary = db.prepare('SELECT COUNT(*) AS n FROM tags').get().n > 0;
   res.json({
     geminiKeyConfigured,
