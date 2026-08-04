@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-// getProductSizes()/migrateProductSizesSeed() now read/write the `product_sizes` DB table
-// (plan.md -> "Rollout" step 1), and backend/db/init.js resolves DB_PATH at import time --
+// getProductSizes() now reads/writes the `product_sizes` DB table (plan.md -> "Rollout"
+// step 1), and backend/db/init.js resolves DB_PATH at import time --
 // so DB_PATH must be set BEFORE config/index.js (which imports db/init.js) is first
 // imported. Dynamic import() inside beforeAll, same env-var-before-import pattern as
 // mockup-generator.idempotency.test.js.
