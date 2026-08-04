@@ -1,13 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 
-// Using CSS classes.
-
 /**
- * One mockup's review card. When `needs_review` is set (see ARCHITECTURE.md -> Module 3
- * -> "AI-outpainting fallback"), shows the smart-crop and AI-extended variants side by
- * side with a button per variant; otherwise just shows whichever variant is currently
- * selected. Selecting a variant calls the step-6 PATCH route, which syncs `file_path`,
- * clears `needs_review`, and returns the updated row.
+ * One mockup's review card — polished to match the dark unified design system,
+ * spacing scale, and clear image preview presentation with side-by-side smart-crop
+ * vs AI-extended review comparison.
  */
 function MockupCard({ mockup, onVariantChange }) {
   const [saving, setSaving] = useState(false);
@@ -34,66 +30,67 @@ function MockupCard({ mockup, onVariantChange }) {
 
   return (
     <div className="dark-panel mockup-card">
-      <h4>
-        {mockup.size_key} {mockup.dimensions ? `(${mockup.dimensions})` : ''}
-      </h4>
+      <div className="settings-readonly-header" style={{ marginBottom: '1rem' }}>
+        <h4 style={{ margin: 0, fontWeight: 700, color: 'var(--ink)' }}>
+          {mockup.size_key} {mockup.dimensions ? `(${mockup.dimensions})` : ''}
+        </h4>
+        <span className="read-only-badge">
+          {mockup.needs_review ? 'Review Required' : `Selected: ${mockup.selected_variant || 'default'}`}
+        </span>
+      </div>
 
       {mockup.needs_review ? (
         <>
-          <p className="mockup-review-status">Needs review — pick a variant:</p>
+          <p className="mockup-review-status mb-3">AI outpainting fallback triggered — please inspect and select a preferred variant below:</p>
           <div className="mockup-variants-row">
             <div className="mockup-variant-col">
-              <strong className="mockup-variant-label">Smart crop</strong>
+              <span className="mockup-variant-label">Option A: Smart Crop</span>
               {mockup.smart_crop_url && (
-                <img src={mockup.smart_crop_url} alt="Smart crop variant" className="mockup-variant-image" />
+                <div className="settings-readonly-box" style={{ padding: '0.5rem', margin: 0 }}>
+                  <img src={mockup.smart_crop_url} alt="Smart crop variant" className="mockup-variant-image" />
+                </div>
               )}
               <button className="btn-secondary" disabled={saving} onClick={() => selectVariant('smart_crop')}>
-                Use smart crop
+                Use Smart Crop
               </button>
             </div>
             <div className="mockup-variant-col">
-              <strong className="mockup-variant-label">AI extended</strong>
+              <span className="mockup-variant-label">Option B: AI Extended</span>
               {mockup.ai_extended_url && (
-                <img src={mockup.ai_extended_url} alt="AI-extended variant" className="mockup-variant-image" />
+                <div className="settings-readonly-box" style={{ padding: '0.5rem', margin: 0 }}>
+                  <img src={mockup.ai_extended_url} alt="AI-extended variant" className="mockup-variant-image" />
+                </div>
               )}
-              <button className="btn-secondary" disabled={saving} onClick={() => selectVariant('ai_extended')}>
-                Use AI extended
+              <button className="btn-primary" disabled={saving} onClick={() => selectVariant('ai_extended')}>
+                Use AI Extended
               </button>
             </div>
           </div>
         </>
       ) : (
-        <div className="mockup-variant-col">
-          <span className="mockup-selected-label">Selected: {mockup.selected_variant}</span>
-          {mockup.file_url && <img src={mockup.file_url} alt="Selected mockup" className="mockup-variant-image" />}
+        <div className="mockup-variant-col" style={{ alignItems: 'flex-start' }}>
+          {mockup.file_url && (
+            <div className="settings-readonly-box" style={{ padding: '0.75rem', margin: 0 }}>
+              <img src={mockup.file_url} alt="Selected mockup" className="mockup-variant-image" style={{ width: 'min(240px, 100%)' }} />
+            </div>
+          )}
         </div>
       )}
 
-      {error && <p className="text-danger mt-1">{error}</p>}
+      {error && <p className="text-danger mt-2">{error}</p>}
     </div>
   );
 }
 
 /**
  * Manual category-selection gate for the curated flow (plan.md -> "Mockup categories").
- * A job created from the curated (Taste Filter promote) path has already had Image
- * Analyzer + Listing Generator run for it, but hasn't had mockups generated yet since
- * the direct/uncurated lane is the only caller of POST /api/jobs/:id/run today — this is
- * that missing "generate" trigger for the curated path, gated by category rather than
- * blanket-generating every configured size.
- *
- * Fetches the distinct configured categories plus every configured template, resolves
- * whichever categories are checked to their underlying size_keys client-side (a template
- * with no category set is never reachable here — only from the direct-upload lane's
- * unfiltered "run everything" behavior), and on submit calls POST /api/jobs/:id/run with
- * just those size_keys. Additive only: a job that never visits this step keeps getting
- * mockups for every configured size, exactly as before this step existed.
+ * Polished to match the dark unified design system, checkboxes, and spacing scale.
  */
 function MockupCategorySelector({ jobId, onGenerated }) {
   const [categories, setCategories] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [loaded, setLoaded] = useState(false);
-  const [checked, setChecked] = useState({}); // category -> boolean
+  const [checked, setChecked] = useState({});
   const [running, setRunning] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState(null);
@@ -119,8 +116,6 @@ function MockupCategorySelector({ jobId, onGenerated }) {
   const resolvedSizeKeys = useMemo(() => {
     const checkedCategories = new Set(Object.keys(checked).filter((c) => checked[c]));
     if (!checkedCategories.size) return [];
-    // Uncategorized templates (category: null) are deliberately excluded — they're only
-    // reachable via the direct-upload lane's unfiltered "run everything" behavior.
     return templates.filter((t) => t.category && checkedCategories.has(t.category)).map((t) => t.size_key);
   }, [checked, templates]);
 
@@ -151,36 +146,36 @@ function MockupCategorySelector({ jobId, onGenerated }) {
 
   return (
     <div className="dark-panel mockup-category-selector">
-      <h4 style={{ marginTop: 0 }}>Choose mockup categories</h4>
+      <h4 style={{ marginTop: 0, marginBottom: '0.75rem' }}>Select Mockup Categories to Generate</h4>
       {categories.length ? (
         <>
           <div className="mockup-category-checklist">
             {categories.map((c) => (
               <label key={c} className="settings-checkbox-row">
                 <input type="checkbox" checked={!!checked[c]} onChange={() => toggleCategory(c)} />
-                <span>{c}</span>
+                <span style={{ fontWeight: 600 }}>{c}</span>
               </label>
             ))}
           </div>
-          <button className="btn-primary" onClick={handleGenerate} disabled={running || !resolvedSizeKeys.length}>
-            {running ? 'Generating…' : 'Generate mockups for selected categories'}
-          </button>
+          <div className="mt-3">
+            <button className="btn-primary" onClick={handleGenerate} disabled={running || !resolvedSizeKeys.length}>
+              {running ? 'Generating mockups…' : '✦ Generate Mockups for Selected Categories'}
+            </button>
+          </div>
         </>
       ) : (
         <p className="empty-state" style={{ margin: 0 }}>
           No mockup categories configured yet — tag templates with a category in Mockup Templates.
         </p>
       )}
-      {status && <p className="mono taste-status">{status}</p>}
-      {error && <p className="text-danger mt-1">{error}</p>}
+      {status && <p className="mono taste-status mt-2">{status}</p>}
+      {error && <p className="text-danger mt-2">{error}</p>}
     </div>
   );
 }
 
 /**
- * Loads and reviews a job's mockups. Takes a jobId as a prop rather than doing its own
- * job lookup/selection UI — Module 6 (the real dashboard, still a skeleton per
- * ARCHITECTURE.md) owns that; this component only covers the review step itself.
+ * Loads and reviews a job's mockups — polished to match the app shell.
  */
 export default function JobMockupReview({ jobId }) {
   const [mockups, setMockups] = useState([]);
@@ -203,23 +198,23 @@ export default function JobMockupReview({ jobId }) {
   }
 
   function handleVariantChange() {
-    // The PATCH response is a bare mockups row (no joined size_key/urls) — simplest to
-    // just reload the list rather than reconstructing the joined shape client-side.
     loadMockups();
   }
 
   return (
     <div>
       <MockupCategorySelector jobId={jobId} onGenerated={loadMockups} />
-      <button onClick={loadMockups} disabled={!jobId || loading}>
-        {loading ? 'Loading…' : 'Load mockups'}
-      </button>
-      {error && <p className="text-danger mt-1">{error}</p>}
+      <div className="mb-4">
+        <button className="btn-secondary" onClick={loadMockups} disabled={!jobId || loading}>
+          {loading ? 'Loading mockups…' : 'Load generated mockups'}
+        </button>
+      </div>
+      {error && <p className="text-danger mb-3">{error}</p>}
       {mockups.map((m) => (
         <MockupCard key={m.id} mockup={m} onVariantChange={handleVariantChange} />
       ))}
       {mockups.length === 0 && !loading && !error && (
-        <p className="text-muted mt-2">No mockups loaded yet.</p>
+        <p className="empty-state">No mockups generated or loaded yet for this job.</p>
       )}
     </div>
   );
