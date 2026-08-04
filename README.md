@@ -42,7 +42,7 @@ On first launch, the dashboard checks its own setup state (Gemini key present, D
 backend/
   server.js          — Express app entry point
   db/                — SQLite schema + init
-  config/             — pipeline.config.json, product-sizes.json, trends.json
+  config/             — pipeline.config.json, product-sizes.json
   lib/llm/            — Gemini (primary) / Claude (fallback) provider layer
   lib/trends/         — manual+CSV / Etsy Open API provider layer
   lib/tags/           — user tag-list provider layer
