@@ -328,7 +328,16 @@ function App() {
     setTagsBackfillMessage('Checking uncategorized tags…');
     try {
       const res = await fetch('/api/tags/backfill-categories', { method: 'POST' });
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        // res.json() only throws like this on an empty/non-JSON body -- not a missing
+        // JSON file (this route never reads one). In practice this means nothing was
+        // listening on the other end of the fetch, so say that plainly instead of
+        // surfacing the raw 'Unexpected end of JSON input' parse error.
+        throw new Error(`No response from backend (status ${res.status}). Is the backend server running?`);
+      }
       setTagsBackfillMessage(
         res.ok
           ? `Backfilled ${data.updated} of ${data.checked} uncategorized tag(s).`
