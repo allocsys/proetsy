@@ -115,8 +115,8 @@ export default function PromptHelper() {
     <div className="module-panel">
       <div className="control-row">
         <div className="control-group">
-          <label className="control-label">Category</label>
-          <select value={category} onChange={(e) => setCategory(e.target.value)}>
+          <label className="control-label" htmlFor="prompt-category-select">Category:</label>
+          <select id="prompt-category-select" value={category} onChange={(e) => setCategory(e.target.value)}>
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
@@ -138,7 +138,7 @@ export default function PromptHelper() {
 
       <div className="control-row" style={{ marginTop: '1rem' }}>
         <input
-          placeholder="New trend term"
+          placeholder="Add a new trend"
           value={newTrendTerm}
           onChange={(e) => setNewTrendTerm(e.target.value)}
         />
