@@ -84,7 +84,7 @@ Composites artwork into the user's own mockup templates. No Canvas/Pillow/Canva 
 - **Known limitation:** `ag-psd` doesn't re-evaluate Photoshop smart-object warp/perspective transforms or most layer effects (drop shadows, overlays). A smart object warped to sit at an angle inside a photographed frame will place the artwork as an unwarped, axis-aligned rectangle — spot-check every new PSD template after its first run. (A follow-on option — reading the warp-transform matrix and applying a matching affine transform — is real additional work, not done, worth revisiting only if warped templates turn out to be common.)
 - Flat PNG/JPEG templates are unaffected — "template canvas = full output, transparent window" convention, unchanged.
 
-**Product-sizes config** (`product-sizes.json`, DB-backed — see Module 6) — one entry per size:
+**Product-sizes config** — one row per size in the `product_sizes` DB table (`size_key`, `dimensions`, `dpi`, `orientation`, `mockup_template_path`, `placement_layer`), dashboard-editable via `MockupTemplates.jsx` / `POST /api/mockup-templates` / `DELETE /api/mockup-templates/:sizeKey`. Conceptually the same shape a `product-sizes.json` file would have held:
 ```json
 {
   "8x10-portrait": { "dimensions": "8x10", "dpi": 300, "orientation": "portrait", "mockup_template": "templates/8x10-frame.png" },
@@ -92,9 +92,9 @@ Composites artwork into the user's own mockup templates. No Canvas/Pillow/Canva 
   "framed-psd":     { "dimensions": "11x14", "dpi": 300, "orientation": "portrait", "mockup_template": "templates/framed-wall.psd", "placement_layer": "artwork" }
 }
 ```
-This is the single source of truth for both Module 2 (which sizes are sellable/mentionable) and Module 3 (which template to composite into). New product types are added by editing this config, not code.
+This is the single source of truth for both Module 2 (which sizes are sellable/mentionable) and Module 3 (which template to composite into). New product types are added through the dashboard (or directly in the DB), not by editing a config file.
 
-**Dashboard:** a folder-picker/thumbnail template manager (`MockupTemplates.jsx`) is planned but not yet built — sizes/templates are currently managed via the DB-backed config and are shown read-only in Module 6's settings panel. See `plan.md` for the rollout plan.
+**Dashboard:** `MockupTemplates.jsx` — folder scan/picker, per-row Save/Remove, full CRUD over `product_sizes`.
 
 ### Module 4 — Trend/Prompt Helper (optional, manual-trend version)
 **What changed from the original plan:** no live Etsy trend-pulling API call — trends come from the **trends provider layer** (see below), backed by a manually maintained/dashboard-entered list.
