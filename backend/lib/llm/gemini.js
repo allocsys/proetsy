@@ -12,9 +12,8 @@ const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 // Read fresh on every cascade() call (see below) rather than parsed once at import, so a
 // key added/enabled/disabled/deleted from the dashboard (backed by the `api_keys` DB
-// table) takes effect on the very next request -- no server restart needed. Falls back
-// to GEMINI_API_KEYS from .env only when the DB has no enabled Gemini rows yet -- see
-// key-store.js.
+// table) takes effect on the very next request -- no server restart needed. DB is the
+// only source -- no .env fallback -- see key-store.js.
 function getKeys() {
   return getKeysForProvider('gemini');
 }
@@ -64,7 +63,7 @@ async function cascade(callFn, options = {}) {
   const keys = getKeys();
   if (keys.length === 0) {
     throw new Error(
-      'No Gemini API keys configured. Add one from the dashboard Settings panel, or set GEMINI_API_KEYS in backend/.env.'
+      'No Gemini API keys configured. Add one from the dashboard Settings panel.'
     );
   }
   // keyStartIndex was computed against a possibly-different-length key list on a prior
