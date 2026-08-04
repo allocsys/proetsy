@@ -6,10 +6,16 @@ wiring, frontend UI, and every item on the Tests checklist (route tests for
 `/api/settings/api-keys`, the `migratePipelineConfigSeed()` test, and the frontend
 Settings-section tests) all landed in later commits and pass (`21` backend tests across
 `server.api-keys-routes.test.js` + `config/index.test.js`, `30` frontend tests in
-`App.test.jsx`, verified locally on this branch). Only two things are left, and both are
-decisions/confirmations rather than code:
-- Rollout step 5 (dropping the `.env` dependency) — needs the DB-backed path confirmed
-  working in real usage first, not just in tests.
+`App.test.jsx`, verified locally on this branch).
+
+Rollout step 5 (dropping the `.env` dependency) has since landed too: `key-store.js` is
+now DB-only (no `GEMINI_API_KEYS` / `CLAUDE_API_KEY` fallback), `gemini.js`/`claude.js`
+and their comments were updated accordingly, `server.js`'s setup-status check is now
+DB-backed, and `key-store.test.js` / `gemini.test.js` / `core-routes.test.js` were updated
+to match (no more .env-fallback test coverage). `backend/.env.example` is kept as-is for
+local dev documentation, per the plan.
+
+The only thing left is a decision, not code:
 - The open auth question below — still unresolved and blocks nothing today since the
   dashboard is single-user/local, but should be answered before any multi-user/hosted
   deployment.
@@ -125,10 +131,10 @@ All four test files verified passing locally on this branch: 21 backend tests
 4. [x] Migrate `pipeline.config.json` into `settings` table + backend/frontend wiring.
    All planned tests (backend routes, seed migration, frontend Settings sections) done
    and passing.
-5. [ ] Remove `.env` dependency once DB-backed keys are confirmed working (keep
-   `.env.example` for local dev documentation only). Not started — this is a
-   confirm-in-practice step, not just a code change, so it's the last thing left before
-   this plan is fully closed out.
+5. [x] Remove `.env` dependency once DB-backed keys are confirmed working (keep
+   `.env.example` for local dev documentation only). Done — `key-store.js` no longer
+   reads `GEMINI_API_KEYS`/`CLAUDE_API_KEY`, the DB `api_keys` table is the sole source
+   of truth, and provider modules / setup-status / tests were all updated to match.
 
 ## Open Question for User
 Confirm whether the dashboard has (or needs) an auth layer before exposing API key
