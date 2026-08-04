@@ -123,8 +123,8 @@ export default function PromptHelper() {
           </select>
         </div>
         <div className="control-group">
-          <label className="control-label">Trend</label>
-          <select value={selectedTrendId} onChange={(e) => setSelectedTrendId(e.target.value)} disabled={loadingTrends}>
+          <label className="control-label" htmlFor="prompt-trend-select">Trend</label>
+          <select id="prompt-trend-select" value={selectedTrendId} onChange={(e) => setSelectedTrendId(e.target.value)} disabled={loadingTrends}>
             <option value="">(none)</option>
             {trends.map((t) => (
               <option key={t.id} value={t.id}>{t.term}{t.category ? ` (${t.category})` : ''}</option>
@@ -155,7 +155,7 @@ export default function PromptHelper() {
       </div>
 
       <div className="mt-2 text-muted mono-sm">
-        Import CSV (<code>term</code>, <code>category</code>): <input type="file" accept=".csv,text/csv" onChange={(e) => importTrendsCsv(e.target.files?.[0])} />
+        <label htmlFor="csv-file-input">Import CSV (<code>term</code>, <code>category</code>):</label> <input id="csv-file-input" type="file" accept=".csv,text/csv" onChange={(e) => importTrendsCsv(e.target.files?.[0])} />
         {csvMessage && <span className="ml-1">{csvMessage}</span>}
       </div>
 
