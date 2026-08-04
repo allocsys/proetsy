@@ -40,7 +40,7 @@ export function migratePipelineConfigSeed() {
   let seed;
   try {
     seed = loadPipelineConfigJsonSeed();
-  } catch (err) {
+  } catch {
     return { migrated: false, inserted: 0 };
   }
   const modules = seed?.pipeline || [];
