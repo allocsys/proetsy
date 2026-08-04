@@ -34,8 +34,9 @@ review and revert independently.
 - [x] **7. TasteFilter.jsx**
   - Apply glass classes to filter controls and result panels
 
-- [ ] **8. UpdaterStatus.jsx**
-  - Apply glass classes to the status widget
+- [x] **8. UpdaterStatus.jsx**
+  - No changes needed: it's a small inline status widget with no container of
+    its own, rendered directly inside the already-glass `app-titlebar`.
 
 ## Approach per batch
 
