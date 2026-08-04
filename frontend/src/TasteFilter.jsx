@@ -158,7 +158,7 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
         <input
           value={promptId}
           onChange={(e) => setPromptId(e.target.value)}
-          placeholder="Prompt ID"
+          placeholder="links to Module 4"
         />
         <button className="btn-secondary" onClick={handleRecompute}>Recompute now</button>
       </div>
