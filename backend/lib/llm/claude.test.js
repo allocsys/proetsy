@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 
 // claude.js is an optional, disabled-by-default fallback (see ARCHITECTURE.md -> LLM
 // Provider Layer -> "Fallback: Claude") — currently a stub pending a real implementation.
