@@ -52,16 +52,7 @@ describe('with a Claude key configured', () => {
   });
 });
 
-describe('generateImage (interface-symmetry stub only)', () => {
-  it('always throws, regardless of whether a Claude key is configured, since Claude has no image-generation endpoint', async () => {
-    const { generateImage: generateImageWithKey } = await freshClaude({ hasKey: true });
-    await expect(generateImageWithKey('extend this canvas', '/tmp/art.png')).rejects.toThrow(
-      /no image-generation fallback/i
-    );
-
-    const { generateImage: generateImageWithoutKey } = await freshClaude({ hasKey: false });
-    await expect(generateImageWithoutKey('extend this canvas', '/tmp/art.png')).rejects.toThrow(
-      /no image-generation fallback/i
-    );
-  });
-});
+// No generateImage tests here -- claude.js doesn't export generateImage at all.
+// llm/index.js's generateImage() always calls gemini.js directly regardless of
+// LLM_PROVIDER (see index.test.js's "generateImage (always Gemini...)" suite), so
+// there's nothing Claude-specific to test for image generation.
