@@ -1,15 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,600&family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 /*
-  DESIGN SYSTEM — v2 FULL OVERHAUL
-  ---------------------------------
-  Direction: native desktop control panel for a local print pipeline, not a
-  marketing page. One unified dark surface family (no more light/dark card
-  split) with a registration-mark magenta as the single accent, cyan reserved
-  for informational/secondary use. Fraunces is used ONLY for the wordmark —
-  every other heading and all UI text runs on Manrope so the app reads as an
-  application, not an editorial blog. Real navigation lives in the sidebar
-  (button-based view switching, not anchor scroll).
+  DESIGN SYSTEM — GLASSMORPHISM FOUNDATION
+  ---------------------------------------
+  Direction: Native desktop control panel with a glassmorphism upgrade.
+  Features frosted translucent backgrounds (backdrop-filter: blur()), semi-transparent
+  rgba surfaces, subtle 1px light borders, soft rounded corners, soft drop shadows,
+  and a layered background with blurred color blobs for glass refraction.
 */
 
 :root {
@@ -18,6 +15,16 @@
   --surface: #1A1D22;
   --surface-raised: #21252B;
   --surface-sunken: #0D0F12;
+
+  /* Glassmorphism Custom Properties */
+  --glass-opacity: 0.7;
+  --glass-blur: 16px;
+  --glass-radius: var(--radius-lg);
+  --glass-bg: rgba(26, 29, 34, 0.65);
+  --glass-surface: rgba(33, 37, 43, 0.7);
+  --glass-surface-raised: rgba(42, 47, 56, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 
   /* Legacy surface aliases kept so untouched component files (which read
      these variable names directly) automatically pick up the new unified
@@ -88,6 +95,83 @@ body {
   font-size: 14px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Layered background with soft blurred color blobs for glass refraction */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  width: 550px;
+  height: 550px;
+  border-radius: 50%;
+  filter: blur(120px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.35;
+}
+
+body::before {
+  top: -150px;
+  left: -100px;
+  background: radial-gradient(circle, rgba(255, 77, 130, 0.32), transparent 70%);
+}
+
+body::after {
+  bottom: -150px;
+  right: -100px;
+  background: radial-gradient(circle, rgba(69, 199, 217, 0.28), transparent 70%);
+}
+
+/* ============ REUSABLE GLASS UTILITIES ============ */
+.glass-surface {
+  background: var(--glass-surface);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  box-shadow: var(--glass-shadow);
+}
+
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  box-shadow: var(--shadow-md);
+}
+
+.glass-card {
+  background: var(--glass-surface);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.glass-nav {
+  background: rgba(26, 29, 34, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.glass-sidebar {
+  background: rgba(26, 29, 34, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-right: 1px solid var(--glass-border);
+}
+
+.glass-input {
+  background: rgba(13, 15, 18, 0.5) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--glass-border) !important;
 }
 
 /* Accessibility Utilities */
@@ -139,7 +223,9 @@ textarea:focus-visible {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: var(--canvas);
+  background: transparent;
+  position: relative;
+  z-index: 1;
 }
 
 .app-titlebar {
@@ -147,8 +233,10 @@ textarea:focus-visible {
   justify-content: space-between;
   align-items: center;
   padding: var(--space-3) var(--space-5);
-  background-color: var(--surface);
-  border-bottom: 1px solid var(--hairline);
+  background-color: rgba(26, 29, 34, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--glass-border);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -222,8 +310,10 @@ textarea:focus-visible {
 .sidebar {
   width: 240px;
   flex-shrink: 0;
-  background-color: var(--surface);
-  border-right: 1px solid var(--hairline);
+  background-color: rgba(26, 29, 34, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-right: 1px solid var(--glass-border);
   padding: var(--space-5) var(--space-3);
   display: flex;
   flex-direction: column;
@@ -231,7 +321,7 @@ textarea:focus-visible {
   position: sticky;
   top: 56px;
   height: calc(100vh - 56px);
-  box-shadow: inset -1px 0 0 var(--hairline);
+  box-shadow: inset -1px 0 0 var(--glass-border);
 }
 
 .sidebar-group-title {
@@ -267,12 +357,12 @@ textarea:focus-visible {
 
 .sidebar-nav-item:hover {
   color: var(--ink);
-  background-color: rgba(255, 255, 255, 0.04);
+  background-color: rgba(255, 255, 255, 0.06);
 }
 
 .sidebar-nav-item.active {
   color: var(--ink);
-  background-color: rgba(255, 77, 130, 0.12);
+  background-color: rgba(255, 77, 130, 0.15);
   border-color: rgba(255, 77, 130, 0.35);
 }
 
@@ -296,7 +386,7 @@ textarea:focus-visible {
 
 /* Sidebar signature element: live pipeline status strip */
 .sidebar-pipeline-strip {
-  border-top: 1px solid var(--hairline);
+  border-top: 1px solid var(--glass-border);
   padding-top: var(--space-4);
   margin-top: var(--space-4);
 }
@@ -364,8 +454,10 @@ textarea:focus-visible {
 /* Mobile nav strip (shown < 900px) — same view-switching buttons as the sidebar */
 .mobile-nav-strip {
   display: none;
-  background: var(--surface);
-  border-bottom: 1px solid var(--hairline);
+  background: rgba(26, 29, 34, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--glass-border);
   padding: var(--space-2) var(--space-4);
   overflow-x: auto;
   gap: var(--space-2);
@@ -377,8 +469,8 @@ textarea:focus-visible {
   align-items: center;
   gap: var(--space-2);
   padding: 0.45rem var(--space-3);
-  background: transparent;
-  border: 1px solid var(--hairline);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
   color: var(--ink-soft);
   border-radius: var(--radius-sm);
   font-family: var(--font-body);
@@ -421,41 +513,41 @@ textarea:focus-visible {
   .flex-row { flex-wrap: wrap; }
 }
 
-/* ============ SURFACES ============ */
-.paper-card {
-  background-color: var(--paper);
+/* ============ SURFACES (GLASS) ============ */
+.paper-card,
+.settings-section-card {
+  background-color: var(--glass-surface);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
   color: var(--ink);
-  border: 1px solid var(--hairline-paper);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   padding: var(--space-6);
   margin-bottom: var(--space-6);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--glass-shadow);
 }
 
-.paper-card h2, .paper-card h3, .paper-card h4 { color: var(--ink); }
-.paper-card p { color: var(--ink-soft); }
+.paper-card h2, .paper-card h3, .paper-card h4,
+.settings-section-card h2, .settings-section-card h3, .settings-section-card h4 { color: var(--ink); }
+.paper-card p, .settings-section-card p { color: var(--ink-soft); }
 
-.dark-panel {
-  background-color: var(--bg-panel);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-lg);
-  padding: var(--space-5);
-  margin-bottom: var(--space-5);
-}
-
-/* Alias used by module-level views (TasteFilter, PromptHelper) — same
-   surface treatment as .dark-panel. */
+.dark-panel,
 .module-panel {
-  background-color: var(--bg-panel);
-  border: 1px solid var(--hairline);
+  background-color: var(--glass-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   padding: var(--space-5);
   margin-bottom: var(--space-5);
+  box-shadow: var(--shadow-sm);
 }
 
 /* Alert / notice bars */
 .backend-banner {
-  background: rgba(240, 169, 61, 0.1);
+  background: rgba(240, 169, 61, 0.12);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--state-pending);
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
@@ -469,6 +561,8 @@ textarea:focus-visible {
 
 .setup-alert {
   background: rgba(240, 169, 61, 0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(240, 169, 61, 0.4);
   border-radius: var(--radius-md);
   padding: var(--space-4) var(--space-5);
@@ -487,20 +581,22 @@ textarea:focus-visible {
   font-size: 12px;
   font-family: var(--font-mono);
   font-weight: 500;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .status-dot { width: 6px; height: 6px; border-radius: 50%; }
 
-.status-pill.success { background: rgba(62, 207, 142, 0.15); color: var(--state-success); }
+.status-pill.success { background: rgba(62, 207, 142, 0.18); color: var(--state-success); border: 1px solid rgba(62, 207, 142, 0.3); }
 .status-pill.success .status-dot { background: var(--state-success); }
 
-.status-pill.danger, .status-pill.failed { background: rgba(240, 84, 75, 0.15); color: var(--state-danger); }
+.status-pill.danger, .status-pill.failed { background: rgba(240, 84, 75, 0.18); color: var(--state-danger); border: 1px solid rgba(240, 84, 75, 0.3); }
 .status-pill.danger .status-dot, .status-pill.failed .status-dot { background: var(--state-danger); }
 
-.status-pill.pending, .status-pill.running { background: rgba(240, 169, 61, 0.15); color: var(--state-pending); }
+.status-pill.pending, .status-pill.running { background: rgba(240, 169, 61, 0.18); color: var(--state-pending); border: 1px solid rgba(240, 169, 61, 0.3); }
 .status-pill.pending .status-dot, .status-pill.running .status-dot { background: var(--state-pending); }
 
-.status-pill.skipped { background: rgba(131, 139, 150, 0.15); color: var(--ink-soft); }
+.status-pill.skipped { background: rgba(131, 139, 150, 0.18); color: var(--ink-soft); border: 1px solid rgba(131, 139, 150, 0.3); }
 .status-pill.skipped .status-dot { background: var(--ink-soft); }
 
 .btn-ghost {
@@ -510,7 +606,7 @@ textarea:focus-visible {
   padding: var(--space-1) var(--space-2);
 }
 .btn-ghost:hover:not(:disabled) {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: rgba(255, 255, 255, 0.08);
   color: var(--ink);
 }
 
@@ -523,7 +619,7 @@ button, .btn {
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -531,13 +627,15 @@ button, .btn {
 }
 
 button {
-  background-color: var(--surface-raised);
+  background-color: rgba(42, 47, 56, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   color: var(--ink);
-  border-color: var(--hairline);
+  border-color: var(--glass-border);
 }
 button:hover:not(:disabled) {
-  background-color: rgba(255, 255, 255, 0.06);
-  border-color: var(--ink-soft);
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .btn-primary {
@@ -545,17 +643,18 @@ button:hover:not(:disabled) {
   color: #17070D;
   font-weight: 700;
   border-color: transparent;
+  box-shadow: 0 4px 16px rgba(255, 77, 130, 0.35);
 }
 .btn-primary:hover:not(:disabled) { background-color: var(--accent-strong); color: #ffffff; }
 
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn-secondary {
-  background-color: transparent;
-  border-color: var(--hairline-paper);
+  background-color: rgba(255, 255, 255, 0.03);
+  border-color: var(--glass-border);
   color: var(--ink);
 }
-.btn-secondary:hover:not(:disabled) { background-color: rgba(255, 255, 255, 0.05); }
+.btn-secondary:hover:not(:disabled) { background-color: rgba(255, 255, 255, 0.08); }
 
 .btn-sm { padding: var(--space-1) var(--space-2); font-size: 12px; }
 .btn-xs { padding: 0.1rem 0.4rem; font-size: 11px; }
@@ -563,29 +662,36 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 /* Form Inputs */
 input[type="text"],
 input[type="number"],
+input[type="password"],
 select,
 textarea {
   font-family: var(--font-body);
   font-size: 13.5px;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
-  border: 1px solid var(--hairline-paper);
-  background-color: var(--surface-sunken);
+  border: 1px solid var(--glass-border);
+  background-color: rgba(13, 15, 18, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   color: var(--ink);
   width: 100%;
   max-width: 100%;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
 }
 
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--accent);
+  background-color: rgba(13, 15, 18, 0.85);
   box-shadow: 0 0 0 2px rgba(255, 77, 130, 0.25);
 }
 
 /* Direct/uncurated Pipeline upload lane, collapsed by default (plan.md Rollout step 7) */
 .upload-lane-collapsible {
-  border: 1px solid var(--hairline-paper);
+  border: 1px solid var(--glass-border);
+  background: rgba(13, 15, 18, 0.35);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-radius: var(--radius-lg);
   padding: var(--space-4) var(--space-5);
   margin-top: var(--space-5);
@@ -609,8 +715,10 @@ input:focus, select:focus, textarea:focus {
 
 /* Upload & Dropzone */
 .dropzone {
-  border: 2px dashed var(--hairline-paper);
-  background-color: var(--surface-sunken);
+  border: 2px dashed rgba(255, 255, 255, 0.15);
+  background-color: rgba(13, 15, 18, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-radius: var(--radius-lg);
   padding: var(--space-7) var(--space-6);
   text-align: center;
@@ -621,7 +729,7 @@ input:focus, select:focus, textarea:focus {
 
 .dropzone.active {
   border-color: var(--accent);
-  background-color: rgba(255, 77, 130, 0.06);
+  background-color: rgba(255, 77, 130, 0.08);
 }
 
 .dropzone p { margin: var(--space-2) 0; color: var(--ink-soft); }
@@ -631,10 +739,10 @@ input:focus, select:focus, textarea:focus {
 .data-table th, .data-table td {
   padding: var(--space-3);
   text-align: left;
-  border-bottom: 1px solid var(--hairline-paper);
+  border-bottom: 1px solid var(--glass-border);
   font-size: 13.5px;
 }
-.data-table th { font-weight: 700; color: var(--ink); background-color: rgba(255, 255, 255, 0.02); }
+.data-table th { font-weight: 700; color: var(--ink); background-color: rgba(255, 255, 255, 0.03); }
 .data-table td { color: var(--ink); }
 
 .empty-state { color: var(--ink-soft); font-style: italic; padding: var(--space-5) 0; }
@@ -649,8 +757,10 @@ input:focus, select:focus, textarea:focus {
 }
 
 .taste-card {
-  background: var(--paper-dim);
-  border: 1px solid var(--hairline-paper);
+  background: rgba(38, 43, 50, 0.65);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   padding: var(--space-3);
   display: flex;
@@ -668,8 +778,10 @@ input:focus, select:focus, textarea:focus {
 
 /* Artwork Analysis Review */
 .artwork-analysis-card {
-  background: var(--paper-dim);
-  border: 1px solid var(--hairline-paper);
+  background: rgba(38, 43, 50, 0.65);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   padding: var(--space-4);
   margin-top: var(--space-3);
@@ -752,12 +864,14 @@ input:focus, select:focus, textarea:focus {
 
 /* Settings View Polish */
 .settings-section-card {
-  background-color: var(--paper);
-  border: 1px solid var(--hairline-paper);
+  background-color: var(--glass-surface);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   padding: var(--space-6);
   margin-bottom: var(--space-6);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--glass-shadow);
 }
 
 .settings-section-title {
@@ -767,7 +881,7 @@ input:focus, select:focus, textarea:focus {
   margin-top: 0;
   margin-bottom: var(--space-5);
   padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--hairline-paper);
+  border-bottom: 1px solid var(--glass-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -849,8 +963,10 @@ input:focus, select:focus, textarea:focus {
 }
 
 .settings-readonly-box {
-  background-color: var(--surface-sunken);
-  border: 1px solid var(--hairline);
+  background-color: rgba(13, 15, 18, 0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   padding: var(--space-4);
   margin-top: var(--space-3);
@@ -876,7 +992,7 @@ input:focus, select:focus, textarea:focus {
   align-items: center;
   gap: 0.3rem;
   padding: 0.15rem 0.5rem;
-  background: rgba(131, 139, 150, 0.15);
+  background: rgba(131, 139, 150, 0.18);
   color: var(--ink-soft);
   border-radius: var(--radius-pill);
   font-size: 11px;
@@ -884,6 +1000,7 @@ input:focus, select:focus, textarea:focus {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  border: 1px solid rgba(131, 139, 150, 0.3);
 }
 
 /* Mockup Template Manager (plan.md Rollout step 4) */
@@ -907,8 +1024,8 @@ input:focus, select:focus, textarea:focus {
   width: 100%;
   aspect-ratio: 1;
   border-radius: var(--radius-sm);
-  background: var(--surface-sunken);
-  border: 1px dashed var(--hairline-paper);
+  background: rgba(13, 15, 18, 0.5);
+  border: 1px dashed var(--glass-border);
   margin-bottom: var(--space-2);
 }
 
