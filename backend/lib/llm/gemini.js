@@ -6,13 +6,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isInCooldown, getCooldownUntil, recordFailure, recordSuccess } from './rate-limits.js';
 import { withRequestSlot } from './queue.js';
+import { getKeysForProvider } from './key-store.js';
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
-const keys = (process.env.GEMINI_API_KEYS || '')
-  .split(',')
-  .map((k) => k.trim())
-  .filter(Boolean);
+// Read fresh on every cascade() call (see below) rather than parsed once at import, so a
+// key added/enabled/disabled/deleted from the dashboard (backed by the `api_keys` DB
+// table) takes effect on the very next request -- no server restart needed. Falls back
+// to GEMINI_API_KEYS from .env only when the DB has no enabled Gemini rows yet -- see
+// key-store.js.
+function getKeys() {
+  return getKeysForProvider('gemini');
+}
 
 const models = (process.env.GEMINI_MODELS || 'gemini-2.5-flash,gemini-2.0-flash,gemini-2.5-pro')
   .split(',')
@@ -56,9 +61,16 @@ function isRetryable(err) {
 // around this function. A sweep that ends with every pair either live-429'd or already
 // in cooldown fails immediately; it does not wait and sweep again.
 async function cascade(callFn, options = {}) {
+  const keys = getKeys();
   if (keys.length === 0) {
-    throw new Error('No Gemini API keys configured. Set GEMINI_API_KEYS in backend/.env.');
+    throw new Error(
+      'No Gemini API keys configured. Add one from the dashboard Settings panel, or set GEMINI_API_KEYS in backend/.env.'
+    );
   }
+  // keyStartIndex was computed against a possibly-different-length key list on a prior
+  // call (a key may have been added/removed from the dashboard since) -- clamp so it
+  // can't index past the current pool.
+  keyStartIndex = keyStartIndex % keys.length;
   const modelsToTry = options.model ? [options.model] : models;
   if (modelsToTry.length === 0) {
     throw new Error('No Gemini models configured. Set GEMINI_MODELS in backend/.env.');
@@ -242,7 +254,7 @@ export async function generateText(prompt, options = {}) {
     const text = await callGenerateContent(key, model, [{ role: 'user', parts: [{ text: prompt }] }], options);
     return { text, provider: 'gemini', model };
   }, options);
-  keyStartIndex = (keyStartIndex + 1) % keys.length;
+  keyStartIndex = (keyStartIndex + 1) % Math.max(getKeys().length, 1);
   return result;
 }
 
@@ -261,7 +273,7 @@ export async function generateVision(prompt, imagePath, options = {}) {
     const text = await callGenerateContent(key, model, contents, options);
     return { text, provider: 'gemini', model };
   }, options);
-  keyStartIndex = (keyStartIndex + 1) % keys.length;
+  keyStartIndex = (keyStartIndex + 1) % Math.max(getKeys().length, 1);
   return result;
 }
 
@@ -294,6 +306,6 @@ export async function generateImage(prompt, imagePath, options = {}) {
     const { data, mimeType } = await callGenerateImage(key, model, contents, imageOptions);
     return { data, mimeType, provider: 'gemini', model };
   }, imageOptions);
-  keyStartIndex = (keyStartIndex + 1) % keys.length;
+  keyStartIndex = (keyStartIndex + 1) % Math.max(getKeys().length, 1);
   return result;
 }
