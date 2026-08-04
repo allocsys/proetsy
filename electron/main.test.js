@@ -12,6 +12,12 @@ const mockApp = {
   whenReady: vi.fn(),
   on: vi.fn(),
   quit: vi.fn(),
+  exit: vi.fn(),
+  // Regression coverage for debug.md's "no single-instance lock" root-cause candidate:
+  // defaults to granting the lock (true) so existing tests that don't care about this
+  // behavior aren't affected; individual tests below override this to simulate a
+  // second instance losing the race.
+  requestSingleInstanceLock: vi.fn(() => true),
 };
 
 const mockBrowserWindowInstance = {
@@ -34,7 +40,9 @@ MockBrowserWindow.getAllWindows = vi.fn(() => []);
 // to be a no-op vi.fn() here (main.js calls it unconditionally at module scope), and
 // dialog.showOpenDialog is the one main.js's exported selectFolder() actually calls.
 const mockIpcMain = { handle: vi.fn() };
-const mockDialog = { showOpenDialog: vi.fn() };
+// showErrorBox: regression coverage for debug.md's "silent app.quit() on backend
+// startup timeout" root-cause candidate -- currently nothing in main.js calls this.
+const mockDialog = { showOpenDialog: vi.fn(), showErrorBox: vi.fn() };
 
 vi.mock('electron', () => ({
   app: mockApp,
@@ -80,6 +88,11 @@ beforeEach(async () => {
   vi.resetModules();
   mockApp.isPackaged = false;
   mockApp.getPath.mockClear().mockReturnValue('/fake/userData');
+  mockApp.quit.mockClear();
+  mockApp.exit.mockClear();
+  mockApp.on.mockClear();
+  mockApp.requestSingleInstanceLock.mockClear().mockReturnValue(true);
+  mockDialog.showErrorBox.mockReset();
   spawnMock.mockClear();
   httpGetMock.mockReset();
   MockBrowserWindow.mockClear();
@@ -262,6 +275,66 @@ describe('select-folder IPC handler (Rollout step 5)', () => {
       mockBrowserWindowInstance,
       expect.objectContaining({ properties: ['openDirectory'] })
     );
+  });
+});
+
+// Regression tests for debug.md §2 "Root cause candidate A -- no single-instance
+// lock". These are written against the fix, not the current code -- main.js does not
+// yet export acquireSingleInstanceLock, so every test in this block currently fails
+// (TypeError: main.acquireSingleInstanceLock is not a function). That failure, surfaced
+// by CI's existing `electron-test` job (ci.yml, runs on every push/PR), is the checked-in
+// proof the bug exists. They should go green once main.js gains this export and calls it
+// from the isMainModule startup block in place of the missing lock check.
+describe('acquireSingleInstanceLock (regression -- debug.md §2 candidate A)', () => {
+  it('requests the OS-level single-instance lock on startup', () => {
+    main.acquireSingleInstanceLock();
+    expect(mockApp.requestSingleInstanceLock).toHaveBeenCalledTimes(1);
+  });
+
+  it('quits this process immediately when the lock cannot be acquired (a prior instance already holds it)', () => {
+    mockApp.requestSingleInstanceLock.mockReturnValue(false);
+
+    main.acquireSingleInstanceLock();
+
+    // Use app.exit() (or app.quit()) here, not silently falling through to spawn a
+    // second backend against the same port -- that duplicate-backend spawn is the
+    // actual mechanism behind debug.md's reported "10 background processes".
+    expect(mockApp.quit.mock.calls.length + mockApp.exit.mock.calls.length).toBeGreaterThan(0);
+  });
+
+  it('does NOT quit when this process successfully acquires the lock', () => {
+    mockApp.requestSingleInstanceLock.mockReturnValue(true);
+
+    main.acquireSingleInstanceLock();
+
+    expect(mockApp.quit).not.toHaveBeenCalled();
+    expect(mockApp.exit).not.toHaveBeenCalled();
+  });
+
+  it('registers a \'second-instance\' handler so a later duplicate launch focuses the existing window instead of spawning its own backend', () => {
+    main.acquireSingleInstanceLock();
+
+    expect(mockApp.on).toHaveBeenCalledWith('second-instance', expect.any(Function));
+  });
+});
+
+// Regression tests for debug.md §2 "Root cause candidate B -- slow first-run backend
+// startup exceeding the 20s waitForBackend timeout". Currently the isMainModule block's
+// catch does only `console.error(...)` + `app.quit()` -- invisible to the user, so a
+// timeout looks identical to "nothing happened". main.js does not yet export
+// reportBackendStartupFailure, so these fail today the same way as the block above.
+describe('reportBackendStartupFailure (regression -- debug.md §2 candidate B)', () => {
+  it('shows a native error dialog instead of quitting silently', () => {
+    main.reportBackendStartupFailure(new Error('Backend did not become healthy within 20000ms (http://localhost:4000/api/health)'));
+
+    expect(mockDialog.showErrorBox).toHaveBeenCalledTimes(1);
+    const [, message] = mockDialog.showErrorBox.mock.calls[0];
+    expect(message).toMatch(/did not become healthy/);
+  });
+
+  it('still quits the app after the user has been shown why', () => {
+    main.reportBackendStartupFailure(new Error('boom'));
+    expect(mockApp.quit).toHaveBeenCalledTimes(1);
   });
 });
 
