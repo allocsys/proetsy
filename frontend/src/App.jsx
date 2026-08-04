@@ -5,6 +5,7 @@ import JobMockupReview from './JobMockupReview.jsx';
 import MockupTemplates from './MockupTemplates.jsx';
 import PromptHelper from './PromptHelper.jsx';
 import TasteFilter from './TasteFilter.jsx';
+import UpdaterStatus from './UpdaterStatus.jsx';
 
 function StatusBadge({ status }) {
   const statusText = status || 'pending';
@@ -373,6 +374,7 @@ function App() {
               {health ? health.status : 'checking...'}
             </strong>
           </span>
+          <UpdaterStatus />
           <button className="btn-secondary" onClick={() => goTo(activeView === 'settings' ? 'upload' : 'settings')}>
             {activeView === 'settings' ? 'Close settings' : '⚙ Settings'}
           </button>
