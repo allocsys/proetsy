@@ -556,23 +556,36 @@ app.patch('/api/jobs/:id/listings/:listingId', (req, res) => {
   const { title, description, tags, tag_alternates } = req.body || {};
 
   const db = getDb();
-  const existing = db.prepare('SELECT * FROM listings WHERE id = ? AND job_id = ?').get(listingId, jobId);
-  if (!existing) return res.status(404).json({ error: 'Listing not found for this job' });
 
-  const merged = {
-    angle: existing.variation,
-    title: title !== undefined ? title : existing.title,
-    description: description !== undefined ? description : existing.description,
-    tags: tags !== undefined ? tags : JSON.parse(existing.tags || '[]'),
-    tag_alternates: tag_alternates !== undefined ? tag_alternates : JSON.parse(existing.tag_alternates || '[]'),
-  };
-  const cleaned = enforceConventions(merged);
+  // Read-merge-write wrapped in a transaction for atomicity. Note: this handler is
+  // fully synchronous (no await between the read and the write), so on today's
+  // single-process/single-threaded server there's no actual interleaving window --
+  // this is future-proofing against the atomicity guarantee silently breaking if
+  // async work (e.g. an await) is ever added to the merge/validation step, not a fix
+  // for an active race condition.
+  const result = db.transaction(() => {
+    const existing = db.prepare('SELECT * FROM listings WHERE id = ? AND job_id = ?').get(listingId, jobId);
+    if (!existing) return null;
 
-  db.prepare(
-    `UPDATE listings SET title = ?, description = ?, tags = ?, tag_alternates = ?, edited_at = datetime('now') WHERE id = ?`
-  ).run(cleaned.title, cleaned.description, JSON.stringify(cleaned.tags), JSON.stringify(cleaned.tagAlternates), listingId);
+    const merged = {
+      angle: existing.variation,
+      title: title !== undefined ? title : existing.title,
+      description: description !== undefined ? description : existing.description,
+      tags: tags !== undefined ? tags : JSON.parse(existing.tags || '[]'),
+      tag_alternates: tag_alternates !== undefined ? tag_alternates : JSON.parse(existing.tag_alternates || '[]'),
+    };
+    const cleaned = enforceConventions(merged);
 
-  const updated = db.prepare('SELECT * FROM listings WHERE id = ?').get(listingId);
+    db.prepare(
+      `UPDATE listings SET title = ?, description = ?, tags = ?, tag_alternates = ?, edited_at = datetime('now') WHERE id = ?`
+    ).run(cleaned.title, cleaned.description, JSON.stringify(cleaned.tags), JSON.stringify(cleaned.tagAlternates), listingId);
+
+    return { updated: db.prepare('SELECT * FROM listings WHERE id = ?').get(listingId), cleaned };
+  })();
+
+  if (!result) return res.status(404).json({ error: 'Listing not found for this job' });
+
+  const { updated, cleaned } = result;
   res.json({
     ...updated,
     tags: JSON.parse(updated.tags || '[]'),
