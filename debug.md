@@ -20,17 +20,16 @@ it guarantees atomicity stays true even if async work (e.g. an `await`) is later
 added to the merge/validation step, which would otherwise silently reopen the
 interleaving window without anyone noticing.
 
-## Step 2 — `backend/server.js`: `/api/setup-status` uses row *count* as "configured" proxy
+## Step 2 — ✅ DONE (commit 3173928) — `backend/server.js`: `/api/setup-status` uses row *count* as "configured" proxy
 
-**Why second:** same file as step 1, and a correctness bug that actively misleads
-users (dashboard says "ready" when it isn't) — fix before moving to config/index.js.
+**Problem:** `hasProductSize` was computed as `COUNT(*) FROM product_sizes > 0`. Any
+row — including an invalid or placeholder one — made the dashboard report "ready to
+run" even when nothing usable was configured.
 
-**Problem:** `hasProductSize` is computed as `COUNT(*) FROM product_sizes > 0`. Any
-row — including an invalid or placeholder one — makes the dashboard report "ready to
-run" even when nothing usable is configured.
-
-**Fix direction:** Check for at least one row with required fields populated
-(`dimensions`, `mockup_template_path` not null) instead of a bare count.
+**Fix applied:** `hasProductSize` now requires at least one row where `dimensions`
+and `mockup_template_path` are both present and non-empty. This is the same
+required-field definition step 3 (`getProductSizes()` validation) should reuse, so
+the two checks stay in sync.
 
 ## Step 3 — `backend/config/index.js`: `getProductSizes()` has no validation
 
