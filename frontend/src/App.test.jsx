@@ -74,6 +74,8 @@ function mockFetchByUrl(overrides = {}) {
     '/api/trends': [],
     '/api/tags': [],
     '/api/taste-filter/watch-status': { active: false, folder: null, category: null, pendingCount: 0, lastError: null },
+    '/api/llm/rate-limits': [],
+    '/api/settings/api-keys': [],
   };
   const responses = { ...defaults, ...overrides };
 
