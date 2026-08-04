@@ -28,7 +28,7 @@ review and revert independently.
 - [x] **5. MockupTemplates.jsx**
   - Apply glass classes to template list/grid and detail panels
 
-- [ ] **6. PromptHelper.jsx**
+- [x] **6. PromptHelper.jsx**
   - Apply glass classes to prompt input/output panels
 
 - [ ] **7. TasteFilter.jsx**
