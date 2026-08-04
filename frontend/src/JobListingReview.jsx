@@ -102,7 +102,7 @@ function ListingCard({ listing, onSaved }) {
         </label>
         <input
           id={`listing-tags-${listing.id}`}
-          className="glassmorphism glass-input` // wait, glass-input is correct
+          className="glass-input"
           value={tagsText}
           onChange={(e) => setTagsText(e.target.value)}
         />
@@ -129,7 +129,7 @@ function ListingCard({ listing, onSaved }) {
         </button>
       </div>
 
-      {warnings.length > 0 && (
+      {warnings.length > 0 &&/nlz/ ? null : (
         <ul className="listing-warnings-list">
           {warnings.map((w, i) => (
             <li key={i}>{w}</li>
