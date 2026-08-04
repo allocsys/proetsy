@@ -102,6 +102,14 @@ export function getPipelineConfig() {
  * object keyed by `size_key`, each entry having `dimensions`, `dpi`, `orientation`,
  * `mockup_template`, `placement_layer`.
  */
+// A row needs at least these to be usable by mockup-generator.js's composeMockup() --
+// the same "dimensions + mockup_template_path present" definition /api/setup-status
+// uses to decide whether product sizing counts as configured (see server.js's
+// hasProductSize check), kept here as the single source of truth for both.
+function isValidProductSizeRow(row) {
+  return Boolean(row.size_key) && Boolean(row.dimensions) && Boolean(row.mockup_template_path);
+}
+
 export function getProductSizes() {
   const db = getDb();
   const rows = db
@@ -112,6 +120,14 @@ export function getProductSizes() {
 
   const result = {};
   for (const row of rows) {
+    if (!isValidProductSizeRow(row)) {
+      // Dashboard-editable table -- a half-filled row (e.g. mid-edit, or
+      // mockup_template_path cleared without a replacement) shouldn't silently reach
+      // mockup-generator.js and fail deep inside image composition. Skipped, not
+      // thrown, so one bad row doesn't take down every other configured size.
+      console.warn(`getProductSizes: skipping invalid product_sizes row (size_key=${row.size_key ?? '(missing)'})`);
+      continue;
+    }
     result[row.size_key] = {
       dimensions: row.dimensions,
       dpi: row.dpi,
