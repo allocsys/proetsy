@@ -10,7 +10,6 @@ import path from 'node:path';
 // mockup-generator.idempotency.test.js.
 let getPipelineConfig;
 let getProductSizes;
-let getTrendsSeed;
 let migrateProductSizesSeed;
 let migratePipelineConfigSeed;
 let getDb;
@@ -21,7 +20,7 @@ beforeAll(async () => {
   process.env.DB_PATH = path.join(tmpRoot, 'test.db');
 
   ({ getDb } = await import('../db/init.js'));
-  ({ getPipelineConfig, getProductSizes, getTrendsSeed, migrateProductSizesSeed, migratePipelineConfigSeed } = await import(
+  ({ getPipelineConfig, getProductSizes, migrateProductSizesSeed, migratePipelineConfigSeed } = await import(
     './index.js'
   ));
 });
@@ -146,13 +145,5 @@ describe('migrateProductSizesSeed', () => {
 
     const after = db.prepare('SELECT COUNT(*) AS n FROM product_sizes').get().n;
     expect(after).toBe(before);
-  });
-});
-
-describe('getTrendsSeed', () => {
-  it('parses without throwing and returns valid JSON', () => {
-    expect(() => getTrendsSeed()).not.toThrow();
-    const seed = getTrendsSeed();
-    expect(seed).toBeDefined();
   });
 });
