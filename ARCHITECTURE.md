@@ -115,7 +115,7 @@ React frontend (`frontend/src/App.jsx`) that:
 - Runs the pipeline server-side (`backend/lib/pipeline-runner.js`, `POST /api/jobs/:id/run` / `POST /api/jobs/run-batch`) — the run isn't tied to the browser tab staying open.
 - Shows a **pipeline config panel**: per-run module toggles seeded from `pipeline.config.json`'s defaults; the required module (Module 2) is shown checked and disabled. Overrides apply to that run only.
 - Job history log, grouped into collapsible "bulk batch" rows (jobs sharing a client-generated `batch_id`) with per-status badge breakdowns.
-- Settings panel: tag-library paste/CSV import, default price/delivery text, trend-list management, shop conventions (read-only — intentionally hardcoded), product-sizes (read-only for now — see Module 3).
+- Settings panel: tag-library paste/CSV import, default price/delivery text, trend-list management, shop conventions (read-only — intentionally hardcoded), product-sizes/mockup templates (dashboard-editable — see Module 3's `MockupTemplates.jsx`).
 - Review/edit any generated field before publishing (`JobListingReview.jsx`, `JobMockupReview.jsx`, `JobArtworkAnalysisReview.jsx`), each with Copy-for-Etsy / export.
 - Persistent setup-status banner (`GET /api/setup-status`) — see First-Run Setup below.
 
@@ -169,7 +169,7 @@ Labeling *is* the training — no separate training mode, and it never "finishes
 
 No separate installer or CLI wizard — the app detects its own setup state on launch and drives the dashboard accordingly.
 
-**Detection:** on backend startup, check for (1) at least one Gemini key in `.env`, (2) an initialized DB, (3) at least one entry in the product-sizes config. If any are missing, the dashboard opens directly into a setup screen.
+**Detection:** on backend startup, check for (1) at least one Gemini key (dashboard-managed, DB-backed), (2) an initialized DB, (3) at least one configured row in the `product_sizes` table. If any are missing, the dashboard opens directly into a setup screen.
 
 **Setup steps, ordered by what's actually required:**
 - **Required to run at all:** at least one Gemini API key, saved to `.env` (never committed). DB schema auto-creates with no user action.
