@@ -24,7 +24,8 @@
 // package.json of its own) parses as ESM.
 
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
-import { autoUpdater } from 'electron-updater';
+import electronUpdaterPkg from 'electron-updater';
+const { autoUpdater } = electronUpdaterPkg;
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { get } from 'node:http';
