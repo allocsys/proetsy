@@ -1,14 +1,18 @@
 # Plan: Editable Settings & API Keys from Dashboard
 
-## Status (2026-08-04, updated)
-Backend is fully wired: `/api/settings/api-keys` routes are live, `migratePipelineConfigSeed()`
-is called on startup, and `key-store.js` has a test file. The frontend now has both a
-dashboard "API Keys" section (add/list-masked/enable-disable/delete, under Settings) and
-a "Pipeline Modules" section (persisted enable/disable per module, distinct from the
-existing per-upload-session override checkboxes on the Upload view). Still open: route
-tests for `/api/settings/api-keys`, a test for `migratePipelineConfigSeed()`, and Rollout
-step 5 (dropping the `.env` dependency once DB-backed keys are confirmed working in
-practice). See the checkboxes below for exactly what's done vs. left in each step.
+## Status (2026-08-04, updated again)
+All implementation and test work is done: backend routes, DB migration, provider-layer
+wiring, frontend UI, and every item on the Tests checklist (route tests for
+`/api/settings/api-keys`, the `migratePipelineConfigSeed()` test, and the frontend
+Settings-section tests) all landed in later commits and pass (`21` backend tests across
+`server.api-keys-routes.test.js` + `config/index.test.js`, `30` frontend tests in
+`App.test.jsx`, verified locally on this branch). Only two things are left, and both are
+decisions/confirmations rather than code:
+- Rollout step 5 (dropping the `.env` dependency) — needs the DB-backed path confirmed
+  working in real usage first, not just in tests.
+- The open auth question below — still unresolved and blocks nothing today since the
+  dashboard is single-user/local, but should be answered before any multi-user/hosted
+  deployment.
 
 ## Goal
 Allow settings (currently split across the `settings` DB table and JSON files in
@@ -61,17 +65,18 @@ directly from the dashboard, instead of requiring manual file/DB edits.
    - `DELETE /api/settings/api-keys/:id` — remove a key
    - `PATCH /api/settings/api-keys/:id` — enable/disable a key
    - Backed by `listKeysMasked`, `addKey`, `setKeyEnabled`, `deleteKey` in
-     `backend/lib/llm/key-store.js`. [ ] Still open: no route-level test file yet
-     (`backend/server.config-routes.test.js` or a new `server.api-keys-routes.test.js`
-     would be the place, mirroring the existing `server.*-routes.test.js` files).
+     `backend/lib/llm/key-store.js`. [x] `backend/server.api-keys-routes.test.js` now
+     covers add/list/enable-disable/delete, mirroring the existing
+     `server.*-routes.test.js` pattern.
 3. [x] Update the provider layer (`backend/lib/llm/gemini.js`, `backend/lib/llm/claude.js`)
    to read from `getKeysForProvider()` (DB-first, `.env` fallback) instead of parsing
    `process.env` once at import.
 4. [x] Migrate `pipeline.config.json` module toggles into the `settings` table
    (`getPipelineConfig()` in `backend/config/index.js` now reads `enabled` from `settings`,
    falling back to the JSON seed value). `migratePipelineConfigSeed()` is now called from
-   `backend/server.js` startup, alongside `migrateProductSizesSeed()`. [ ] Still open: no
-   test yet for `migratePipelineConfigSeed()` itself (see Tests below).
+   `backend/server.js` startup, alongside `migrateProductSizesSeed()`. [x]
+   `backend/config/index.test.js` now has a `migratePipelineConfigSeed()` describe block
+   (mirroring the existing `migrateProductSizesSeed` one).
 5. [x] Add basic validation: `key-store.js`'s `addKey()` now rejects a `key_value` under
    16 chars or containing whitespace (`assertPlausibleKey()`), on top of the existing
    provider/key_value presence check. Full key values are never logged; routes only ever
@@ -92,16 +97,20 @@ directly from the dashboard, instead of requiring manual file/DB edits.
    shown in plaintext while typing.
 
 ### Tests
-- [x] `backend/lib/llm/key-store.test.js` added — covers `getKeysForProvider` (.env
-  fallback, DB-first, disabled-row exclusion), `addKey` (validation + masking),
-  `listKeysMasked`, `setKeyEnabled`, `deleteKey`.
-- [ ] No route tests yet for `/api/settings/api-keys` (add/list/enable/disable/delete via
-  supertest, mirroring `server.config-routes.test.js`'s pattern).
-- [ ] No test yet for `migratePipelineConfigSeed()` in `backend/config/index.test.js`
-  (mirroring the existing `migrateProductSizesSeed` describe block).
-- [ ] No frontend test yet for the new Settings sections (`App.test.jsx` would be the
-  place — assert the API Keys list renders, add/enable/disable/delete call the right
-  endpoints, and the Pipeline Modules checkboxes PATCH `/api/settings`).
+- [x] `backend/lib/llm/key-store.test.js` — covers `getKeysForProvider` (.env fallback,
+  DB-first, disabled-row exclusion), `addKey` (validation + masking), `listKeysMasked`,
+  `setKeyEnabled`, `deleteKey`.
+- [x] `backend/server.api-keys-routes.test.js` — add/list/enable/disable/delete via
+  supertest, mirroring `server.config-routes.test.js`'s pattern.
+- [x] `backend/config/index.test.js` — `migratePipelineConfigSeed()` describe block,
+  mirroring the existing `migrateProductSizesSeed` one.
+- [x] `frontend/src/App.test.jsx` — API Keys list renders, add/enable/disable/delete call
+  the right endpoints (and the add form never leaks the plaintext key into a visible
+  field), and the Pipeline Modules checkboxes PATCH `/api/settings`.
+
+All four test files verified passing locally on this branch: 21 backend tests
+(`server.api-keys-routes.test.js` + `config/index.test.js`) and 30 frontend tests
+(`App.test.jsx`).
 
 ### Security Notes
 - Never return full key values from the API after creation — mask on every read.
@@ -114,6 +123,8 @@ directly from the dashboard, instead of requiring manual file/DB edits.
 2. [x] Update provider layer to read keys from DB with `.env` fallback.
 3. [x] Frontend API Keys UI.
 4. [x] Migrate `pipeline.config.json` into `settings` table + backend/frontend wiring.
+   All planned tests (backend routes, seed migration, frontend Settings sections) done
+   and passing.
 5. [ ] Remove `.env` dependency once DB-backed keys are confirmed working (keep
    `.env.example` for local dev documentation only). Not started — this is a
    confirm-in-practice step, not just a code change, so it's the last thing left before
