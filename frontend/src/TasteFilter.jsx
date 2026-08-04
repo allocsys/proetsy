@@ -14,7 +14,7 @@ function ScoreBadge({ label, score, confident }) {
   return (
     <span className={`status-pill ${LABEL_CLASS[label] || 'skipped'}`} aria-label={`Score: ${text}`}>
       <span className="status-dot" aria-hidden="true" />
-      {label} ({score.toFixed(3)})${confident === false ? ' · cold start' : ''}
+      {label} ({score.toFixed(3)}){confident === false ? ' · cold start' : ''}
     </span>
   );
 }
