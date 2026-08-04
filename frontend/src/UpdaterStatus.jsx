@@ -64,7 +64,7 @@ function UpdaterStatus() {
 
   if (phase === 'available') {
     return (
-      <div className="flex-row items-center" style={{ gap: '0.5rem' }}>
+      <div className="flex-row flex-wrap" style={{ gap: '0.5rem' }}>
         <span className="status-pill pending">Update {version ? `v${version}` : ''} available</span>
         <button className="btn-primary btn-sm" onClick={handleDownload}>Download update</button>
       </div>
@@ -77,7 +77,7 @@ function UpdaterStatus() {
 
   if (phase === 'downloaded') {
     return (
-      <div className="flex-row items-center" style={{ gap: '0.5rem' }}>
+      <div className="flex-row flex-wrap" style={{ gap: '0.5rem' }}>
         <span className="status-pill success">Update {version ? `v${version}` : ''} ready</span>
         <button className="btn-primary btn-sm" onClick={handleInstall}>Restart & install</button>
       </div>
@@ -86,7 +86,7 @@ function UpdaterStatus() {
 
   if (phase === 'not-available') {
     return (
-      <div className="flex-row items-center" style={{ gap: '0.5rem' }}>
+      <div className="flex-row flex-wrap" style={{ gap: '0.5rem' }}>
         <span className="status-pill success">Up to date</span>
         <button className="btn-ghost btn-sm" onClick={handleCheck}>Check again</button>
       </div>
@@ -95,7 +95,7 @@ function UpdaterStatus() {
 
   if (phase === 'error') {
     return (
-      <div className="flex-row items-center" style={{ gap: '0.5rem' }}>
+      <div className="flex-row flex-wrap" style={{ gap: '0.5rem' }}>
         <span className="text-danger mono-sm">{errorMsg}</span>
         <button className="btn-secondary btn-sm" onClick={handleCheck}>Retry</button>
       </div>
