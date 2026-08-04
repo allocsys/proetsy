@@ -285,6 +285,54 @@ app.patch('/api/settings', (req, res) => {
   res.json({ ...AUTO_SETTING_DEFAULTS, ...Object.fromEntries(rows.map((r) => [r.key, r.value])) });
 });
 
+// plan.md -> "Editable Settings & API Keys from Dashboard": dashboard-managed LLM
+// provider API keys, backed by the `api_keys` table (see lib/llm/key-store.js). Full key
+// values are never returned by any of these routes -- list/create both come back through
+// listKeysMasked()-shaped objects (masked to the last 4 chars). `.env`-sourced keys
+// (GEMINI_API_KEYS / CLAUDE_API_KEY) are intentionally NOT listed here -- they're a
+// fallback used only when the DB has zero enabled rows for a provider, and have no `id`
+// to enable/disable/delete, so this is a DB-managed-keys-only view.
+app.get('/api/settings/api-keys', (req, res) => {
+  res.json(listKeysMasked());
+});
+
+// Body: { provider: 'gemini' | 'claude', key_value: string, label?: string }. Provider
+// isn't restricted to a fixed enum here -- key-store.js's ENV_KEYS_BY_PROVIDER only
+// knows about 'gemini'/'claude' for the .env-fallback path, but a DB-only provider with
+// no .env fallback is still a valid row (just never falls back to anything if disabled).
+app.post('/api/settings/api-keys', (req, res) => {
+  const { provider, key_value, label } = req.body || {};
+  if (!provider || !key_value) {
+    return res.status(400).json({ error: 'provider and key_value are required' });
+  }
+  try {
+    const key = addKey({ provider, key_value, label });
+    res.status(201).json(key);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Body: { enabled: boolean }. Enable/disable rather than edit-in-place -- there's no
+// route to change an existing key's value, matching the "never re-expose a full key
+// value" security note (an edit would require either accepting a new full value, which
+// this covers via delete + re-add, or reading the old one back out, which we don't do).
+app.patch('/api/settings/api-keys/:id', (req, res) => {
+  const { enabled } = req.body || {};
+  if (typeof enabled !== 'boolean') {
+    return res.status(400).json({ error: 'enabled (boolean) is required' });
+  }
+  const updated = setKeyEnabled(Number(req.params.id), enabled);
+  if (!updated) return res.status(404).json({ error: 'API key not found' });
+  res.json(listKeysMasked().find((k) => k.id === Number(req.params.id)));
+});
+
+app.delete('/api/settings/api-keys/:id', (req, res) => {
+  const deleted = deleteKey(Number(req.params.id));
+  if (!deleted) return res.status(404).json({ error: 'API key not found' });
+  res.status(204).end();
+});
+
 // Module 6 -> First-Run Setup -> "Required for Module 2 (core): a starter tag list —
 // paste a list or upload a CSV, not one-at-a-time entry." Also doubles as the ongoing
 // Settings-panel tag-library editor. Module 2's tags provider layer (lib/tags/user-list.js)
