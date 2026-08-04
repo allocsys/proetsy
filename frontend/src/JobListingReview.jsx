@@ -129,7 +129,7 @@ function ListingCard({ listing, onSaved }) {
         </button>
       </div>
 
-      {warnings.length > 0 &&/nlz/ ? null : (
+      {warnings.length > 0 && (
         <ul className="listing-warnings-list">
           {warnings.map((w, i) => (
             <li key={i}>{w}</li>
