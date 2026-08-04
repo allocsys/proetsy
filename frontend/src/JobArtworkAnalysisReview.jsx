@@ -105,7 +105,7 @@ export default function JobArtworkAnalysisReview({ jobId }) {
   }
 
   return (
-    <div className="artwork-analysis-card">
+    <div className="glass-card artwork-analysis-card">
       <div className="flex-row mb-3" style={{ justifyContent: 'space-between' }}>
         <button className="btn-primary" onClick={loadJobAndAnalysis} disabled={!jobId || loading}>
           {loading ? 'Loading…' : 'Load analysis'}
@@ -118,7 +118,7 @@ export default function JobArtworkAnalysisReview({ jobId }) {
       {error && <p className="text-danger mt-2">{error}</p>}
 
       {analysis ? (
-        <div className="settings-readonly-box" style={{ marginTop: '1rem', marginBottom: '1rem' }}>
+        <div className="settings-readonly-box glass-panel" style={{ marginTop: '1rem', marginBottom: '1rem' }}>
           <div className="settings-readonly-header">
             <span className="settings-readonly-title">AI Analysis Result</span>
             <span className="read-only-badge">AI Generated</span>
@@ -135,14 +135,14 @@ export default function JobArtworkAnalysisReview({ jobId }) {
             <span className="settings-field-label">Manual notes fallback</span>
             <span className="text-muted mono-sm">Used by listing generator when AI analysis is skipped or fails.</span>
             <textarea
-              className="listing-textarea"
+              className="listing-textarea glass-input"
               value={manualNotes}
               onChange={(e) => setManualNotes(e.target.value)}
               placeholder="Enter custom style, subject, or mood notes..."
             />
           </div>
           <div className="mt-2">
-            <button onClick={saveManualNotes} disabled={savingNotes}>
+            <button className="btn-secondary" onClick={saveManualNotes} disabled={savingNotes}>
               {savingNotes ? 'Saving notes…' : 'Save manual notes'}
             </button>
           </div>

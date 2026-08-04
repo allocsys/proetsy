@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 /**
- * One mockup's review card — polished to match the dark unified design system,
- * spacing scale, and clear image preview presentation with side-by-side smart-crop
- * vs AI-extended review comparison.
+ * One mockup's review card — polished with glassmorphism design system.
  */
 function MockupCard({ mockup, onVariantChange }) {
   const [saving, setSaving] = useState(false);
@@ -29,9 +27,9 @@ function MockupCard({ mockup, onVariantChange }) {
   }
 
   return (
-    <div className="dark-panel mockup-card">
-      <div className="settings-readonly-header" style={{ marginBottom: '1rem' }}>
-        <h4 style={{ margin: 0, fontWeight: 700, color: 'var(--ink)' }}>
+    <div className="glass-card mockup-card">
+      <div className="settings-readonly-header mb-4">
+        <h4 className="m-0 font-bold text-ink">
           {mockup.size_key} {mockup.dimensions ? `(${mockup.dimensions})` : ''}
         </h4>
         <span className="read-only-badge">
@@ -46,7 +44,7 @@ function MockupCard({ mockup, onVariantChange }) {
             <div className="mockup-variant-col">
               <span className="mockup-variant-label">Option A: Smart Crop</span>
               {mockup.smart_crop_url && (
-                <div className="settings-readonly-box" style={{ padding: '0.5rem', margin: 0 }}>
+                <div className="glass-surface p-2 m-0">
                   <img src={mockup.smart_crop_url} alt="Smart crop variant" className="mockup-variant-image" />
                 </div>
               )}
@@ -57,7 +55,7 @@ function MockupCard({ mockup, onVariantChange }) {
             <div className="mockup-variant-col">
               <span className="mockup-variant-label">Option B: AI Extended</span>
               {mockup.ai_extended_url && (
-                <div className="settings-readonly-box" style={{ padding: '0.5rem', margin: 0 }}>
+                <div className="glass-surface p-2 m-0">
                   <img src={mockup.ai_extended_url} alt="AI-extended variant" className="mockup-variant-image" />
                 </div>
               )}
@@ -70,7 +68,7 @@ function MockupCard({ mockup, onVariantChange }) {
       ) : (
         <div className="mockup-variant-col" style={{ alignItems: 'flex-start' }}>
           {mockup.file_url && (
-            <div className="settings-readonly-box" style={{ padding: '0.75rem', margin: 0 }}>
+            <div className="glass-surface p-3 m-0">
               <img src={mockup.file_url} alt="Selected mockup" className="mockup-variant-image" style={{ width: 'min(240px, 100%)' }} />
             </div>
           )}
@@ -83,8 +81,7 @@ function MockupCard({ mockup, onVariantChange }) {
 }
 
 /**
- * Manual category-selection gate for the curated flow (plan.md -> "Mockup categories").
- * Polished to match the dark unified design system, checkboxes, and spacing scale.
+ * Manual category-selection gate for the curated flow.
  */
 function MockupCategorySelector({ jobId, onGenerated }) {
   const [categories, setCategories] = useState([]);
@@ -145,14 +142,14 @@ function MockupCategorySelector({ jobId, onGenerated }) {
   if (!loaded) return null;
 
   return (
-    <div className="dark-panel mockup-category-selector">
+    <div className="glass-panel mockup-category-selector">
       <h4 style={{ marginTop: 0, marginBottom: '0.75rem' }}>Select Mockup Categories to Generate</h4>
       {categories.length ? (
         <>
           <div className="mockup-category-checklist">
             {categories.map((c) => (
               <label key={c} className="settings-checkbox-row">
-                <input type="checkbox" checked={!!checked[c]} onChange={() => toggleCategory(c)} />
+                <input type="checkbox" className="glass-input" checked={!!checked[c]} onChange={() => toggleCategory(c)} />
                 <span style={{ fontWeight: 600 }}>{c}</span>
               </label>
             ))}
@@ -175,7 +172,7 @@ function MockupCategorySelector({ jobId, onGenerated }) {
 }
 
 /**
- * Loads and reviews a job's mockups — polished to match the app shell.
+ * Loads and reviews a job's mockups with glassmorphism design system.
  */
 export default function JobMockupReview({ jobId }) {
   const [mockups, setMockups] = useState([]);
