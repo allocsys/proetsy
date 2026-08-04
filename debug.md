@@ -2,30 +2,29 @@
 
 Review scope: `remove-product-sizes-json-seed` branch (merged into `main`
 2026-08-04) and related backend config/provider code. Found via manual review +
-delegated multi-file investigation, not yet fixed.
+delegated multi-file investigation.
 
-## 1. `backend/config/index.js` — `getProductSizes()` has no validation
+Sequenced in the order to fix them — each step is picked so it doesn't get
+re-touched or invalidated by a later step.
 
-**Problem:** Reads raw rows from the `product_sizes` table and returns them
-unvalidated. That table is now dashboard-editable (no longer a static JSON seed),
-so a bad edit — empty `dimensions`, missing/zero `dpi` — flows straight through to
-`mockup-generator.js` with no guardrail.
+## Step 1 — `backend/server.js`: `PATCH /api/jobs/:id/listings/:listingId` race condition
 
-**Fix direction:** Add a schema check (e.g. Zod/Joi, or hand-rolled) in
-`getProductSizes()` before returning `result`, rejecting or logging rows missing
-required fields.
-
-## 2. `backend/server.js` — `PATCH /api/jobs/:id/listings/:listingId` race condition
+**Why first:** the only one of these that can actually lose user data right now
+(concurrent requests overwriting each other). Highest severity, fix before anything
+else.
 
 **Problem:** The route does a `SELECT`, merges the partial request body in JS, runs
-it through `enforceConventions()`, then issues a separate `UPDATE`. The
-select+merge+update isn't atomic, so two concurrent PATCHes on the same listing can
-overwrite each other (lost-update anomaly).
+it through `enforceConventions()`, then issues a separate `UPDATE`. Not atomic —
+two concurrent PATCHes on the same listing can overwrite each other (lost-update
+anomaly).
 
 **Fix direction:** Wrap the read-merge-write in `db.transaction(() => { ... })` so
 the whole operation is atomic.
 
-## 3. `backend/server.js` — `/api/setup-status` uses row *count* as "configured" proxy
+## Step 2 — `backend/server.js`: `/api/setup-status` uses row *count* as "configured" proxy
+
+**Why second:** same file as step 1, and a correctness bug that actively misleads
+users (dashboard says "ready" when it isn't) — fix before moving to config/index.js.
 
 **Problem:** `hasProductSize` is computed as `COUNT(*) FROM product_sizes > 0`. Any
 row — including an invalid or placeholder one — makes the dashboard report "ready to
@@ -34,16 +33,26 @@ run" even when nothing usable is configured.
 **Fix direction:** Check for at least one row with required fields populated
 (`dimensions`, `mockup_template_path` not null) instead of a bare count.
 
-## 4. `backend/config/index.js` — `getPipelineConfig()` re-queries on every call
+## Step 3 — `backend/config/index.js`: `getProductSizes()` has no validation
 
-**Problem:** Every call does a fresh `SELECT ... FROM settings` and re-joins against
-the JSON seed. Not wrong, but a needless DB round-trip on a function likely called
-frequently.
+**Why third:** directly related to step 2 — once "configured" means "has a valid
+row," `getProductSizes()` should enforce that same validity on every read, not just
+at setup-status time.
 
-**Fix direction:** Memoize the result, invalidating the cache only when
-`PATCH /api/settings` updates a pipeline-related key.
+**Problem:** Reads raw rows from the `product_sizes` table and returns them
+unvalidated. That table is dashboard-editable, so a bad edit — empty `dimensions`,
+missing/zero `dpi` — flows straight through to `mockup-generator.js` with no
+guardrail.
 
-## 5. `backend/lib/llm/claude.js` — `generateImage` stub throws instead of not existing
+**Fix direction:** Add a schema check (e.g. Zod/Joi, or hand-rolled) in
+`getProductSizes()` before returning `result`, rejecting or logging rows missing
+required fields. Reuse the same "required fields" definition from step 2 so the two
+checks can't drift apart.
+
+## Step 4 — `backend/lib/llm/claude.js`: `generateImage` stub throws instead of not existing
+
+**Why fourth:** independent of the config/server work above, pure cleanup — do it
+once the data-integrity fixes are settled.
 
 **Problem:** `generateImage` is exported purely to throw "no image-generation
 fallback." If any caller mis-routes an image request to the Claude provider, it's a
@@ -53,104 +62,14 @@ hard 500 instead of being filtered out earlier by capability checks.
 calling code in `llm/index.js` check provider capabilities before routing, instead
 of relying on a defensive stub per-provider.
 
----
+## Step 5 — `backend/config/index.js`: `getPipelineConfig()` re-queries on every call
 
-# Debug log — Windows install: installer prompts for C:\ dir, then clicking the app does nothing but spawns background processes
+**Why last:** pure performance optimization, no correctness impact — do it last so
+it doesn't need to be redone if steps 1–3 change adjacent code in the same file.
 
-Reported symptom: on Windows, the NSIS installer prompts to choose an install
-directory under `C:\...`; after installing, clicking the app produces no visible
-window, but ~10 processes show up in the background.
+**Problem:** Every call does a fresh `SELECT ... FROM settings` and re-joins against
+the JSON seed. Not wrong, but a needless DB round-trip on a function likely called
+frequently.
 
-## 1. The C:\ install-directory prompt — not a bug
-
-`package.json`'s `build.nsis` config sets:
-
-```json
-"nsis": {
-  "oneClick": false,
-  "allowToChangeInstallationDirectory": true
-}
-```
-
-`oneClick: false` + `allowToChangeInstallationDirectory: true` is what makes NSIS show
-the "choose install location" page (default suggestion is typically under
-`C:\Users\<user>\AppData\Local\Programs\ProEtsy` or `Program Files`, but the user can
-browse elsewhere). This is expected installer behavior, not a symptom of anything
-broken.
-
-## 2. "Nothing happens, but background processes appear"
-
-### Root cause candidate A (most likely) — no single-instance lock
-
-`electron/main.js` never calls `app.requestSingleInstanceLock()`. Startup sequence:
-
-1. `app.whenReady()` → `spawnBackend()` spawns the Node backend as a child process
-   bound to `PORT` (default 4000).
-2. `waitForBackend()` polls `GET /api/health` for up to 20s (`timeoutMs: 20000`).
-3. Only once that resolves does `createWindow()` run and a window appear.
-4. If `waitForBackend()` times out, the code does `console.error(...)` and
-   `app.quit()` — **silently**, no dialog shown to the user.
-
-If the first launch is still inside that up-to-20s window (or a window did open but
-off-screen/behind other windows) and the user clicks the exe again — which is a very
-natural reaction to "nothing happened" — Windows launches a **second, fully separate
-instance**. That second instance spawns its *own* backend child process, which tries
-to bind the same port 4000 already held by the first instance's backend, fails
-(`EADDRINUSE`), health-check never succeeds, and that instance times out and quits
-too — again silently. Each additional click compounds more orphaned/short-lived
-processes without ever producing a visible window. This matches the reported "10
-background processes, nothing visible."
-
-### Root cause candidate B — slow first-run backend startup exceeding the 20s timeout
-
-The bundled backend does SQLite schema init (`backend/db/init.js`) and loads
-`onnxruntime-web` on first run. On a slower disk/first run this could plausibly
-exceed the hardcoded 20s `waitForBackend` timeout, causing the same silent
-`app.quit()` path as above — no error dialog, so it looks like nothing happened even
-with only one instance running.
-
-### Root cause candidate C — SmartScreen / unsigned installer
-
-The installer is unsigned (`ARCHITECTURE.md` → Open Discussions → "Unsigned Windows
-exe / SmartScreen"). Release notes tell users to click "More info → Run anyway" on
-first launch. If a user's Defender/AV config silently blocks or quarantines instead of
-prompting, the app may fail to run at all. Worth ruling out but doesn't by itself
-explain 10 background processes.
-
-### Ruled out — the packaged backend itself (better-sqlite3 / missing deps)
-
-`ARCHITECTURE.md`'s "Electron packaging — build sequence" documents CI runs #1–#6
-tracking down and fixing exactly this class of failure (root `package.json` missing a
-`dependencies` block so electron-builder's production-dependency walk didn't discover
-backend's runtime deps; `better-sqlite3` ABI mismatch against Electron's Node version).
-Run #6 (workflow_dispatch, commit `276e20e`) confirmed via an asar-inspection CI step
-that `better-sqlite3` (and, by the same fix, the rest of backend's deps) are correctly
-present in `app.asar` and unpacked at `app.asar.unpacked`. The published `v0.1.0`
-release (run #7, commit `2639c4f`) has an identical `package.json` to the verified
-commit, so the packaged backend itself is not expected to be missing dependencies or
-failing to `require()` at startup.
-
-## 3. How to confirm which candidate, on the affected Windows machine
-
-- Task Manager: check for **multiple** `ProEtsy.exe` / `electron.exe` process groups
-  (as opposed to one instance's normal Chromium helper-process footprint — GPU,
-  network service, crashpad, 1–2 renderers — which is itself normally ~6–9 processes
-  for a single instance and is not by itself a sign of a bug).
-- `netstat -ano | findstr :4000` — reveals whether something is already bound to the
-  backend's port from a stuck earlier launch.
-- Launch via `cmd.exe` instead of double-clicking, to see
-  `[electron] backend process exited (code=..., signal=...)` or the
-  `waitForBackend` timeout error printed to console instead of disappearing silently.
-- Check whether SmartScreen showed a warning dialog on first run and whether "Run
-  anyway" was clicked.
-
-## 4. Planned fix (not yet applied)
-
-Two changes to `electron/main.js`:
-
-1. Add `app.requestSingleInstanceLock()` near the top of the file; if a second
-   instance launches while one is already running, focus/restore the existing
-   window instead of spawning a duplicate backend+window stack.
-2. Replace the silent `app.quit()` in `waitForBackend`'s catch block with
-   `dialog.showErrorBox(...)` (or similar user-visible feedback) so a startup
-   failure is visible instead of looking like a no-op.
+**Fix direction:** Memoize the result, invalidating the cache only when
+`PATCH /api/settings` updates a pipeline-related key.
