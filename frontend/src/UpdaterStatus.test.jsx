@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import UpdaterStatus from './UpdaterStatus.jsx';
 
@@ -8,10 +8,10 @@ import UpdaterStatus from './UpdaterStatus.jsx';
 // main.js sending a real 'updater:*' IPC event) and returns an unsubscribe spy.
 function makeUpdaterAPI(overrides = {}) {
   const callbacks = {};
-  const on = (name) => (cb) => {
+  const on = (name) => vi.fn((cb) => {
     callbacks[name] = cb;
     return vi.fn();
-  };
+  });
   return {
     api: {
       checkForUpdates: vi.fn().mockResolvedValue({ skipped: false }),
@@ -84,7 +84,7 @@ describe('UpdaterStatus — update lifecycle events', () => {
     window.updaterAPI = api;
     render(<UpdaterStatus />);
 
-    callbacks.notAvailable({});
+    act(() => callbacks.notAvailable({}));
 
     expect(await screen.findByText('Up to date')).toBeInTheDocument();
     expect(screen.getByText('Check again')).toBeInTheDocument();
@@ -96,7 +96,7 @@ describe('UpdaterStatus — update lifecycle events', () => {
     const user = userEvent.setup();
     render(<UpdaterStatus />);
 
-    callbacks.available({ version: '1.2.3' });
+    act(() => callbacks.available({ version: '1.2.3' }));
 
     expect(await screen.findByText(/Update v1\.2\.3 available/)).toBeInTheDocument();
     await user.click(screen.getByText('Download update'));
@@ -108,7 +108,7 @@ describe('UpdaterStatus — update lifecycle events', () => {
     window.updaterAPI = api;
     render(<UpdaterStatus />);
 
-    callbacks.progress({ percent: 42.7 });
+    act(() => callbacks.progress({ percent: 42.7 }));
 
     expect(await screen.findByText(/Downloading update… 43%/)).toBeInTheDocument();
   });
@@ -119,7 +119,7 @@ describe('UpdaterStatus — update lifecycle events', () => {
     const user = userEvent.setup();
     render(<UpdaterStatus />);
 
-    callbacks.downloaded({ version: '1.2.3' });
+    act(() => callbacks.downloaded({ version: '1.2.3' }));
 
     expect(await screen.findByText(/Update v1\.2\.3 ready/)).toBeInTheDocument();
     await user.click(screen.getByText('Restart & install'));
@@ -131,7 +131,7 @@ describe('UpdaterStatus — update lifecycle events', () => {
     window.updaterAPI = api;
     render(<UpdaterStatus />);
 
-    callbacks.error('GitHub rate limit exceeded');
+    act(() => callbacks.error('GitHub rate limit exceeded'));
 
     expect(await screen.findByText('GitHub rate limit exceeded')).toBeInTheDocument();
     expect(screen.getByText('Retry')).toBeInTheDocument();
