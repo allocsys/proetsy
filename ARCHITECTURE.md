@@ -84,7 +84,7 @@ Composites artwork into the user's own mockup templates. No Canvas/Pillow/Canva 
 - **Known limitation:** `ag-psd` doesn't re-evaluate Photoshop smart-object warp/perspective transforms or most layer effects (drop shadows, overlays). A smart object warped to sit at an angle inside a photographed frame will place the artwork as an unwarped, axis-aligned rectangle — spot-check every new PSD template after its first run. (A follow-on option — reading the warp-transform matrix and applying a matching affine transform — is real additional work, not done, worth revisiting only if warped templates turn out to be common.)
 - Flat PNG/JPEG templates are unaffected — "template canvas = full output, transparent window" convention, unchanged.
 
-**Product-sizes config** (`product-sizes.json`, DB-backed — see Module 6) — one entry per size:
+**Product-sizes config** — one row per size in the `product_sizes` DB table (`size_key`, `dimensions`, `dpi`, `orientation`, `mockup_template_path`, `placement_layer`), dashboard-editable via `MockupTemplates.jsx` / `POST /api/mockup-templates` / `DELETE /api/mockup-templates/:sizeKey`. Conceptually the same shape a `product-sizes.json` file would have held:
 ```json
 {
   "8x10-portrait": { "dimensions": "8x10", "dpi": 300, "orientation": "portrait", "mockup_template": "templates/8x10-frame.png" },
@@ -92,9 +92,9 @@ Composites artwork into the user's own mockup templates. No Canvas/Pillow/Canva 
   "framed-psd":     { "dimensions": "11x14", "dpi": 300, "orientation": "portrait", "mockup_template": "templates/framed-wall.psd", "placement_layer": "artwork" }
 }
 ```
-This is the single source of truth for both Module 2 (which sizes are sellable/mentionable) and Module 3 (which template to composite into). New product types are added by editing this config, not code.
+This is the single source of truth for both Module 2 (which sizes are sellable/mentionable) and Module 3 (which template to composite into). New product types are added through the dashboard (or directly in the DB), not by editing a config file.
 
-**Dashboard:** a folder-picker/thumbnail template manager (`MockupTemplates.jsx`) is planned but not yet built — sizes/templates are currently managed via the DB-backed config and are shown read-only in Module 6's settings panel. See `plan.md` for the rollout plan.
+**Dashboard:** `MockupTemplates.jsx` — folder scan/picker, per-row Save/Remove, full CRUD over `product_sizes`.
 
 ### Module 4 — Trend/Prompt Helper (optional, manual-trend version)
 **What changed from the original plan:** no live Etsy trend-pulling API call — trends come from the **trends provider layer** (see below), backed by a manually maintained/dashboard-entered list.
@@ -115,7 +115,7 @@ React frontend (`frontend/src/App.jsx`) that:
 - Runs the pipeline server-side (`backend/lib/pipeline-runner.js`, `POST /api/jobs/:id/run` / `POST /api/jobs/run-batch`) — the run isn't tied to the browser tab staying open.
 - Shows a **pipeline config panel**: per-run module toggles seeded from `pipeline.config.json`'s defaults; the required module (Module 2) is shown checked and disabled. Overrides apply to that run only.
 - Job history log, grouped into collapsible "bulk batch" rows (jobs sharing a client-generated `batch_id`) with per-status badge breakdowns.
-- Settings panel: tag-library paste/CSV import, default price/delivery text, trend-list management, shop conventions (read-only — intentionally hardcoded), product-sizes (read-only for now — see Module 3).
+- Settings panel: tag-library paste/CSV import, default price/delivery text, trend-list management, shop conventions (read-only — intentionally hardcoded), product-sizes/mockup templates (dashboard-editable — see Module 3's `MockupTemplates.jsx`).
 - Review/edit any generated field before publishing (`JobListingReview.jsx`, `JobMockupReview.jsx`, `JobArtworkAnalysisReview.jsx`), each with Copy-for-Etsy / export.
 - Persistent setup-status banner (`GET /api/setup-status`) — see First-Run Setup below.
 
@@ -169,7 +169,7 @@ Labeling *is* the training — no separate training mode, and it never "finishes
 
 No separate installer or CLI wizard — the app detects its own setup state on launch and drives the dashboard accordingly.
 
-**Detection:** on backend startup, check for (1) at least one Gemini key in `.env`, (2) an initialized DB, (3) at least one entry in the product-sizes config. If any are missing, the dashboard opens directly into a setup screen.
+**Detection:** on backend startup, check for (1) at least one Gemini key (dashboard-managed, DB-backed), (2) an initialized DB, (3) at least one configured row in the `product_sizes` table. If any are missing, the dashboard opens directly into a setup screen.
 
 **Setup steps, ordered by what's actually required:**
 - **Required to run at all:** at least one Gemini API key, saved to `.env` (never committed). DB schema auto-creates with no user action.
