@@ -112,19 +112,33 @@ export default function PromptHelper() {
   }
 
   return (
-    <div className="module-panel">
-      <div className="control-row">
-        <div className="control-group">
-          <label className="control-label" htmlFor="prompt-category-select">Category:</label>
-          <select id="prompt-category-select" value={category} onChange={(e) => setCategory(e.target.value)}>
+    <div className="glass-panel">
+      <h2 className="settings-section-title">
+        <span>Prompt Helper & Trends</span>
+      </h2>
+      <div className="settings-field-row mb-3">
+        <div className="settings-field flex-1">
+          <label className="settings-field-label" htmlFor="prompt-category-select">Category</label>
+          <select 
+            className="glass-input" 
+            id="prompt-category-select" 
+            value={category} 
+            onChange={(e) => setCategory(e.target.value)}
+          >
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
         </div>
-        <div className="control-group">
-          <label className="control-label" htmlFor="prompt-trend-select">Trend</label>
-          <select id="prompt-trend-select" value={selectedTrendId} onChange={(e) => setSelectedTrendId(e.target.value)} disabled={loadingTrends}>
+        <div className="settings-field flex-1">
+          <label className="settings-field-label" htmlFor="prompt-trend-select">Trend</label>
+          <select 
+            className="glass-input" 
+            id="prompt-trend-select" 
+            value={selectedTrendId} 
+            onChange={(e) => setSelectedTrendId(e.target.value)} 
+            disabled={loadingTrends}
+          >
             <option value="">(none)</option>
             {trends.map((t) => (
               <option key={t.id} value={t.id}>{t.term}{t.category ? ` (${t.category})` : ''}</option>
@@ -136,40 +150,47 @@ export default function PromptHelper() {
         </button>
       </div>
 
-      <div className="control-row" style={{ marginTop: '1rem' }}>
-        <input
-          placeholder="Add a new trend"
-          aria-label="Add a new trend"
-          value={newTrendTerm}
-          onChange={(e) => setNewTrendTerm(e.target.value)}
-        />
-        <input
-          placeholder="Category"
-          aria-label="Trend category"
-          value={newTrendCategory}
-          onChange={(e) => setNewTrendCategory(e.target.value)}
-        />
+      <div className="settings-field-row mb-3">
+        <div className="settings-field flex-1">
+          <input
+            className="glass-input"
+            placeholder="Add a new trend"
+            aria-label="Add a new trend"
+            value={newTrendTerm}
+            onChange={(e) => setNewTrendTerm(e.target.value)}
+          />
+        </div>
+        <div className="settings-field flex-1">
+          <input
+            className="glass-input"
+            placeholder="Category"
+            aria-label="Trend category"
+            value={newTrendCategory}
+            onChange={(e) => setNewTrendCategory(e.target.value)}
+          />
+        </div>
         <button className="btn-secondary" onClick={addTrend} disabled={addingTrend || !newTrendTerm.trim()}>
           {addingTrend ? 'Adding…' : 'Add trend'}
         </button>
       </div>
 
-      <div className="mt-2 text-muted mono-sm">
-        <label htmlFor="csv-file-input">Import CSV (<code>term</code>, <code>category</code>):</label> <input id="csv-file-input" type="file" accept=".csv,text/csv" onChange={(e) => importTrendsCsv(e.target.files?.[0])} />
-        {csvMessage && <span className="ml-1">{csvMessage}</span>}
+      <div className="mt-2 text-muted mono-sm mb-4">
+        <label htmlFor="csv-file-input">Import CSV (<code>term</code>, <code>category</code>):</label>{' '}
+        <input className="glass-input input-auto ml-1" id="csv-file-input" type="file" accept=".csv,text/csv" onChange={(e) => importTrendsCsv(e.target.files?.[0])} />
+        {csvMessage && <span className="ml-1 text-muted">{csvMessage}</span>}
       </div>
 
-      {error && <p className="status-error mt-2">{error}</p>}
+      {error && <p className="text-danger mt-2">{error}</p>}
 
       {generated.length > 0 && (
         <div className="mt-4">
-          <h4 className="settings-sub-heading">Generated</h4>
+          <h4 className="settings-sub-heading mb-2">Generated Prompts</h4>
           {generated.map((p) => (
-            <div key={p.id} className="settings-section-card" style={{ marginBottom: '0.75rem' }}>
-              <code className="block mb-2">{p.prompt_text}</code>
+            <div key={p.id} className="glass-card mb-3 p-4">
+              <code className="prompt-code-block block mb-2">{p.prompt_text}</code>
               <button className="btn-secondary btn-sm" onClick={() => copyToClipboard(p.prompt_text)}>Copy</button>
               {p.warnings.length > 0 && (
-                <ul className="text-danger mt-2">
+                <ul className="prompt-warnings-list mt-2">
                   {p.warnings.map((w, i) => <li key={i}>{w}</li>)}
                 </ul>
               )}
@@ -180,10 +201,10 @@ export default function PromptHelper() {
 
       {history.length > 0 && (
         <div className="mt-4">
-          <h4 className="settings-sub-heading">History: &quot;{category}&quot;</h4>
-          <ul className="settings-compact-list">
+          <h4 className="settings-sub-heading mb-2">History: &quot;{category}&quot;</h4>
+          <ul className="prompt-history-list">
             {history.map((p) => (
-              <li key={p.id} className="flex-row items-center justify-between">
+              <li key={p.id} className="prompt-history-item flex-row items-center justify-between">
                 <code className="mono-sm">{p.prompt_text}</code> 
                 <button className="btn-ghost btn-sm" onClick={() => copyToClipboard(p.prompt_text)}>Copy</button>
               </li>
