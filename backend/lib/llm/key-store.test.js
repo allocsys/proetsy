@@ -16,36 +16,22 @@ afterAll(() => {
   fs.rmSync(tmpRoot, { recursive: true, force: true });
 });
 
-async function freshKeyStore({ geminiEnv, claudeEnv } = {}) {
+async function freshKeyStore() {
   vi.resetModules();
   process.env.DB_PATH = path.join(tmpRoot, `${Math.random().toString(36).slice(2)}.db`);
-  if (geminiEnv === undefined) delete process.env.GEMINI_API_KEYS;
-  else process.env.GEMINI_API_KEYS = geminiEnv;
-  if (claudeEnv === undefined) delete process.env.CLAUDE_API_KEY;
-  else process.env.CLAUDE_API_KEY = claudeEnv;
   return import('./key-store.js');
 }
 
 const VALID_KEY = 'AIzaSyD-fake-key-1234567890';
 
 describe('getKeysForProvider', () => {
-  it('falls back to GEMINI_API_KEYS (comma-separated) when the DB has no enabled rows', async () => {
-    const { getKeysForProvider } = await freshKeyStore({ geminiEnv: 'key-one, key-two ,key-three' });
-    expect(getKeysForProvider('gemini')).toEqual(['key-one', 'key-two', 'key-three']);
-  });
-
-  it('falls back to CLAUDE_API_KEY (single value) when the DB has no enabled rows', async () => {
-    const { getKeysForProvider } = await freshKeyStore({ claudeEnv: 'claude-fallback-key' });
-    expect(getKeysForProvider('claude')).toEqual(['claude-fallback-key']);
-  });
-
-  it('returns an empty array for a provider with no DB rows and no .env fallback', async () => {
+  it('returns an empty array for a provider with no DB rows', async () => {
     const { getKeysForProvider } = await freshKeyStore();
     expect(getKeysForProvider('mystery-provider')).toEqual([]);
   });
 
-  it('prefers DB-backed enabled keys over the .env fallback once any exist', async () => {
-    const { getKeysForProvider, addKey } = await freshKeyStore({ geminiEnv: 'env-fallback-key' });
+  it('returns enabled DB-backed keys', async () => {
+    const { getKeysForProvider, addKey } = await freshKeyStore();
     addKey({ provider: 'gemini', key_value: VALID_KEY });
     expect(getKeysForProvider('gemini')).toEqual([VALID_KEY]);
   });
@@ -59,12 +45,12 @@ describe('getKeysForProvider', () => {
     expect(getKeysForProvider('gemini')).toEqual([`${VALID_KEY}-b`]);
   });
 
-  it('falls back to .env again once every DB row for that provider is disabled', async () => {
-    const { getKeysForProvider, addKey, setKeyEnabled } = await freshKeyStore({ geminiEnv: 'env-fallback-key' });
+  it('returns an empty array once every DB row for that provider is disabled', async () => {
+    const { getKeysForProvider, addKey, setKeyEnabled } = await freshKeyStore();
     const key = addKey({ provider: 'gemini', key_value: VALID_KEY });
     setKeyEnabled(key.id, false);
 
-    expect(getKeysForProvider('gemini')).toEqual(['env-fallback-key']);
+    expect(getKeysForProvider('gemini')).toEqual([]);
   });
 });
 
