@@ -37,7 +37,9 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
         if (!fresh.length) return;
         fresh.forEach((c) => seenPathsRef.current.add(c.imagePath));
         setCandidates((prev) => [...fresh, ...prev]);
-      } catch {}
+      } catch {
+        // Ignore transient polling errors; next interval tick will retry.
+      }
     }, PENDING_POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, []);
