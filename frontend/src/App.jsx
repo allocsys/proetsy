@@ -93,6 +93,11 @@ function App() {
   const [tagsBackfillRunning, setTagsBackfillRunning] = useState(false);
   const [watchStatus, setWatchStatus] = useState(null);
   const [rateLimits, setRateLimits] = useState([]);
+  const [apiKeys, setApiKeys] = useState([]);
+  const [newKeyProvider, setNewKeyProvider] = useState('gemini');
+  const [newKeyValue, setNewKeyValue] = useState('');
+  const [newKeyLabel, setNewKeyLabel] = useState('');
+  const [apiKeysMessage, setApiKeysMessage] = useState('');
   const [jobs, setJobs] = useState([]);
   const [dragActive, setDragActive] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
@@ -102,7 +107,11 @@ function App() {
 
   function goTo(view) {
     setActiveView(view);
-    if (view === 'settings') refreshRateLimits();
+    if (view === 'settings') {
+      refreshRateLimits();
+      refreshApiKeys();
+      refreshPipelineConfig();
+    }
   }
 
   function refreshJobs() {
@@ -147,6 +156,23 @@ function App() {
       .catch(() => {});
   }
 
+  function refreshApiKeys() {
+    fetch('/api/settings/api-keys')
+      .then((r) => r.json())
+      .then(setApiKeys)
+      .catch(() => {});
+  }
+
+  function refreshPipelineConfig() {
+    fetch('/api/config/pipeline')
+      .then((r) => r.json())
+      .then((cfg) => {
+        setPipelineDefault(cfg);
+        setOverrides(Object.fromEntries(cfg.pipeline.map((m) => [m.module, m.enabled])));
+      })
+      .catch(() => {});
+  }
+
   useEffect(() => {
     fetch('/api/health')
       .then((r) => r.json())
@@ -169,6 +195,7 @@ function App() {
     refreshTags();
     refreshWatchStatus();
     refreshRateLimits();
+    refreshApiKeys();
   }, []);
 
   const tagCategories = useMemo(
@@ -325,6 +352,61 @@ function App() {
   async function saveWatchSetting(updates) {
     await saveSettings(updates);
     refreshWatchStatus();
+  }
+
+  // plan.md -> "Editable Settings & API Keys from Dashboard" -> Frontend step 1. Full key
+  // values only ever leave the input field here on the way to POST -- every response from
+  // the backend (including this add call's own response) only ever contains maskedKey,
+  // never key_value, so nothing round-trips the raw value back into state.
+  async function addApiKey() {
+    if (!newKeyValue.trim()) return;
+    setApiKeysMessage('Adding key…');
+    try {
+      const res = await fetch('/api/settings/api-keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: newKeyProvider,
+          key_value: newKeyValue.trim(),
+          label: newKeyLabel.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to add key');
+      setNewKeyValue('');
+      setNewKeyLabel('');
+      setApiKeysMessage('');
+      refreshApiKeys();
+    } catch (err) {
+      setApiKeysMessage(err.message);
+    }
+  }
+
+  async function toggleApiKeyEnabled(key) {
+    await fetch(`/api/settings/api-keys/${key.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: !key.enabled }),
+    });
+    refreshApiKeys();
+  }
+
+  async function deleteApiKey(key) {
+    if (!window.confirm(`Delete ${key.provider} key${key.label ? ` "${key.label}"` : ''} (${key.maskedKey})? This can't be undone.`)) return;
+    await fetch(`/api/settings/api-keys/${key.id}`, { method: 'DELETE' });
+    refreshApiKeys();
+  }
+
+  // plan.md -> Frontend step 2: dashboard-editable pipeline module toggles, backed by
+  // the same `pipeline_module_<name>_enabled` settings keys getPipelineConfig() reads
+  // (backend/config/index.js). Distinct from toggleModule()/`overrides` above, which is
+  // a per-upload-session override that's never persisted -- this PATCHes the saved
+  // default straight away, then re-fetches so pipelineDefault (and the Upload view's
+  // checkboxes, which start from it) reflect the new default immediately.
+  async function togglePersistedModule(moduleName, currentlyEnabled, required) {
+    if (required) return;
+    await saveSettings({ [`pipeline_module_${moduleName}_enabled`]: !currentlyEnabled });
+    refreshPipelineConfig();
   }
 
   async function addTrendFromSettings() {
