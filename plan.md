@@ -31,7 +31,7 @@ review and revert independently.
 - [x] **6. PromptHelper.jsx**
   - Apply glass classes to prompt input/output panels
 
-- [ ] **7. TasteFilter.jsx**
+- [x] **7. TasteFilter.jsx**
   - Apply glass classes to filter controls and result panels
 
 - [ ] **8. UpdaterStatus.jsx**
