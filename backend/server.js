@@ -6,7 +6,7 @@ import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
 import { getDb } from './db/init.js';
-import { getPipelineConfig, getProductSizes, migrateProductSizesSeed } from './config/index.js';
+import { getPipelineConfig, getProductSizes, migrateProductSizesSeed, migratePipelineConfigSeed } from './config/index.js';
 import { SHOP_CONVENTIONS, MIDJOURNEY_CONVENTIONS } from './config/shop-conventions.js';
 import { createJob, getJobWithModules, setManualNotes, setModuleStatus } from './lib/jobs.js';
 import { analyzeArtworkForJob } from './lib/image-analyzer/index.js';
@@ -15,6 +15,7 @@ import { enforceConventions } from './lib/listing-generator/validate.js';
 import { generateMockupForJob, OUTPUT_DIR } from './lib/mockup-generator.js';
 import { runPendingModulesForJob, runPendingModulesForJobs } from './lib/pipeline-runner.js';
 import { initRateLimitCache } from './lib/llm/rate-limits.js';
+import { listKeysMasked, addKey, setKeyEnabled, deleteKey } from './lib/llm/key-store.js';
 import { getTrends } from './lib/trends/index.js';
 import { addManualTrend, importFromCsvRows, rowsFromCsvText } from './lib/trends/manual.js';
 import {
@@ -129,6 +130,14 @@ getDb();
 // of the file (see config/index.js -> migrateProductSizesSeed(), plan.md -> "Rollout"
 // step 1). Safe to call on every startup -- a no-op once the table has any rows.
 migrateProductSizesSeed();
+
+// One-time migration: seeds each pipeline module's `pipeline_module_<name>_enabled`
+// settings key from pipeline.config.json the first time it's seen, so an existing
+// hand-edited JSON file's toggles survive the move to the dashboard-editable flow (see
+// config/index.js -> migratePipelineConfigSeed(), plan.md -> "Rollout" step 4). Same
+// safe-to-call-every-startup / no-op-once-seeded shape as migrateProductSizesSeed()
+// above.
+migratePipelineConfigSeed();
 
 // Rehydrates the LLM provider layer's in-process cooldown Map from the durable
 // llm_rate_limits table, so a restart doesn't reset an already-exhausted key/model pair
