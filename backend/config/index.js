@@ -58,7 +58,20 @@ export function migratePipelineConfigSeed() {
     return inserted;
   });
   const inserted = run();
+  if (inserted > 0) invalidatePipelineConfigCache();
   return { migrated: inserted > 0, inserted };
+}
+
+// getPipelineConfig() result cache (debug.md step 5) -- avoids a DB round-trip + JSON
+// re-join on every call. Invalidated here on startup seeding and by server.js's
+// PATCH /api/settings whenever a dashboard toggle could have changed a module's
+// `enabled` value; never invalidated based on which specific key changed, since the
+// cost of an extra rebuild on an unrelated settings PATCH is negligible next to the
+// risk of missing an invalidation and serving a stale pipeline config.
+let pipelineConfigCache = null;
+
+export function invalidatePipelineConfigCache() {
+  pipelineConfigCache = null;
 }
 
 /**
@@ -70,6 +83,8 @@ export function migratePipelineConfigSeed() {
  * `enabled`.
  */
 export function getPipelineConfig() {
+  if (pipelineConfigCache) return pipelineConfigCache;
+
   const jsonConfig = loadPipelineConfigJsonSeed();
   const db = getDb();
   const modules = jsonConfig?.pipeline || [];
@@ -80,7 +95,7 @@ export function getPipelineConfig() {
     .all(...modules.map((m) => pipelineEnabledSettingKey(m.module)));
   const overrides = Object.fromEntries(rows.map((r) => [r.key, r.value]));
 
-  return {
+  pipelineConfigCache = {
     ...jsonConfig,
     pipeline: modules.map((entry) => {
       const key = pipelineEnabledSettingKey(entry.module);
@@ -88,6 +103,7 @@ export function getPipelineConfig() {
       return { ...entry, enabled };
     }),
   };
+  return pipelineConfigCache;
 }
 
 /**
