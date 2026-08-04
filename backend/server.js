@@ -6,7 +6,12 @@ import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
 import { getDb } from './db/init.js';
-import { getPipelineConfig, getProductSizes, migratePipelineConfigSeed } from './config/index.js';
+import {
+  getPipelineConfig,
+  getProductSizes,
+  migratePipelineConfigSeed,
+  invalidatePipelineConfigCache,
+} from './config/index.js';
 import { SHOP_CONVENTIONS, MIDJOURNEY_CONVENTIONS } from './config/shop-conventions.js';
 import { createJob, getJobWithModules, setManualNotes, setModuleStatus } from './lib/jobs.js';
 import { analyzeArtworkForJob } from './lib/image-analyzer/index.js';
@@ -279,6 +284,11 @@ app.patch('/api/settings', (req, res) => {
     }
   });
   run();
+  // getPipelineConfig() is memoized (config/index.js) -- any settings PATCH could have
+  // touched a pipeline_module_<name>_enabled key, so invalidate unconditionally rather
+  // than trying to detect which keys changed. Cheap: the next getPipelineConfig() call
+  // just rebuilds it once.
+  invalidatePipelineConfigCache();
   // Re-reconciles the taste-filter watcher against whatever just changed -- covers
   // toggling taste_filter_watch_enabled, editing taste_filter_watch_folder/_category, or
   // any other settings PATCH that happens to touch none of those (a no-op in that case,
