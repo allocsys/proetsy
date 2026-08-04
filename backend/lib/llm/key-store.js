@@ -66,10 +66,29 @@ export function listKeysMasked() {
   }));
 }
 
+// Deliberately loose -- this isn't provider-specific validation (key formats vary and
+// change over time), just enough of a sanity check to catch obvious mistakes like
+// pasting a stray space, a placeholder string, or truncated clipboard content before it
+// silently fails at call time instead. Never logs key_value -- only the length shows up
+// in the thrown message.
+function assertPlausibleKey(key_value) {
+  const trimmed = key_value.trim();
+  if (trimmed !== key_value) {
+    throw new Error('key_value should not have leading/trailing whitespace');
+  }
+  if (trimmed.length < 16) {
+    throw new Error(`key_value looks too short to be a real API key (${trimmed.length} chars)`);
+  }
+  if (/\s/.test(trimmed)) {
+    throw new Error('key_value should not contain whitespace');
+  }
+}
+
 export function addKey({ provider, key_value, label }) {
   if (!provider || !key_value) {
     throw new Error('provider and key_value are required');
   }
+  assertPlausibleKey(key_value);
   const db = getDb();
   const { lastInsertRowid } = db
     .prepare('INSERT INTO api_keys (provider, key_value, label, enabled) VALUES (?, ?, ?, 1)')
