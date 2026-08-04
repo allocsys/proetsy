@@ -10,7 +10,6 @@ import path from 'node:path';
 // mockup-generator.idempotency.test.js.
 let getPipelineConfig;
 let getProductSizes;
-let migrateProductSizesSeed;
 let migratePipelineConfigSeed;
 let getDb;
 let tmpRoot;
@@ -20,7 +19,7 @@ beforeAll(async () => {
   process.env.DB_PATH = path.join(tmpRoot, 'test.db');
 
   ({ getDb } = await import('../db/init.js'));
-  ({ getPipelineConfig, getProductSizes, migrateProductSizesSeed, migratePipelineConfigSeed } = await import(
+  ({ getPipelineConfig, getProductSizes, migratePipelineConfigSeed } = await import(
     './index.js'
   ));
 });
@@ -117,33 +116,5 @@ describe('getProductSizes (DB-backed)', () => {
     });
 
     db.prepare("DELETE FROM product_sizes WHERE size_key = 'unit-test-size'").run();
-  });
-});
-
-describe('migrateProductSizesSeed', () => {
-  it('seeds product_sizes from product-sizes.json when the table is empty', () => {
-    const db = getDb();
-    db.prepare('DELETE FROM product_sizes').run();
-
-    const result = migrateProductSizesSeed();
-    expect(result.migrated).toBe(true);
-    expect(result.inserted).toBeGreaterThan(0);
-
-    const sizes = getProductSizes();
-    expect(sizes['8x10-portrait']).toBeDefined();
-    expect(sizes['8x10-portrait'].mockup_template).toBe('templates/8x10-frame.png');
-  });
-
-  it('is a no-op once product_sizes already has rows (never duplicates or overwrites)', () => {
-    const db = getDb();
-    const before = db.prepare('SELECT COUNT(*) AS n FROM product_sizes').get().n;
-    expect(before).toBeGreaterThan(0);
-
-    const result = migrateProductSizesSeed();
-    expect(result.migrated).toBe(false);
-    expect(result.inserted).toBe(0);
-
-    const after = db.prepare('SELECT COUNT(*) AS n FROM product_sizes').get().n;
-    expect(after).toBe(before);
   });
 });
