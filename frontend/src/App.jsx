@@ -526,7 +526,7 @@ function App() {
             <div className="setup-alert">
               <strong>Setup incomplete</strong>
               <ul>
-                <li>{setupStatus.geminiKeyConfigured ? '✅' : '⚠️'} Gemini API key configured (.env)</li>
+                <li>{setupStatus.geminiKeyConfigured ? '✅' : '⚠️'} Gemini API key configured — add one below in Settings</li>
                 <li>{setupStatus.hasTagLibrary ? '✅' : '⚠️'} Tag library has at least one tag — add one below in Settings</li>
                 <li>{setupStatus.hasProductSize ? '✅' : '⚠️ (optional)'} At least one product size / mockup template configured</li>
               </ul>
@@ -667,7 +667,7 @@ function App() {
 
                 <div className="settings-subsection">
                   <p className="text-muted" style={{ marginTop: 0 }}>
-                    Keys stored here are used before falling back to <code>backend/.env</code>. Values are never shown again after saving — only the last 4 characters are kept visible.
+                    Keys are stored in the database — this is the only place the app reads API keys from. Values are never shown again after saving — only the last 4 characters are kept visible.
                   </p>
                   {apiKeys.length ? (
                     <table className="data-table">
@@ -700,7 +700,7 @@ function App() {
                       </tbody>
                     </table>
                   ) : (
-                    <p className="empty-state">No dashboard-managed keys yet — using whatever's in <code>backend/.env</code>.</p>
+                    <p className="empty-state">No dashboard-managed keys yet — add one below to enable Gemini/Claude calls.</p>
                   )}
 
                   <div className="settings-field-row" style={{ marginTop: '1rem' }}>
