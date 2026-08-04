@@ -41,7 +41,7 @@ function MockupCard({ mockup, onVariantChange }) {
 
       {mockup.needs_review ? (
         <>
-          <p className="mockup-review-status mb-3">AI outpainting fallback triggered — please inspect and select a preferred variant below:</p>
+          <p className="mockup-review-status mb-3">Needs review — pick a variant:</p>
           <div className="mockup-variants-row">
             <div className="mockup-variant-col">
               <span className="mockup-variant-label">Option A: Smart Crop</span>
@@ -51,7 +51,7 @@ function MockupCard({ mockup, onVariantChange }) {
                 </div>
               )}
               <button className="btn-secondary" disabled={saving} onClick={() => selectVariant('smart_crop')}>
-                Use Smart Crop
+                Use smart crop
               </button>
             </div>
             <div className="mockup-variant-col">
@@ -62,7 +62,7 @@ function MockupCard({ mockup, onVariantChange }) {
                 </div>
               )}
               <button className="btn-primary" disabled={saving} onClick={() => selectVariant('ai_extended')}>
-                Use AI Extended
+                Use AI extended
               </button>
             </div>
           </div>
@@ -159,13 +159,13 @@ function MockupCategorySelector({ jobId, onGenerated }) {
           </div>
           <div className="mt-3">
             <button className="btn-primary" onClick={handleGenerate} disabled={running || !resolvedSizeKeys.length}>
-              {running ? 'Generating mockups…' : '✦ Generate Mockups for Selected Categories'}
+              {running ? 'Generating mockups…' : 'Generate mockups for selected categories'}
             </button>
           </div>
         </>
       ) : (
         <p className="empty-state" style={{ margin: 0 }}>
-          No mockup categories configured yet — tag templates with a category in Mockup Templates.
+          No mockup categories configured yet.
         </p>
       )}
       {status && <p className="mono taste-status mt-2">{status}</p>}
@@ -206,7 +206,7 @@ export default function JobMockupReview({ jobId }) {
       <MockupCategorySelector jobId={jobId} onGenerated={loadMockups} />
       <div className="mb-4">
         <button className="btn-secondary" onClick={loadMockups} disabled={!jobId || loading}>
-          {loading ? 'Loading mockups…' : 'Load generated mockups'}
+          {loading ? 'Loading mockups…' : 'Load mockups'}
         </button>
       </div>
       {error && <p className="text-danger mb-3">{error}</p>}
@@ -214,7 +214,7 @@ export default function JobMockupReview({ jobId }) {
         <MockupCard key={m.id} mockup={m} onVariantChange={handleVariantChange} />
       ))}
       {mockups.length === 0 && !loading && !error && (
-        <p className="empty-state">No mockups generated or loaded yet for this job.</p>
+        <p className="empty-state">No mockups loaded yet.</p>
       )}
     </div>
   );
