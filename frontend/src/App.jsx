@@ -663,6 +663,106 @@ function App() {
               </div>
 
               <div className="settings-section-card">
+                <h3 className="settings-section-title">API Keys</h3>
+
+                <div className="settings-subsection">
+                  <p className="text-muted" style={{ marginTop: 0 }}>
+                    Keys stored here are used before falling back to <code>backend/.env</code>. Values are never shown again after saving — only the last 4 characters are kept visible.
+                  </p>
+                  {apiKeys.length ? (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Provider</th>
+                          <th>Label</th>
+                          <th>Key</th>
+                          <th>Status</th>
+                          <th />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {apiKeys.map((key) => (
+                          <tr key={key.id}>
+                            <td className="mono">{key.provider}</td>
+                            <td>{key.label || <span className="text-muted">—</span>}</td>
+                            <td className="mono mono-sm">{key.maskedKey}</td>
+                            <td>{key.enabled ? '✅ Enabled' : '⚪ Disabled'}</td>
+                            <td>
+                              <div className="flex-row" style={{ gap: '0.5rem' }}>
+                                <button className="btn-secondary btn-sm" onClick={() => toggleApiKeyEnabled(key)}>
+                                  {key.enabled ? 'Disable' : 'Enable'}
+                                </button>
+                                <button className="btn-secondary btn-sm" onClick={() => deleteApiKey(key)}>Delete</button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="empty-state">No dashboard-managed keys yet — using whatever's in <code>backend/.env</code>.</p>
+                  )}
+
+                  <div className="settings-field-row" style={{ marginTop: '1rem' }}>
+                    <div className="settings-field">
+                      <span className="settings-field-label">Provider</span>
+                      <select value={newKeyProvider} onChange={(e) => setNewKeyProvider(e.target.value)}>
+                        <option value="gemini">Gemini</option>
+                        <option value="claude">Claude</option>
+                      </select>
+                    </div>
+                    <div className="settings-field" style={{ flex: 1, minWidth: '240px' }}>
+                      <span className="settings-field-label">Key value</span>
+                      <input
+                        type="password"
+                        value={newKeyValue}
+                        onChange={(e) => setNewKeyValue(e.target.value)}
+                        placeholder="Paste API key"
+                      />
+                    </div>
+                    <div className="settings-field">
+                      <span className="settings-field-label">Label (optional)</span>
+                      <input
+                        value={newKeyLabel}
+                        onChange={(e) => setNewKeyLabel(e.target.value)}
+                        placeholder="e.g. backup key"
+                      />
+                    </div>
+                    <button className="btn-primary" onClick={addApiKey} disabled={!newKeyValue.trim()}>Add key</button>
+                  </div>
+                  {apiKeysMessage && <p className="text-muted mono-sm" style={{ marginTop: '0.5rem' }}>{apiKeysMessage}</p>}
+                </div>
+              </div>
+
+              <div className="settings-section-card">
+                <h3 className="settings-section-title">Pipeline Modules</h3>
+
+                <div className="settings-subsection" style={{ marginBottom: 0 }}>
+                  <p className="text-muted" style={{ marginTop: 0 }}>
+                    Default enable/disable for each pipeline module. Applies to new uploads going forward — matches the checkboxes on the Upload view, but saved here instead of one-off per session.
+                  </p>
+                  <div className="flex-row flex-wrap" style={{ gap: '1.5rem' }}>
+                    {pipelineDefault?.pipeline?.map((m) => (
+                      <label
+                        key={m.module}
+                        className="settings-checkbox-row"
+                        style={{ opacity: m.required ? 0.6 : 1, cursor: m.required ? 'not-allowed' : 'pointer' }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!m.enabled}
+                          disabled={m.required}
+                          onChange={() => togglePersistedModule(m.module, m.enabled, m.required)}
+                        />
+                        {m.module}
+                        {m.required ? <span className="text-muted mono-sm"> (required)</span> : null}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="settings-section-card">
                 <h3 className="settings-section-title">Automation & Diagnostics</h3>
 
                 <div className="settings-subsection">
