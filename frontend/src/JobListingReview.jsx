@@ -12,11 +12,8 @@ function textToTags(text) {
 }
 
 /**
- * One listing variation's review/edit card (ARCHITECTURE.md -> Module 6 -> "Previews and
- * allows editing any generated field before publishing"). Local edit state is separate
- * from the loaded `listing` prop so typing doesn't round-trip through the parent on every
- * keystroke; Save sends only the edited fields to the step's PATCH route, which re-applies
- * enforceConventions() and returns the cleaned result (and any new warnings) to show.
+ * One listing variation's review/edit card — polished to match the dark unified
+ * design system, spacing scale, and visual hierarchy.
  */
 function ListingCard({ listing, onSaved }) {
   const [title, setTitle] = useState(listing.title || '');
@@ -44,9 +41,6 @@ function ListingCard({ listing, onSaved }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save listing');
-      // The convention backstop may have adjusted what we sent (e.g. stripped a forbidden
-      // word, capped tag count) — reflect the cleaned result back into the fields rather
-      // than trusting what was typed.
       setTitle(data.title || '');
       setDescription(data.description || '');
       setTagsText(tagsToText(data.tags));
@@ -73,50 +67,63 @@ function ListingCard({ listing, onSaved }) {
 
   return (
     <div className="dark-panel listing-card">
-      <h4 className="listing-card-title">{listing.variation?.replace('_', ' ')}</h4>
+      <div className="settings-readonly-header" style={{ marginBottom: '1rem' }}>
+        <h4 className="listing-card-title">{listing.variation?.replace('_', ' ')}</h4>
+        <span className="read-only-badge">AI Listing</span>
+      </div>
 
-      <label className="listing-field-label" htmlFor={`listing-title-${listing.id}`}>
-        Title
-      </label>
-      <input
-        id={`listing-title-${listing.id}`}
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-      />
+      <div className="settings-field mb-3">
+        <label className="listing-field-label" htmlFor={`listing-title-${listing.id}`}>
+          Title (max 140 chars)
+        </label>
+        <input
+          id={`listing-title-${listing.id}`}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+      </div>
 
-      <label className="listing-field-label" htmlFor={`listing-desc-${listing.id}`}>
-        Description
-      </label>
-      <textarea
-        id={`listing-desc-${listing.id}`}
-        className="listing-textarea"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-      />
+      <div className="settings-field mb-3">
+        <label className="listing-field-label" htmlFor={`listing-desc-${listing.id}`}>
+          Description
+        </label>
+        <textarea
+          id={`listing-desc-${listing.id}`}
+          className="listing-textarea"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+      </div>
 
-      <label className="listing-field-label" htmlFor={`listing-tags-${listing.id}`}>
-        Tags (comma-separated)
-      </label>
-      <input
-        id={`listing-tags-${listing.id}`}
-        value={tagsText}
-        onChange={(e) => setTagsText(e.target.value)}
-      />
+      <div className="settings-field mb-3">
+        <label className="listing-field-label" htmlFor={`listing-tags-${listing.id}`}>
+          Tags (comma-separated, max 13)
+        </label>
+        <input
+          id={`listing-tags-${listing.id}`}
+          value={tagsText}
+          onChange={(e) => setTagsText(e.target.value)}
+        />
+      </div>
 
-      <label className="listing-field-label" htmlFor={`listing-alt-tags-${listing.id}`}>
-        Alternate tags (comma-separated)
-      </label>
-      <input
-        id={`listing-alt-tags-${listing.id}`}
-        value={tagAltText}
-        onChange={(e) => setTagAltText(e.target.value)}
-      />
+      <div className="settings-field mb-4">
+        <label className="listing-field-label" htmlFor={`listing-alt-tags-${listing.id}`}>
+          Alternate tags (comma-separated)
+        </label>
+        <input
+          id={`listing-alt-tags-${listing.id}`}
+          value={tagAltText}
+          onChange={(e) => setTagAltText(e.target.value)}
+        />
+      </div>
 
       <div className="flex-row">
-        <button onClick={save} disabled={saving}>
-          {saving ? 'Saving…' : 'Save'}
+        <button className="btn-primary" onClick={save} disabled={saving}>
+          {saving ? 'Saving changes…' : 'Save'}
         </button>
-        <button className="btn-secondary" data-testid="copy-for-etsy" onClick={copyForEtsy}>{copied ? 'Copied!' : 'Copy for Etsy'}</button>
+        <button className="btn-secondary" data-testid="copy-for-etsy" onClick={copyForEtsy}>
+          {copied ? 'Copied!' : 'Copy for Etsy'}
+        </button>
       </div>
 
       {warnings.length > 0 && (
@@ -126,15 +133,13 @@ function ListingCard({ listing, onSaved }) {
           ))}
         </ul>
       )}
-      {error && <p className="text-danger listing-error">{error}</p>}
+      {error && <p className="text-danger listing-error mt-2">{error}</p>}
     </div>
   );
 }
 
 /**
- * Loads and reviews a job's generated listings. Takes a jobId as a prop, same as
- * JobMockupReview — Module 6 (the real dashboard, still a skeleton) owns job
- * lookup/selection; this component only covers the review/edit step itself.
+ * Loads and reviews a job's generated listings — polished to match the app shell.
  */
 export default function JobListingReview({ jobId }) {
   const [listings, setListings] = useState([]);
@@ -149,8 +154,6 @@ export default function JobListingReview({ jobId }) {
       const res = await fetch(`/api/jobs/${jobId}/listings`);
       if (!res.ok) throw new Error('Failed to load listings');
       const data = await res.json();
-      // GET returns bare listing rows (no job_id echoed back per-row is present already
-      // since `listings.*` includes job_id) — kept as-is for the PATCH URL below.
       setListings(data);
     } catch (err) {
       setError(err.message);
@@ -165,15 +168,17 @@ export default function JobListingReview({ jobId }) {
 
   return (
     <div>
-      <button onClick={loadListings} disabled={!jobId || loading}>
-        {loading ? 'Loading…' : 'Load listings'}
-      </button>
-      {error && <p className="text-danger">{error}</p>}
+      <div className="mb-4">
+        <button className="btn-primary" onClick={loadListings} disabled={!jobId || loading}>
+          {loading ? 'Loading listings…' : 'Load listings'}
+        </button>
+      </div>
+      {error && <p className="text-danger mb-3">{error}</p>}
       {listings.map((l) => (
         <ListingCard key={l.id} listing={l} onSaved={handleSaved} />
       ))}
       {listings.length === 0 && !loading && !error && (
-        <p className="text-muted">No listings loaded yet.</p>
+        <p className="empty-state">No listings loaded yet.</p>
       )}
     </div>
   );

@@ -8,16 +8,6 @@ function copyToClipboard(text) {
   }
 }
 
-/**
- * Module 4 (Trend/Prompt Helper) dashboard surface. Unlike JobListingReview/
- * JobMockupReview, this isn't job-scoped — no jobId prop — it's keyed only by an
- * optional selected trend + a target category, per ARCHITECTURE.md -> Module 4 and its
- * isolation from the main pipeline (Partial Failure Handling).
- *
- * Covers: browsing/creating trends (GET/POST /api/trends), generating a fresh batch of
- * ready-to-paste Midjourney prompts (POST /api/prompts/generate), and a browsable
- * history of previously generated batches (GET /api/prompts) for the selected category.
- */
 export default function PromptHelper() {
   const [trends, setTrends] = useState([]);
   const [selectedTrendId, setSelectedTrendId] = useState('');
@@ -80,11 +70,6 @@ export default function PromptHelper() {
     }
   }
 
-  // CSV trend import (ARCHITECTURE.md -> Trends Provider Layer -> "CSV import in
-  // manual.js"). Reads the picked file as plain text client-side and posts it to
-  // POST /api/trends/csv, which expects a header row with a term/keyword/trend column
-  // and an optional category column -- the tool's own export feature, not automation
-  // against its site, same ToS-clean framing as the rest of this provider layer.
   async function importTrendsCsv(file) {
     if (!file) return;
     setCsvMessage(`Importing ${file.name}…`);
@@ -127,41 +112,40 @@ export default function PromptHelper() {
   }
 
   return (
-    <div className="dark-panel">
-      <div className="prompt-filter-row">
-        <label className="prompt-filter-label" htmlFor="prompt-category-select">
-          Category:
-        </label>
-        <select id="prompt-category-select" value={category} onChange={(e) => setCategory(e.target.value)}>
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
-        <label className="prompt-filter-label" htmlFor="prompt-trend-select">
-          Trend:
-        </label>
-        <select id="prompt-trend-select" value={selectedTrendId} onChange={(e) => setSelectedTrendId(e.target.value)} disabled={loadingTrends}>
-          <option value="">(none)</option>
-          {trends.map((t) => (
-            <option key={t.id} value={t.id}>{t.term}{t.category ? ` (${t.category})` : ''}</option>
-          ))}
-        </select>
+    <div className="module-panel">
+      <div className="control-row">
+        <div className="control-group">
+          <label className="control-label" htmlFor="prompt-category-select">Category:</label>
+          <select id="prompt-category-select" value={category} onChange={(e) => setCategory(e.target.value)}>
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+        <div className="control-group">
+          <label className="control-label" htmlFor="prompt-trend-select">Trend</label>
+          <select id="prompt-trend-select" value={selectedTrendId} onChange={(e) => setSelectedTrendId(e.target.value)} disabled={loadingTrends}>
+            <option value="">(none)</option>
+            {trends.map((t) => (
+              <option key={t.id} value={t.id}>{t.term}{t.category ? ` (${t.category})` : ''}</option>
+            ))}
+          </select>
+        </div>
+        <button className="btn-primary" onClick={generate} disabled={generating}>
+          {generating ? 'Generating…' : 'Generate prompts'}
+        </button>
       </div>
 
-      <div className="prompt-add-row">
+      <div className="control-row" style={{ marginTop: '1rem' }}>
         <input
-          id="new-trend-term-input"
-          className="prompt-flex-input"
-          aria-label="Add a new trend"
           placeholder="Add a new trend"
+          aria-label="Add a new trend"
           value={newTrendTerm}
           onChange={(e) => setNewTrendTerm(e.target.value)}
         />
         <input
-          id="new-trend-category-input"
-          className="prompt-flex-input"
+          placeholder="Category"
           aria-label="Trend category"
-          placeholder="Trend category"
           value={newTrendCategory}
           onChange={(e) => setNewTrendCategory(e.target.value)}
         />
@@ -170,29 +154,22 @@ export default function PromptHelper() {
         </button>
       </div>
 
-      <div className="prompt-csv-container">
-        <label className="prompt-csv-label" htmlFor="csv-file-input">
-          Or import a CSV export (<code>term</code> column, optional <code>category</code>):{' '}
-        </label>
-        <input id="csv-file-input" type="file" accept=".csv,text/csv" onChange={(e) => importTrendsCsv(e.target.files?.[0])} />
-        {csvMessage && <span className="prompt-csv-message">{csvMessage}</span>}
+      <div className="mt-2 text-muted mono-sm">
+        <label htmlFor="csv-file-input">Import CSV (<code>term</code>, <code>category</code>):</label> <input id="csv-file-input" type="file" accept=".csv,text/csv" onChange={(e) => importTrendsCsv(e.target.files?.[0])} />
+        {csvMessage && <span className="ml-1">{csvMessage}</span>}
       </div>
 
-      <button onClick={generate} disabled={generating}>
-        {generating ? 'Generating…' : 'Generate prompts'}
-      </button>
-
-      {error && <p className="text-danger mt-1">{error}</p>}
+      {error && <p className="status-error mt-2">{error}</p>}
 
       {generated.length > 0 && (
-        <div className="mt-3">
-          <h4 className="prompt-section-title">Generated prompts</h4>
+        <div className="mt-4">
+          <h4 className="settings-sub-heading">Generated</h4>
           {generated.map((p) => (
-            <div key={p.id} className="prompt-item-card">
-              <code className="prompt-code-block">{p.prompt_text}</code>
+            <div key={p.id} className="settings-section-card" style={{ marginBottom: '0.75rem' }}>
+              <code className="block mb-2">{p.prompt_text}</code>
               <button className="btn-secondary btn-sm" onClick={() => copyToClipboard(p.prompt_text)}>Copy</button>
               {p.warnings.length > 0 && (
-                <ul className="prompt-warnings-list">
+                <ul className="text-danger mt-2">
                   {p.warnings.map((w, i) => <li key={i}>{w}</li>)}
                 </ul>
               )}
@@ -202,12 +179,13 @@ export default function PromptHelper() {
       )}
 
       {history.length > 0 && (
-        <div className="mt-3">
-          <h4 className="prompt-section-title">History for &quot;{category}&quot;</h4>
-          <ul className="prompt-history-list">
+        <div className="mt-4">
+          <h4 className="settings-sub-heading">History: &quot;{category}&quot;</h4>
+          <ul className="settings-compact-list">
             {history.map((p) => (
-              <li key={p.id} className="prompt-history-item">
-                <code className="mono-sm">{p.prompt_text}</code> <button className="btn-secondary btn-xs" onClick={() => copyToClipboard(p.prompt_text)}>Copy</button>
+              <li key={p.id} className="flex-row items-center justify-between">
+                <code className="mono-sm">{p.prompt_text}</code> 
+                <button className="btn-ghost btn-sm" onClick={() => copyToClipboard(p.prompt_text)}>Copy</button>
               </li>
             ))}
           </ul>

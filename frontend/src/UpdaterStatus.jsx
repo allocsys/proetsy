@@ -1,14 +1,5 @@
 import { useEffect, useState } from 'react';
 
-// Auto-update button (see electron/main.js's autoUpdater wiring and preload.js's
-// updaterAPI bridge). Renders nothing outside Electron (dev-in-browser, or any
-// context where preload.js never ran) -- same feature-detect convention
-// MockupTemplates.jsx already established for window.mockupTemplatesAPI.
-//
-// State machine mirrors the six updater:* events forwarded from the main process:
-// idle -> checking -> (not-available | available -> downloading -> downloaded) | error.
-// Checking for updates never auto-downloads (autoDownload is false in main.js) -- the
-// download and the install/restart are each their own explicit user click.
 function UpdaterStatus() {
   const [phase, setPhase] = useState('idle');
   const [version, setVersion] = useState(null);
@@ -48,10 +39,6 @@ function UpdaterStatus() {
     setErrorMsg('');
     setPhase('checking');
     try {
-      // Dev/unpackaged builds resolve { skipped: true } instead of firing any
-      // updater:* event (main.js's checkForUpdates() short-circuits before calling
-      // electron-updater at all) -- fall back to idle rather than sitting on
-      // "Checking..." forever.
       const result = await window.updaterAPI.checkForUpdates();
       if (result?.skipped) setPhase('idle');
     } catch (err) {
@@ -72,64 +59,51 @@ function UpdaterStatus() {
   }
 
   if (phase === 'checking') {
-    return <span className="text-muted mono-sm" data-testid="updater-status">Checking for updates…</span>;
+    return <span className="text-muted mono-sm">Checking for updates…</span>;
   }
 
   if (phase === 'available') {
     return (
-      <span className="flex-row" style={{ gap: '0.5rem' }} data-testid="updater-status">
-        <span className="status-pill pending" aria-label="Update available">
-          <span className="status-dot" aria-hidden="true" />
-          Update {version ? `v${version}` : ''} available
-        </span>
+      <div className="flex-row items-center" style={{ gap: '0.5rem' }}>
+        <span className="status-pill pending">Update {version ? `v${version}` : ''} available</span>
         <button className="btn-primary btn-sm" onClick={handleDownload}>Download update</button>
-      </span>
+      </div>
     );
   }
 
   if (phase === 'downloading') {
-    return (
-      <span className="text-muted mono-sm" data-testid="updater-status">
-        Downloading update… {percent}%
-      </span>
-    );
+    return <span className="text-muted mono-sm">Downloading update… {percent}%</span>;
   }
 
   if (phase === 'downloaded') {
     return (
-      <span className="flex-row" style={{ gap: '0.5rem' }} data-testid="updater-status">
-        <span className="status-pill success" aria-label="Update ready to install">
-          <span className="status-dot" aria-hidden="true" />
-          Update {version ? `v${version}` : ''} ready
-        </span>
+      <div className="flex-row items-center" style={{ gap: '0.5rem' }}>
+        <span className="status-pill success">Update {version ? `v${version}` : ''} ready</span>
         <button className="btn-primary btn-sm" onClick={handleInstall}>Restart & install</button>
-      </span>
+      </div>
     );
   }
 
   if (phase === 'not-available') {
     return (
-      <span className="flex-row" style={{ gap: '0.5rem' }} data-testid="updater-status">
-        <span className="status-pill success" aria-label="Up to date">
-          <span className="status-dot" aria-hidden="true" />
-          Up to date
-        </span>
-        <button className="btn-secondary btn-sm" onClick={handleCheck}>Check again</button>
-      </span>
+      <div className="flex-row items-center" style={{ gap: '0.5rem' }}>
+        <span className="status-pill success">Up to date</span>
+        <button className="btn-ghost btn-sm" onClick={handleCheck}>Check again</button>
+      </div>
     );
   }
 
   if (phase === 'error') {
     return (
-      <span className="flex-row" style={{ gap: '0.5rem' }} data-testid="updater-status">
+      <div className="flex-row items-center" style={{ gap: '0.5rem' }}>
         <span className="text-danger mono-sm">{errorMsg}</span>
         <button className="btn-secondary btn-sm" onClick={handleCheck}>Retry</button>
-      </span>
+      </div>
     );
   }
 
   return (
-    <button className="btn-secondary btn-sm" onClick={handleCheck} data-testid="updater-status">
+    <button className="btn-ghost btn-sm" onClick={handleCheck}>
       Check for updates
     </button>
   );

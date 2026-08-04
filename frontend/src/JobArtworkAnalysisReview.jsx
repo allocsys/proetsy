@@ -32,15 +32,9 @@ function AnalysisSummary({ analysis }) {
 }
 
 /**
- * Module 1 (Image Analyzer) review surface — the "dashboard surface" ARCHITECTURE.md
- * flagged as not yet built (analysis was previously only visible via a raw
- * GET /api/artworks/:id call). Mirrors JobListingReview/JobMockupReview's prop shape
- * (jobId in, self-contained load/action state) so it wires into App.jsx the same way.
- *
- * Covers the module's full optional-module flow (ARCHITECTURE.md -> Partial Failure
- * Handling): run analysis, view the result, or — since Module 1 is optional and can
- * fail without blocking Module 2 — fall back to hand-typed manual notes via
- * PATCH /api/jobs/:id/manual-notes.
+ * Module 1 (Image Analyzer) review surface — polished to match the app shell's
+ * dark unified design system, spacing scale, card styles, and visual hierarchy
+ * distinguishing AI-generated content from user actions.
  */
 export default function JobArtworkAnalysisReview({ jobId }) {
   const [job, setJob] = useState(null);
@@ -80,10 +74,6 @@ export default function JobArtworkAnalysisReview({ jobId }) {
     try {
       const res = await fetch(`/api/jobs/${jobId}/run/image-analyzer`, { method: 'POST' });
       const data = await res.json();
-      // A 422 here is Module 1's optional-module failure path (ARCHITECTURE.md ->
-      // Partial Failure Handling) — the job itself isn't blocked, so surface the error
-      // inline and let the user fall back to manual notes below, rather than treating
-      // this like a hard failure.
       if (!res.ok) throw new Error(data.error || 'Image analysis failed');
       setAnalysis(data.imageAnalysis);
       setJob(data.job);
@@ -116,36 +106,46 @@ export default function JobArtworkAnalysisReview({ jobId }) {
 
   return (
     <div className="artwork-analysis-card">
-      <div className="flex-row mb-1">
-        <button onClick={loadJobAndAnalysis} disabled={!jobId || loading}>
+      <div className="flex-row mb-3" style={{ justifyContent: 'space-between' }}>
+        <button className="btn-primary" onClick={loadJobAndAnalysis} disabled={!jobId || loading}>
           {loading ? 'Loading…' : 'Load analysis'}
         </button>
         <button className="btn-secondary" onClick={runAnalysis} disabled={!jobId || running}>
-          {running ? 'Analyzing…' : 'Run image analyzer'}
+          {running ? 'Running...' : 'Run image analyzer'}
         </button>
       </div>
 
-      {error && <p className="text-danger mt-1">{error}</p>}
+      {error && <p className="text-danger mt-2">{error}</p>}
 
       {analysis ? (
-        <AnalysisSummary analysis={analysis} />
+        <div className="settings-readonly-box" style={{ marginTop: '1rem', marginBottom: '1rem' }}>
+          <div className="settings-readonly-header">
+            <span className="settings-readonly-title">AI Analysis Result</span>
+            <span className="read-only-badge">AI Generated</span>
+          </div>
+          <AnalysisSummary analysis={analysis} />
+        </div>
       ) : (
-        job && <p className="text-muted my-1">No analysis yet for this artwork — run it, or use manual notes below.</p>
+        job && <p className="text-muted my-3 empty-state">No analysis yet for this artwork</p>
       )}
 
       {job && (
         <div className="manual-notes-section">
-          <label className="manual-notes-label">
-            Manual notes (fallback for the listing generator when analysis is skipped or fails)
+          <div className="settings-field">
+            <span className="settings-field-label">Manual notes fallback</span>
+            <span className="text-muted mono-sm">Used by listing generator when AI analysis is skipped or fails.</span>
             <textarea
-              className="manual-notes-textarea"
+              className="listing-textarea"
               value={manualNotes}
               onChange={(e) => setManualNotes(e.target.value)}
+              placeholder="Enter custom style, subject, or mood notes..."
             />
-          </label>
-          <button onClick={saveManualNotes} disabled={savingNotes}>
-            {savingNotes ? 'Saving…' : 'Save manual notes'}
-          </button>
+          </div>
+          <div className="mt-2">
+            <button onClick={saveManualNotes} disabled={savingNotes}>
+              {savingNotes ? 'Saving notes…' : 'Save manual notes'}
+            </button>
+          </div>
         </div>
       )}
     </div>
