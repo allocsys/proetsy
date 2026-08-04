@@ -17,25 +17,63 @@ function StatusBadge({ status }) {
   );
 }
 
+function NavIcon({ name }) {
+  switch (name) {
+    case 'upload':
+      return (
+        <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+        </svg>
+      );
+    case 'templates':
+      return (
+        <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <rect x="3" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="14" width="7" height="7" rx="1" />
+          <rect x="3" y="14" width="7" height="7" rx="1" />
+        </svg>
+      );
+    case 'history':
+      return (
+        <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 3" />
+        </svg>
+      );
+    case 'review':
+      return (
+        <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+        </svg>
+      );
+    case 'prompt':
+      return (
+        <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+        </svg>
+      );
+    case 'settings':
+      return (
+        <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+
 const NAV_ITEMS = [
-  { id: 'upload', label: 'Upload', group: 'Pipeline' },
-  { id: 'mockup-templates', label: 'Mockup Templates', group: 'Pipeline' },
-  { id: 'history', label: 'Listing History', group: 'Pipeline' },
-  { id: 'review', label: 'Review a Job', group: 'Pipeline' },
-  { id: 'prompt-helper', label: 'Prompt Helper', group: 'Modules' },
-  { id: 'settings', label: 'Shop Settings & Tags', group: 'Configuration' },
+  { id: 'upload', label: 'Upload', group: 'Pipeline', icon: 'upload' },
+  { id: 'mockup-templates', label: 'Mockup Templates', group: 'Pipeline', icon: 'templates' },
+  { id: 'history', label: 'Listing History', group: 'Pipeline', icon: 'history' },
+  { id: 'review', label: 'Review a Job', group: 'Pipeline', icon: 'review' },
+  { id: 'prompt-helper', label: 'Prompt Helper', group: 'Modules', icon: 'prompt' },
+  { id: 'settings', label: 'Shop Settings & Tags', group: 'Configuration', icon: 'settings' },
 ];
 
-// Module 6 — Control Dashboard. See ARCHITECTURE.md -> Module 6 for the target feature
-// set: drag-and-drop artwork, a per-run pipeline config panel, bulk mode, a listing
-// history log, and a settings panel. Individual per-job review screens
-// (JobArtworkAnalysisReview / JobListingReview / JobMockupReview) already existed;
-// this component is the shell that ties them to real upload + orchestration + history.
-//
-// v2: the shell is now a real single-page-app layout — one view renders at a time,
-// chosen by `activeView` and switched by the sidebar/mobile nav buttons — instead of
-// every section being stacked on one long scrolling page with anchor links jumping
-// between them.
 function App() {
   const [health, setHealth] = useState(null);
   const [setupStatus, setSetupStatus] = useState(null);
@@ -88,9 +126,6 @@ function App() {
       .catch(() => {});
   }
 
-  // Backs the category <datalist> next to the tag-paste textarea (plan.md step 2): lets
-  // the category input suggest whatever categories already exist in the library, while
-  // still accepting free text for a brand-new category.
   function refreshTags() {
     fetch('/api/tags')
       .then((r) => r.json())
@@ -98,9 +133,6 @@ function App() {
       .catch(() => {});
   }
 
-  // Module 7 -> "Auto-import via watched folder" (step 7) -> "Activation": read-only
-  // status (active/folder/category/pending count/last error) for the Settings panel,
-  // driven entirely by the taste_filter_watch_* keys below.
   function refreshWatchStatus() {
     fetch('/api/taste-filter/watch-status')
       .then((r) => r.json())
@@ -108,11 +140,6 @@ function App() {
       .catch(() => {});
   }
 
-  // LLM Provider Layer -> "Rate-limit cooldown tracking": read-only view of the durable
-  // llm_rate_limits table (previously only visible by inspecting the DB directly). Polled
-  // on load and whenever the Settings view is opened, since cooldowns change in the
-  // background as pipeline jobs make LLM calls -- there's no push mechanism for this yet,
-  // so a fresh fetch on view-open is the cheap way to avoid showing stale state.
   function refreshRateLimits() {
     fetch('/api/llm/rate-limits')
       .then((r) => r.json())
@@ -144,8 +171,6 @@ function App() {
     refreshRateLimits();
   }, []);
 
-  // plan.md step 2: distinct categories already present in the tag library, offered as
-  // suggestions (not a hard enum) in the category input next to the tag-paste textarea.
   const tagCategories = useMemo(
     () => Array.from(new Set(tags.map((t) => t.category).filter(Boolean))).sort(),
     [tags]
@@ -153,12 +178,6 @@ function App() {
 
   const [expandedBatches, setExpandedBatches] = useState({});
 
-  // Module 6 -> "consolidated single-page 'bulk batch' view": groups jobs sharing the
-  // same batch_id (set at creation time for a multi-file drop, see handleFiles below)
-  // into one entry, so a bulk drop shows as a single collapsible row in the history table
-  // instead of N indistinguishable ones. Jobs without a batch_id (single-artwork uploads)
-  // pass through unchanged. Preserves the API's newest-first ordering by grouping at each
-  // batch's first-seen position rather than re-sorting.
   const groupedJobs = useMemo(() => {
     const groups = [];
     const batchIndex = new Map();
@@ -177,9 +196,6 @@ function App() {
     return groups;
   }, [jobs]);
 
-  // Sidebar signature element: a live per-status breakdown of every job the dashboard
-  // knows about, so the nav rail itself carries real pipeline information instead of
-  // being purely decorative chrome.
   const statusCounts = useMemo(
     () =>
       jobs.reduce((acc, j) => {
@@ -190,12 +206,6 @@ function App() {
     [jobs]
   );
 
-  // Runs a batch of jobs' full pipelines via the server-side runner
-  // (backend/lib/pipeline-runner.js), one request for the whole batch instead of the
-  // dashboard sequencing each module call itself. Each job still proceeds independently
-  // server-side (Partial Failure Handling's bulk-mode rule), and — unlike the old
-  // client-side sequencing — the work isn't tied to this browser tab staying open once
-  // the request has been sent.
   async function runJobsBatch(jobIds) {
     await fetch('/api/jobs/run-batch', {
       method: 'POST',
@@ -213,9 +223,6 @@ function App() {
     const formData = new FormData();
     files.forEach((f) => formData.append('files', f));
 
-    // Multi-file drops get a shared batch_id (a client-generated UUID) so the history
-    // table below can group their jobs into one row instead of N separate ones. A
-    // single-file drop stays ungrouped (batch_id omitted) since there's nothing to group.
     const batchId = files.length > 1 ? crypto.randomUUID() : null;
 
     try {
@@ -237,9 +244,6 @@ function App() {
       refreshJobs();
 
       setUploadStatus(`Running pipeline for ${jobIds.length} job${jobIds.length > 1 ? 's' : ''} on the server… (bulk mode — each runs independently; safe to navigate away)`);
-      // Server-side batch runner: each job proceeds independently, one failure doesn't
-      // block the rest, and — unlike the old client-side sequencing — the run isn't
-      // cancelled by closing this tab once the request has been sent.
       await runJobsBatch(jobIds);
       setUploadStatus(`Done. ${jobIds.length} job${jobIds.length > 1 ? 's' : ''} processed — see history.`);
       if (jobIds.length === 1) setActiveJobId(String(jobIds[0]));
@@ -272,10 +276,6 @@ function App() {
     refreshTags();
   }
 
-  // CSV tag import (ARCHITECTURE.md -> Module 6 -> Settings panel). Reads the picked
-  // file as plain text client-side (no upload/multipart route needed for this — it's a
-  // small text file) and posts its contents to POST /api/tags/csv, which expects a
-  // header row with a tag_text/tag/text/keyword column and an optional category column.
   async function importTagsCsv(file) {
     if (!file) return;
     setTagsCsvMessage(`Importing ${file.name}…`);
@@ -295,9 +295,6 @@ function App() {
     refreshTags();
   }
 
-  // plan.md Rollout step 3: one-time admin action that runs uncategorized tags' text
-  // against categories already present elsewhere in the library and backfills any
-  // obvious matches, without requiring a full manual re-tag of the existing library.
   async function backfillTagCategories() {
     setTagsBackfillRunning(true);
     setTagsBackfillMessage('Checking uncategorized tags…');
@@ -325,16 +322,11 @@ function App() {
     setSettings(await res.json());
   }
 
-  // Module 7 -> "Activation": toggling/editing any of the watch settings takes effect
-  // immediately server-side (syncWatcherFromSettings runs on every PATCH /api/settings),
-  // so re-fetching status right after a save reflects it without a page reload.
   async function saveWatchSetting(updates) {
     await saveSettings(updates);
     refreshWatchStatus();
   }
 
-  // Trend-list management, consolidated into Settings (Module 4's own PromptHelper.jsx
-  // keeps its own add-a-trend form too — this is an additional view, not a replacement).
   async function addTrendFromSettings() {
     if (!newTrendTerm.trim()) return;
     await fetch('/api/trends', {
@@ -388,6 +380,7 @@ function App() {
             className={`mobile-nav-item ${activeView === item.id ? 'active' : ''}`}
             onClick={() => goTo(item.id)}
           >
+            <NavIcon name={item.icon} />
             {item.label}
           </button>
         ))}
@@ -404,7 +397,8 @@ function App() {
                   className={`sidebar-nav-item ${activeView === item.id ? 'active' : ''}`}
                   onClick={() => goTo(item.id)}
                 >
-                  {item.label}
+                  <NavIcon name={item.icon} />
+                  <span>{item.label}</span>
                 </button>
               ))}
             </div>
@@ -522,7 +516,7 @@ function App() {
                   ) : (
                     <p className="empty-state">No trends added yet.</p>
                   )}
-                  <div className="flex-row flex-wrap">
+                  <div className="flex-row flex-wrap mt-2">
                     <input
                       value={newTrendTerm}
                       onChange={(e) => setNewTrendTerm(e.target.value)}
@@ -624,7 +618,7 @@ function App() {
                     </div>
                   </div>
                   {watchStatus && (
-                    <p className="text-muted mono-sm" style={{ marginTop: '0.5rem' }}>
+                    <p className="text-muted mono-sm" style={{ marginTop: '0.75rem' }}>
                       {watchStatus.active ? `✅ Watching ${watchStatus.folder}` : '⚠️ Not currently watching'}
                       {watchStatus.category ? ` (category: ${watchStatus.category})` : ''}
                       {watchStatus.pendingCount ? ` — ${watchStatus.pendingCount} pending` : ''}
@@ -698,7 +692,7 @@ function App() {
 
           {activeView === 'upload' && (
             <section className="paper-card">
-              <h2 style={{ marginTop: 0 }}>Upload</h2>
+              <h2 style={{ marginTop: 0 }}>Upload & Curation Pipeline</h2>
 
               <div className="upload-lane">
                 <h3 style={{ marginTop: 0 }}>Curation</h3>
