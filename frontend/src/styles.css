@@ -443,6 +443,16 @@ textarea:focus-visible {
   margin-bottom: var(--space-5);
 }
 
+/* Alias used by module-level views (TasteFilter, PromptHelper) — same
+   surface treatment as .dark-panel. */
+.module-panel {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  margin-bottom: var(--space-5);
+}
+
 /* Alert / notice bars */
 .backend-banner {
   background: rgba(240, 169, 61, 0.1);
@@ -492,6 +502,17 @@ textarea:focus-visible {
 
 .status-pill.skipped { background: rgba(131, 139, 150, 0.15); color: var(--ink-soft); }
 .status-pill.skipped .status-dot { background: var(--ink-soft); }
+
+.btn-ghost {
+  background-color: transparent;
+  border-color: transparent;
+  color: var(--ink-soft);
+  padding: var(--space-1) var(--space-2);
+}
+.btn-ghost:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--ink);
+}
 
 /* Buttons */
 button, .btn {
@@ -619,7 +640,8 @@ input:focus, select:focus, textarea:focus {
 .empty-state { color: var(--ink-soft); font-style: italic; padding: var(--space-5) 0; }
 
 /* Taste Filter Grid */
-.taste-grid {
+.taste-grid,
+.card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 1.25rem;
