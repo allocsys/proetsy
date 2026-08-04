@@ -43,18 +43,19 @@ and `mockup_template_path` all present — the same definition step 2's
 `/api/setup-status` check uses. Invalid rows are skipped (with a `console.warn`),
 not thrown, so one bad row doesn't take every configured size down with it.
 
-## Step 4 — `backend/lib/llm/claude.js`: `generateImage` stub throws instead of not existing
+## Step 4 — ✅ DONE (commits cc2f567, c1b953a) — `backend/lib/llm/claude.js`: `generateImage` stub throws instead of not existing
 
-**Why fourth:** independent of the config/server work above, pure cleanup — do it
-once the data-integrity fixes are settled.
+**Correction after reading the actual code:** the "mis-route causes a hard 500"
+scenario doesn't actually happen today. `llm/index.js`'s `generateImage()` already
+hardcodes a direct call to `gemini.js`, bypassing the `LLM_PROVIDER` switch
+entirely — confirmed by `index.test.js`, which explicitly asserts
+`claude.generateImage` is never called even when `LLM_PROVIDER=claude`. So this was
+dead code, not a live mis-routing risk.
 
-**Problem:** `generateImage` is exported purely to throw "no image-generation
-fallback." If any caller mis-routes an image request to the Claude provider, it's a
-hard 500 instead of being filtered out earlier by capability checks.
-
-**Fix direction:** Remove `generateImage` from `claude.js` entirely; have the
-calling code in `llm/index.js` check provider capabilities before routing, instead
-of relying on a defensive stub per-provider.
+**Fix applied:** Removed `generateImage` from `claude.js` (`cc2f567`) and the
+corresponding stub test from `claude.test.js` (`c1b953a`), since `claude.js` no
+longer exports it. No change needed in `llm/index.js` — its existing hardcoded
+routing to `gemini.js` already is the capability check; there was nothing to add.
 
 ## Step 5 — `backend/config/index.js`: `getPipelineConfig()` re-queries on every call
 
