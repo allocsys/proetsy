@@ -19,7 +19,7 @@ review and revert independently.
 - [x] **2. JobArtworkAnalysisReview.jsx**
   - Apply glass classes to review cards/panels, keep functionality unchanged
 
-- [ ] **3. JobListingReview.jsx**
+- [x] **3. JobListingReview.jsx**
   - Apply glass classes to listing review cards/panels
 
 - [ ] **4. JobMockupReview.jsx**
