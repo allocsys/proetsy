@@ -141,6 +141,42 @@ export function waitForBackend(url, { timeoutMs = 20000, intervalMs = 250 } = {}
   });
 }
 
+// Single-instance lock (debug.md §2 candidate A / §4 planned fix #1). Must be requested
+// before any window/backend spawning happens: if this returns false, a prior instance
+// already holds the lock and this process should get out of the way immediately rather
+// than going on to spawn a second backend against the same port -- that duplicate-
+// backend spawn is the actual mechanism behind debug.md's reported "10 background
+// processes". The 'second-instance' handler is what makes surviving that useful for the
+// user, rather than just silently exiting a duplicate launch: it hands the *original*
+// instance a chance to bring its own window to the front, so double-clicking the exe
+// again while it's already starting up (a very natural reaction to "nothing happened
+// yet") feels like "oh, there it is" instead of a no-op.
+export function acquireSingleInstanceLock() {
+  const gotLock = app.requestSingleInstanceLock();
+  if (!gotLock) {
+    app.quit();
+    return false;
+  }
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+  return true;
+}
+
+// debug.md §2 candidate B / §4 planned fix #2: the previous behavior on a backend
+// startup failure (timeout or otherwise) was `console.error(...)` + `app.quit()` --
+// invisible to anyone not watching a terminal, so it looked exactly like "nothing
+// happened" from the user's side. dialog.showErrorBox() is synchronous/native and needs
+// no BrowserWindow to already exist, so it works even when createWindow() was never
+// reached.
+export function reportBackendStartupFailure(err) {
+  dialog.showErrorBox('ProEtsy failed to start', err.message);
+  app.quit();
+}
+
 // Rollout step 5 (plan.md -> "Electron: real native folder picker"): opens a native OS
 // folder picker and returns the chosen path, or null if the user cancelled. Called via
 // the 'select-folder' IPC channel below -- preload.js's window.mockupTemplatesAPI is
@@ -258,40 +294,44 @@ export { BACKEND_PORT, BACKEND_URL, DEV_FRONTEND_URL };
 const isMainModule = process.argv[1] && path.resolve(process.argv[1]) === __filename;
 
 if (isMainModule) {
-  app.whenReady().then(async () => {
-    backendProcess = spawnBackend();
-    try {
-      await waitForBackend(`${BACKEND_URL}/api/health`);
-    } catch (err) {
-      console.error(`[electron] ${err.message}`);
-      app.quit();
-      return;
-    }
-    await createWindow();
+  // Must happen before any backend/window spawning -- see acquireSingleInstanceLock()
+  // above. A losing second instance already called app.quit() inside that function and
+  // has nothing further to do here.
+  if (acquireSingleInstanceLock()) {
+    app.whenReady().then(async () => {
+      backendProcess = spawnBackend();
+      try {
+        await waitForBackend(`${BACKEND_URL}/api/health`);
+      } catch (err) {
+        reportBackendStartupFailure(err);
+        return;
+      }
+      await createWindow();
 
-    // Silent startup check -- only fires 'checking-for-update'/'update-available'/etc.
-    // events to the renderer (see above); never auto-downloads (autoDownload is false).
-    // Swallowed rather than surfaced as a startup failure: no network / no publish feed
-    // yet / GitHub rate-limited should never block the app from opening, the update
-    // button in the renderer already surfaces its own 'updater:error' event for a
-    // user-triggered check.
-    checkForUpdates().catch(() => {});
+      // Silent startup check -- only fires 'checking-for-update'/'update-available'/etc.
+      // events to the renderer (see above); never auto-downloads (autoDownload is false).
+      // Swallowed rather than surfaced as a startup failure: no network / no publish feed
+      // yet / GitHub rate-limited should never block the app from opening, the update
+      // button in the renderer already surfaces its own 'updater:error' event for a
+      // user-triggered check.
+      checkForUpdates().catch(() => {});
 
-    app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+      app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) createWindow();
+      });
     });
-  });
 
-  app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit();
-  });
+    app.on('window-all-closed', () => {
+      if (process.platform !== 'darwin') app.quit();
+    });
 
-  // Make sure the spawned backend doesn't outlive the Electron app -- without this,
-  // closing the window/quitting would leave an orphaned `node server.js` process (and
-  // its bound port) running in the background.
-  app.on('before-quit', () => {
-    if (backendProcess && !backendProcess.killed) {
-      backendProcess.kill();
-    }
-  });
+    // Make sure the spawned backend doesn't outlive the Electron app -- without this,
+    // closing the window/quitting would leave an orphaned `node server.js` process (and
+    // its bound port) running in the background.
+    app.on('before-quit', () => {
+      if (backendProcess && !backendProcess.killed) {
+        backendProcess.kill();
+      }
+    });
+  }
 }
