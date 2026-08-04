@@ -65,7 +65,7 @@ mockAutoUpdater.checkForUpdates = vi.fn(() => Promise.resolve({}));
 mockAutoUpdater.downloadUpdate = vi.fn(() => Promise.resolve({}));
 mockAutoUpdater.quitAndInstall = vi.fn();
 
-vi.mock('electron-updater', () => ({ autoUpdater: mockAutoUpdater }));
+vi.mock('electron-updater', () => ({ default: { autoUpdater: mockAutoUpdater } }));
 
 // Fake child process: enough of Node's ChildProcess surface (an EventEmitter with
 // .killed) for spawnBackend()'s own `.on('exit', ...)` wiring to attach without error.
