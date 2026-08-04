@@ -31,21 +31,17 @@ and `mockup_template_path` are both present and non-empty. This is the same
 required-field definition step 3 (`getProductSizes()` validation) should reuse, so
 the two checks stay in sync.
 
-## Step 3 — `backend/config/index.js`: `getProductSizes()` has no validation
+## Step 3 — ✅ DONE (commit 8321059) — `backend/config/index.js`: `getProductSizes()` had no validation
 
-**Why third:** directly related to step 2 — once "configured" means "has a valid
-row," `getProductSizes()` should enforce that same validity on every read, not just
-at setup-status time.
-
-**Problem:** Reads raw rows from the `product_sizes` table and returns them
+**Problem:** Read raw rows from the `product_sizes` table and returned them
 unvalidated. That table is dashboard-editable, so a bad edit — empty `dimensions`,
-missing/zero `dpi` — flows straight through to `mockup-generator.js` with no
-guardrail.
+cleared `mockup_template_path` — flowed straight through to `mockup-generator.js`
+with no guardrail.
 
-**Fix direction:** Add a schema check (e.g. Zod/Joi, or hand-rolled) in
-`getProductSizes()` before returning `result`, rejecting or logging rows missing
-required fields. Reuse the same "required fields" definition from step 2 so the two
-checks can't drift apart.
+**Fix applied:** Added `isValidProductSizeRow()` requiring `size_key`, `dimensions`,
+and `mockup_template_path` all present — the same definition step 2's
+`/api/setup-status` check uses. Invalid rows are skipped (with a `console.warn`),
+not thrown, so one bad row doesn't take every configured size down with it.
 
 ## Step 4 — `backend/lib/llm/claude.js`: `generateImage` stub throws instead of not existing
 
