@@ -49,8 +49,6 @@ describe('GET /api/setup-status', () => {
   // JSON-configured sizes (or, here, the repo's own shipped example entries) shouldn't
   // read as "not set up" just because they haven't been re-entered through the DB yet.
   it('reports not-ready on a fresh DB with no Gemini key and no tag library, but hasProductSize true from the JSON-seed migration', async () => {
-    delete process.env.GEMINI_API_KEYS;
-
     const res = await request(app).get('/api/setup-status');
 
     expect(res.status).toBe(200);
@@ -63,8 +61,10 @@ describe('GET /api/setup-status', () => {
     });
   });
 
-  it('reports readyToRun once a Gemini key and a tag are present', async () => {
-    process.env.GEMINI_API_KEYS = 'fake-key-1,fake-key-2';
+  it('reports readyToRun once a Gemini key (added via the dashboard API-keys route) and a tag are present', async () => {
+    await request(app)
+      .post('/api/settings/api-keys')
+      .send({ provider: 'gemini', key_value: 'fake-key-1234567890' });
     await request(app).post('/api/tags/bulk').send({ tags: 'setup-status-tag' });
 
     const res = await request(app).get('/api/setup-status');
@@ -72,8 +72,6 @@ describe('GET /api/setup-status', () => {
     expect(res.body.geminiKeyConfigured).toBe(true);
     expect(res.body.hasTagLibrary).toBe(true);
     expect(res.body.readyToRun).toBe(true);
-
-    delete process.env.GEMINI_API_KEYS;
   });
 });
 
