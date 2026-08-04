@@ -16,7 +16,7 @@ review and revert independently.
   - Layered/blurred background so translucency has something to show through
   - Applied to app shell: titlebar nav, sidebar, mobile nav strip
 
-- [ ] **2. JobArtworkAnalysisReview.jsx**
+- [x] **2. JobArtworkAnalysisReview.jsx**
   - Apply glass classes to review cards/panels, keep functionality unchanged
 
 - [ ] **3. JobListingReview.jsx**
