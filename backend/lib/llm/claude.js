@@ -25,14 +25,7 @@ export async function generateVision(prompt, imagePath, _options = {}) {
   return { text: `[stub] Claude vision response for ${imagePath}`, provider: 'claude' };
 }
 
-// Stub kept for interface symmetry with gemini.js's generateImage() (Module 3's
-// AI-outpainting fallback). Claude has no image-generation endpoint comparable to Nano
-// Banana, so there is no real Claude implementation to build here — this function is never
-// actually called: llm/index.js's generateImage() bypasses the LLM_PROVIDER switch and
-// calls gemini.js directly, so this stub only exists for interface symmetry / in case
-// something imports claude.js directly.
-export async function generateImage(prompt, imagePath, _options = {}) {
-  throw new Error(
-    'Claude has no image-generation fallback. generateImage() is Gemini-only — see ARCHITECTURE.md -> Module 3.'
-  );
-}
+// No generateImage() here -- Claude has no image-generation endpoint comparable to
+// Nano Banana, and llm/index.js's generateImage() deliberately bypasses the
+// LLM_PROVIDER switch and always calls gemini.js directly (see index.js), so this
+// module never needs to implement or stub image generation at all.
