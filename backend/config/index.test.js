@@ -12,6 +12,7 @@ let getPipelineConfig;
 let getProductSizes;
 let getTrendsSeed;
 let migrateProductSizesSeed;
+let migratePipelineConfigSeed;
 let getDb;
 let tmpRoot;
 
@@ -20,7 +21,9 @@ beforeAll(async () => {
   process.env.DB_PATH = path.join(tmpRoot, 'test.db');
 
   ({ getDb } = await import('../db/init.js'));
-  ({ getPipelineConfig, getProductSizes, getTrendsSeed, migrateProductSizesSeed } = await import('./index.js'));
+  ({ getPipelineConfig, getProductSizes, getTrendsSeed, migrateProductSizesSeed, migratePipelineConfigSeed } = await import(
+    './index.js'
+  ));
 });
 
 afterAll(() => {
@@ -44,6 +47,52 @@ describe('getPipelineConfig', () => {
     const second = getPipelineConfig();
 
     expect(second.pipeline.some((m) => m.module === 'not_real')).toBe(false);
+  });
+});
+
+describe('migratePipelineConfigSeed', () => {
+  it('seeds a pipeline_module_<name>_enabled settings row for each module in pipeline.config.json', () => {
+    const db = getDb();
+    db.prepare("DELETE FROM settings WHERE key LIKE 'pipeline_module_%'").run();
+
+    const result = migratePipelineConfigSeed();
+    expect(result.migrated).toBe(true);
+    expect(result.inserted).toBe(3);
+
+    const rows = db
+      .prepare("SELECT key, value FROM settings WHERE key LIKE 'pipeline_module_%' ORDER BY key")
+      .all();
+    expect(rows).toEqual([
+      { key: 'pipeline_module_image_analyzer_enabled', value: 'true' },
+      { key: 'pipeline_module_listing_generator_enabled', value: 'true' },
+      { key: 'pipeline_module_mockup_composer_enabled', value: 'true' },
+    ]);
+  });
+
+  it('is a no-op once seeded (never overwrites a dashboard-made toggle on a later call)', () => {
+    const db = getDb();
+    // Simulate a dashboard-made edit to one module's toggle before calling again.
+    db.prepare(
+      "UPDATE settings SET value = 'false' WHERE key = 'pipeline_module_image_analyzer_enabled'"
+    ).run();
+
+    const result = migratePipelineConfigSeed();
+    expect(result.migrated).toBe(false);
+    expect(result.inserted).toBe(0);
+
+    const row = db
+      .prepare("SELECT value FROM settings WHERE key = 'pipeline_module_image_analyzer_enabled'")
+      .get();
+    expect(row.value).toBe('false');
+  });
+
+  it('getPipelineConfig() reflects the seeded/edited settings rows after migration', () => {
+    const { pipeline } = getPipelineConfig();
+    const analyzer = pipeline.find((m) => m.module === 'image_analyzer');
+    expect(analyzer.enabled).toBe(false);
+
+    const listingGenerator = pipeline.find((m) => m.module === 'listing_generator');
+    expect(listingGenerator.enabled).toBe(true);
   });
 });
 

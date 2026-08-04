@@ -74,6 +74,8 @@ function mockFetchByUrl(overrides = {}) {
     '/api/trends': [],
     '/api/tags': [],
     '/api/taste-filter/watch-status': { active: false, folder: null, category: null, pendingCount: 0, lastError: null },
+    '/api/llm/rate-limits': [],
+    '/api/settings/api-keys': [],
   };
   const responses = { ...defaults, ...overrides };
 
@@ -441,6 +443,184 @@ describe('App', () => {
       expect(global.fetch).toHaveBeenCalledWith(
         '/api/settings',
         expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ taste_filter_watch_enabled: true }) })
+      );
+    });
+  });
+
+  // plan.md -> "Editable Settings & API Keys from Dashboard" -> Frontend -> new App.test.jsx
+  // coverage for the API Keys and Pipeline Modules Settings sections.
+  const API_KEY_ROW = {
+    id: 1,
+    provider: 'gemini',
+    label: 'primary',
+    enabled: true,
+    createdAt: '2026-08-01T00:00:00Z',
+    maskedKey: '********...abcd',
+  };
+
+  it('lists dashboard-managed API keys, masked, in the Settings panel', async () => {
+    mockFetchByUrl({ '/api/settings/api-keys': [API_KEY_ROW] });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('ok');
+
+    await user.click(screen.getByText('⚙ Settings'));
+
+    expect(await screen.findByText('primary')).toBeInTheDocument();
+    expect(screen.getByText('********...abcd')).toBeInTheDocument();
+    expect(screen.getByText('✅ Enabled')).toBeInTheDocument();
+  });
+
+  it('shows the empty state when no dashboard-managed keys exist yet', async () => {
+    mockFetchByUrl({ '/api/settings/api-keys': [] });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('ok');
+
+    await user.click(screen.getByText('⚙ Settings'));
+
+    expect(await screen.findByText(/No dashboard-managed keys yet/)).toBeInTheDocument();
+  });
+
+  it('adds a new API key and never sends a plaintext-visible field name for it', async () => {
+    mockFetchByUrl({
+      '/api/settings/api-keys': (url, options) => {
+        if (options?.method === 'POST') return { id: 2, provider: 'gemini', label: 'backup', enabled: true, maskedKey: '****...wxyz' };
+        return [];
+      },
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('ok');
+
+    await user.click(screen.getByText('⚙ Settings'));
+    await user.type(await screen.findByPlaceholderText('Paste API key'), 'AIzaSyD-fake-key-1234567890');
+    await user.type(screen.getByPlaceholderText('e.g. backup key'), 'backup');
+    await user.click(screen.getByText('Add key'));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/settings/api-keys',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ provider: 'gemini', key_value: 'AIzaSyD-fake-key-1234567890', label: 'backup' }),
+        })
+      );
+    });
+    // The key input is masked so a pasted value isn't shown in plaintext while typing.
+    expect(screen.getByPlaceholderText('Paste API key')).toHaveAttribute('type', 'password');
+  });
+
+  it('shows an error message when adding a key is rejected by the backend', async () => {
+    mockFetchByUrl({
+      '/api/settings/api-keys': (url, options) => {
+        if (options?.method === 'POST') return { error: 'key_value looks too short to be a real API key (5 chars)' };
+        return [];
+      },
+    });
+    global.fetch = vi.fn();
+    mockFetchByUrl({
+      '/api/settings/api-keys': (url, options) => {
+        if (options?.method === 'POST') return { error: 'key_value looks too short to be a real API key (5 chars)' };
+        return [];
+      },
+    });
+    // Override fetch's ok flag for the POST specifically so App's `if (!res.ok) throw` path fires.
+    const realFetch = global.fetch;
+    global.fetch = vi.fn((url, options) => {
+      if (url === '/api/settings/api-keys' && options?.method === 'POST') {
+        return Promise.resolve({ ok: false, json: async () => ({ error: 'key_value looks too short to be a real API key (5 chars)' }) });
+      }
+      return realFetch(url, options);
+    });
+
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('ok');
+
+    await user.click(screen.getByText('⚙ Settings'));
+    await user.type(await screen.findByPlaceholderText('Paste API key'), 'short');
+    await user.click(screen.getByText('Add key'));
+
+    expect(await screen.findByText('key_value looks too short to be a real API key (5 chars)')).toBeInTheDocument();
+  });
+
+  it('toggles an API key enabled/disabled via PATCH', async () => {
+    mockFetchByUrl({ '/api/settings/api-keys': [API_KEY_ROW] });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('ok');
+
+    await user.click(screen.getByText('⚙ Settings'));
+    await user.click(await screen.findByText('Disable'));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/settings/api-keys/1',
+        expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ enabled: false }) })
+      );
+    });
+  });
+
+  it('deletes an API key after confirmation, and does nothing if the confirm is cancelled', async () => {
+    mockFetchByUrl({ '/api/settings/api-keys': [API_KEY_ROW] });
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<App />);
+    await screen.findByText('ok');
+
+    await user.click(screen.getByText('⚙ Settings'));
+    await user.click(await screen.findByText('Delete'));
+
+    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('gemini'));
+    expect(global.fetch).not.toHaveBeenCalledWith('/api/settings/api-keys/1', expect.objectContaining({ method: 'DELETE' }));
+
+    confirmSpy.mockReturnValue(true);
+    await user.click(screen.getByText('Delete'));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith('/api/settings/api-keys/1', expect.objectContaining({ method: 'DELETE' }));
+    });
+  });
+
+  it('renders the persisted Pipeline Modules checkboxes in Settings, disabling the required module', async () => {
+    mockFetchByUrl();
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('ok');
+
+    await user.click(screen.getByText('⚙ Settings'));
+
+    expect(await screen.findByText('Pipeline Modules')).toBeInTheDocument();
+    const checkboxes = screen.getAllByRole('checkbox', { name: /listing_generator/ });
+    // One in Pipeline Modules (Settings), one in the Upload view's per-session overrides.
+    expect(checkboxes.length).toBeGreaterThanOrEqual(1);
+    for (const cb of checkboxes) expect(cb).toBeDisabled();
+  });
+
+  it('toggling a persisted (non-required) pipeline module PATCHes settings and re-fetches pipeline config', async () => {
+    mockFetchByUrl({
+      '/api/settings': (url, options) => (options?.method === 'PATCH' ? {} : {}),
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('ok');
+
+    await user.click(screen.getByText('⚙ Settings'));
+
+    const settingsPanelCheckbox = document
+      .querySelector('.settings-checkbox-row input[type="checkbox"]');
+    expect(settingsPanelCheckbox).not.toBeNull();
+
+    await user.click(await screen.findByText('image_analyzer'));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/settings',
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ pipeline_module_image_analyzer_enabled: false }),
+        })
       );
     });
   });

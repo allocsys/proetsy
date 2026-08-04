@@ -93,6 +93,11 @@ function App() {
   const [tagsBackfillRunning, setTagsBackfillRunning] = useState(false);
   const [watchStatus, setWatchStatus] = useState(null);
   const [rateLimits, setRateLimits] = useState([]);
+  const [apiKeys, setApiKeys] = useState([]);
+  const [newKeyProvider, setNewKeyProvider] = useState('gemini');
+  const [newKeyValue, setNewKeyValue] = useState('');
+  const [newKeyLabel, setNewKeyLabel] = useState('');
+  const [apiKeysMessage, setApiKeysMessage] = useState('');
   const [jobs, setJobs] = useState([]);
   const [dragActive, setDragActive] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
@@ -102,7 +107,11 @@ function App() {
 
   function goTo(view) {
     setActiveView(view);
-    if (view === 'settings') refreshRateLimits();
+    if (view === 'settings') {
+      refreshRateLimits();
+      refreshApiKeys();
+      refreshPipelineConfig();
+    }
   }
 
   function refreshJobs() {
@@ -147,6 +156,23 @@ function App() {
       .catch(() => {});
   }
 
+  function refreshApiKeys() {
+    fetch('/api/settings/api-keys')
+      .then((r) => r.json())
+      .then(setApiKeys)
+      .catch(() => {});
+  }
+
+  function refreshPipelineConfig() {
+    fetch('/api/config/pipeline')
+      .then((r) => r.json())
+      .then((cfg) => {
+        setPipelineDefault(cfg);
+        setOverrides(Object.fromEntries(cfg.pipeline.map((m) => [m.module, m.enabled])));
+      })
+      .catch(() => {});
+  }
+
   useEffect(() => {
     fetch('/api/health')
       .then((r) => r.json())
@@ -169,6 +195,7 @@ function App() {
     refreshTags();
     refreshWatchStatus();
     refreshRateLimits();
+    refreshApiKeys();
   }, []);
 
   const tagCategories = useMemo(
@@ -327,6 +354,61 @@ function App() {
     refreshWatchStatus();
   }
 
+  // plan.md -> "Editable Settings & API Keys from Dashboard" -> Frontend step 1. Full key
+  // values only ever leave the input field here on the way to POST -- every response from
+  // the backend (including this add call's own response) only ever contains maskedKey,
+  // never key_value, so nothing round-trips the raw value back into state.
+  async function addApiKey() {
+    if (!newKeyValue.trim()) return;
+    setApiKeysMessage('Adding key…');
+    try {
+      const res = await fetch('/api/settings/api-keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: newKeyProvider,
+          key_value: newKeyValue.trim(),
+          label: newKeyLabel.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to add key');
+      setNewKeyValue('');
+      setNewKeyLabel('');
+      setApiKeysMessage('');
+      refreshApiKeys();
+    } catch (err) {
+      setApiKeysMessage(err.message);
+    }
+  }
+
+  async function toggleApiKeyEnabled(key) {
+    await fetch(`/api/settings/api-keys/${key.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: !key.enabled }),
+    });
+    refreshApiKeys();
+  }
+
+  async function deleteApiKey(key) {
+    if (!window.confirm(`Delete ${key.provider} key${key.label ? ` "${key.label}"` : ''} (${key.maskedKey})? This can't be undone.`)) return;
+    await fetch(`/api/settings/api-keys/${key.id}`, { method: 'DELETE' });
+    refreshApiKeys();
+  }
+
+  // plan.md -> Frontend step 2: dashboard-editable pipeline module toggles, backed by
+  // the same `pipeline_module_<name>_enabled` settings keys getPipelineConfig() reads
+  // (backend/config/index.js). Distinct from toggleModule()/`overrides` above, which is
+  // a per-upload-session override that's never persisted -- this PATCHes the saved
+  // default straight away, then re-fetches so pipelineDefault (and the Upload view's
+  // checkboxes, which start from it) reflect the new default immediately.
+  async function togglePersistedModule(moduleName, currentlyEnabled, required) {
+    if (required) return;
+    await saveSettings({ [`pipeline_module_${moduleName}_enabled`]: !currentlyEnabled });
+    refreshPipelineConfig();
+  }
+
   async function addTrendFromSettings() {
     if (!newTrendTerm.trim()) return;
     await fetch('/api/trends', {
@@ -444,7 +526,7 @@ function App() {
             <div className="setup-alert">
               <strong>Setup incomplete</strong>
               <ul>
-                <li>{setupStatus.geminiKeyConfigured ? '✅' : '⚠️'} Gemini API key configured (.env)</li>
+                <li>{setupStatus.geminiKeyConfigured ? '✅' : '⚠️'} Gemini API key configured — add one below in Settings</li>
                 <li>{setupStatus.hasTagLibrary ? '✅' : '⚠️'} Tag library has at least one tag — add one below in Settings</li>
                 <li>{setupStatus.hasProductSize ? '✅' : '⚠️ (optional)'} At least one product size / mockup template configured</li>
               </ul>
@@ -578,6 +660,106 @@ function App() {
                   </div>
                 </div>
 
+              </div>
+
+              <div className="settings-section-card">
+                <h3 className="settings-section-title">API Keys</h3>
+
+                <div className="settings-subsection">
+                  <p className="text-muted" style={{ marginTop: 0 }}>
+                    Keys are stored in the database — this is the only place the app reads API keys from. Values are never shown again after saving — only the last 4 characters are kept visible.
+                  </p>
+                  {apiKeys.length ? (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Provider</th>
+                          <th>Label</th>
+                          <th>Key</th>
+                          <th>Status</th>
+                          <th />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {apiKeys.map((key) => (
+                          <tr key={key.id}>
+                            <td className="mono">{key.provider}</td>
+                            <td>{key.label || <span className="text-muted">—</span>}</td>
+                            <td className="mono mono-sm">{key.maskedKey}</td>
+                            <td>{key.enabled ? '✅ Enabled' : '⚪ Disabled'}</td>
+                            <td>
+                              <div className="flex-row" style={{ gap: '0.5rem' }}>
+                                <button className="btn-secondary btn-sm" onClick={() => toggleApiKeyEnabled(key)}>
+                                  {key.enabled ? 'Disable' : 'Enable'}
+                                </button>
+                                <button className="btn-secondary btn-sm" onClick={() => deleteApiKey(key)}>Delete</button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="empty-state">No dashboard-managed keys yet — add one below to enable Gemini/Claude calls.</p>
+                  )}
+
+                  <div className="settings-field-row" style={{ marginTop: '1rem' }}>
+                    <div className="settings-field">
+                      <span className="settings-field-label">Provider</span>
+                      <select value={newKeyProvider} onChange={(e) => setNewKeyProvider(e.target.value)}>
+                        <option value="gemini">Gemini</option>
+                        <option value="claude">Claude</option>
+                      </select>
+                    </div>
+                    <div className="settings-field" style={{ flex: 1, minWidth: '240px' }}>
+                      <span className="settings-field-label">Key value</span>
+                      <input
+                        type="password"
+                        value={newKeyValue}
+                        onChange={(e) => setNewKeyValue(e.target.value)}
+                        placeholder="Paste API key"
+                      />
+                    </div>
+                    <div className="settings-field">
+                      <span className="settings-field-label">Label (optional)</span>
+                      <input
+                        value={newKeyLabel}
+                        onChange={(e) => setNewKeyLabel(e.target.value)}
+                        placeholder="e.g. backup key"
+                      />
+                    </div>
+                    <button className="btn-primary" onClick={addApiKey} disabled={!newKeyValue.trim()}>Add key</button>
+                  </div>
+                  {apiKeysMessage && <p className="text-muted mono-sm" style={{ marginTop: '0.5rem' }}>{apiKeysMessage}</p>}
+                </div>
+              </div>
+
+              <div className="settings-section-card">
+                <h3 className="settings-section-title">Pipeline Modules</h3>
+
+                <div className="settings-subsection" style={{ marginBottom: 0 }}>
+                  <p className="text-muted" style={{ marginTop: 0 }}>
+                    Default enable/disable for each pipeline module. Applies to new uploads going forward — matches the checkboxes on the Upload view, but saved here instead of one-off per session.
+                  </p>
+                  <div className="flex-row flex-wrap" style={{ gap: '1.5rem' }}>
+                    {pipelineDefault?.pipeline?.map((m) => (
+                      <label
+                        key={m.module}
+                        className="settings-checkbox-row"
+                        style={{ opacity: m.required ? 0.6 : 1, cursor: m.required ? 'not-allowed' : 'pointer' }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!m.enabled}
+                          disabled={m.required}
+                          onChange={() => togglePersistedModule(m.module, m.enabled, m.required)}
+                        />
+                        {m.module}
+                        {m.required ? <span className="text-muted mono-sm"> (required)</span> : null}
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <div className="settings-section-card">

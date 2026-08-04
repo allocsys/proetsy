@@ -6,7 +6,7 @@ import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
 import { getDb } from './db/init.js';
-import { getPipelineConfig, getProductSizes, migrateProductSizesSeed } from './config/index.js';
+import { getPipelineConfig, getProductSizes, migrateProductSizesSeed, migratePipelineConfigSeed } from './config/index.js';
 import { SHOP_CONVENTIONS, MIDJOURNEY_CONVENTIONS } from './config/shop-conventions.js';
 import { createJob, getJobWithModules, setManualNotes, setModuleStatus } from './lib/jobs.js';
 import { analyzeArtworkForJob } from './lib/image-analyzer/index.js';
@@ -15,6 +15,7 @@ import { enforceConventions } from './lib/listing-generator/validate.js';
 import { generateMockupForJob, OUTPUT_DIR } from './lib/mockup-generator.js';
 import { runPendingModulesForJob, runPendingModulesForJobs } from './lib/pipeline-runner.js';
 import { initRateLimitCache } from './lib/llm/rate-limits.js';
+import { listKeysMasked, addKey, setKeyEnabled, deleteKey, getKeysForProvider } from './lib/llm/key-store.js';
 import { getTrends } from './lib/trends/index.js';
 import { addManualTrend, importFromCsvRows, rowsFromCsvText } from './lib/trends/manual.js';
 import {
@@ -130,6 +131,14 @@ getDb();
 // step 1). Safe to call on every startup -- a no-op once the table has any rows.
 migrateProductSizesSeed();
 
+// One-time migration: seeds each pipeline module's `pipeline_module_<name>_enabled`
+// settings key from pipeline.config.json the first time it's seen, so an existing
+// hand-edited JSON file's toggles survive the move to the dashboard-editable flow (see
+// config/index.js -> migratePipelineConfigSeed(), plan.md -> "Rollout" step 4). Same
+// safe-to-call-every-startup / no-op-once-seeded shape as migrateProductSizesSeed()
+// above.
+migratePipelineConfigSeed();
+
 // Rehydrates the LLM provider layer's in-process cooldown Map from the durable
 // llm_rate_limits table, so a restart doesn't reset an already-exhausted key/model pair
 // back to "looks fine, try it". See ARCHITECTURE.md -> LLM Provider Layer -> "Rate-limit
@@ -147,13 +156,14 @@ app.get('/api/health', (req, res) => {
 });
 
 // ARCHITECTURE.md -> First-Run Setup -> "Detection: on backend startup, check for (1) at
-// least one Gemini key in .env, (2) an initialized DB, (3) at least one entry in
-// product-sizes.json." Also reports the tag-library check ("Required for Module 2") so
-// the dashboard's persistent Settings-panel status list (not just a one-time modal) has
-// everything it needs in one call.
+// least one Gemini key (dashboard-managed, DB-backed -- see key-store.js), (2) an
+// initialized DB, (3) at least one entry in product-sizes.json." Also reports the
+// tag-library check ("Required for Module 2") so the dashboard's persistent
+// Settings-panel status list (not just a one-time modal) has everything it needs in one
+// call.
 app.get('/api/setup-status', (req, res) => {
   const db = getDb();
-  const geminiKeyConfigured = (process.env.GEMINI_API_KEYS || '').split(',').map((k) => k.trim()).filter(Boolean).length > 0;
+  const geminiKeyConfigured = getKeysForProvider('gemini').length > 0;
   const hasProductSize = db.prepare('SELECT COUNT(*) AS n FROM product_sizes').get().n > 0;
   const hasTagLibrary = db.prepare('SELECT COUNT(*) AS n FROM tags').get().n > 0;
   res.json({
@@ -274,6 +284,54 @@ app.patch('/api/settings', (req, res) => {
   syncWatcherFromSettings(CANDIDATES_DIR);
   const rows = db.prepare('SELECT key, value FROM settings').all();
   res.json({ ...AUTO_SETTING_DEFAULTS, ...Object.fromEntries(rows.map((r) => [r.key, r.value])) });
+});
+
+// plan.md -> "Editable Settings & API Keys from Dashboard": dashboard-managed LLM
+// provider API keys, backed by the `api_keys` table (see lib/llm/key-store.js) -- the
+// ONLY source of truth as of plan.md Rollout step 5 (the earlier .env fallback for
+// GEMINI_API_KEYS / CLAUDE_API_KEY has been removed now that this path is confirmed
+// working). Full key values are never returned by any of these routes -- list/create
+// both come back through listKeysMasked()-shaped objects (masked to the last 4 chars).
+// No auth layer on these routes -- confirmed as not needed, the dashboard is
+// single-user/local (see plan.md's resolved "Open Question for User").
+app.get('/api/settings/api-keys', (req, res) => {
+  res.json(listKeysMasked());
+});
+
+// Body: { provider: 'gemini' | 'claude', key_value: string, label?: string }. Provider
+// isn't restricted to a fixed enum here -- any provider string is a valid row, whether
+// or not gemini.js/claude.js actually know how to consume it.
+app.post('/api/settings/api-keys', (req, res) => {
+  const { provider, key_value, label } = req.body || {};
+  if (!provider || !key_value) {
+    return res.status(400).json({ error: 'provider and key_value are required' });
+  }
+  try {
+    const key = addKey({ provider, key_value, label });
+    res.status(201).json(key);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Body: { enabled: boolean }. Enable/disable rather than edit-in-place -- there's no
+// route to change an existing key's value, matching the "never re-expose a full key
+// value" security note (an edit would require either accepting a new full value, which
+// this covers via delete + re-add, or reading the old one back out, which we don't do).
+app.patch('/api/settings/api-keys/:id', (req, res) => {
+  const { enabled } = req.body || {};
+  if (typeof enabled !== 'boolean') {
+    return res.status(400).json({ error: 'enabled (boolean) is required' });
+  }
+  const updated = setKeyEnabled(Number(req.params.id), enabled);
+  if (!updated) return res.status(404).json({ error: 'API key not found' });
+  res.json(listKeysMasked().find((k) => k.id === Number(req.params.id)));
+});
+
+app.delete('/api/settings/api-keys/:id', (req, res) => {
+  const deleted = deleteKey(Number(req.params.id));
+  if (!deleted) return res.status(404).json({ error: 'API key not found' });
+  res.status(204).end();
 });
 
 // Module 6 -> First-Run Setup -> "Required for Module 2 (core): a starter tag list —
