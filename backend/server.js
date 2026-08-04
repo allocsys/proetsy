@@ -6,7 +6,7 @@ import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
 import { getDb } from './db/init.js';
-import { getPipelineConfig, getProductSizes, migrateProductSizesSeed, migratePipelineConfigSeed } from './config/index.js';
+import { getPipelineConfig, getProductSizes, migratePipelineConfigSeed } from './config/index.js';
 import { SHOP_CONVENTIONS, MIDJOURNEY_CONVENTIONS } from './config/shop-conventions.js';
 import { createJob, getJobWithModules, setManualNotes, setModuleStatus } from './lib/jobs.js';
 import { analyzeArtworkForJob } from './lib/image-analyzer/index.js';
@@ -124,19 +124,11 @@ function withMockupUrls(row) {
 // Initializes the schema on boot (CREATE TABLE IF NOT EXISTS, so safe to call every start).
 getDb();
 
-// One-time migration: seeds `product_sizes` from product-sizes.json the first time the
-// table is found empty, so an existing dev setup with a hand-edited JSON file doesn't
-// lose its configured sizes now that getProductSizes() reads from the DB table instead
-// of the file (see config/index.js -> migrateProductSizesSeed(), plan.md -> "Rollout"
-// step 1). Safe to call on every startup -- a no-op once the table has any rows.
-migrateProductSizesSeed();
-
 // One-time migration: seeds each pipeline module's `pipeline_module_<name>_enabled`
 // settings key from pipeline.config.json the first time it's seen, so an existing
 // hand-edited JSON file's toggles survive the move to the dashboard-editable flow (see
-// config/index.js -> migratePipelineConfigSeed(), plan.md -> "Rollout" step 4). Same
-// safe-to-call-every-startup / no-op-once-seeded shape as migrateProductSizesSeed()
-// above.
+// config/index.js -> migratePipelineConfigSeed(), plan.md -> "Rollout" step 4). Safe to
+// call on every startup -- a no-op once each module's settings key has been seeded once.
 migratePipelineConfigSeed();
 
 // Rehydrates the LLM provider layer's in-process cooldown Map from the durable
@@ -157,7 +149,7 @@ app.get('/api/health', (req, res) => {
 
 // ARCHITECTURE.md -> First-Run Setup -> "Detection: on backend startup, check for (1) at
 // least one Gemini key (dashboard-managed, DB-backed -- see key-store.js), (2) an
-// initialized DB, (3) at least one entry in product-sizes.json." Also reports the
+// initialized DB, (3) at least one configured row in the product_sizes table." Also reports the
 // tag-library check ("Required for Module 2") so the dashboard's persistent
 // Settings-panel status list (not just a one-time modal) has everything it needs in one
 // call.
