@@ -15,7 +15,7 @@ import { enforceConventions } from './lib/listing-generator/validate.js';
 import { generateMockupForJob, OUTPUT_DIR } from './lib/mockup-generator.js';
 import { runPendingModulesForJob, runPendingModulesForJobs } from './lib/pipeline-runner.js';
 import { initRateLimitCache } from './lib/llm/rate-limits.js';
-import { listKeysMasked, addKey, setKeyEnabled, deleteKey } from './lib/llm/key-store.js';
+import { listKeysMasked, addKey, setKeyEnabled, deleteKey, getKeysForProvider } from './lib/llm/key-store.js';
 import { getTrends } from './lib/trends/index.js';
 import { addManualTrend, importFromCsvRows, rowsFromCsvText } from './lib/trends/manual.js';
 import {
@@ -156,13 +156,14 @@ app.get('/api/health', (req, res) => {
 });
 
 // ARCHITECTURE.md -> First-Run Setup -> "Detection: on backend startup, check for (1) at
-// least one Gemini key in .env, (2) an initialized DB, (3) at least one entry in
-// product-sizes.json." Also reports the tag-library check ("Required for Module 2") so
-// the dashboard's persistent Settings-panel status list (not just a one-time modal) has
-// everything it needs in one call.
+// least one Gemini key (dashboard-managed, DB-backed -- see key-store.js), (2) an
+// initialized DB, (3) at least one entry in product-sizes.json." Also reports the
+// tag-library check ("Required for Module 2") so the dashboard's persistent
+// Settings-panel status list (not just a one-time modal) has everything it needs in one
+// call.
 app.get('/api/setup-status', (req, res) => {
   const db = getDb();
-  const geminiKeyConfigured = (process.env.GEMINI_API_KEYS || '').split(',').map((k) => k.trim()).filter(Boolean).length > 0;
+  const geminiKeyConfigured = getKeysForProvider('gemini').length > 0;
   const hasProductSize = db.prepare('SELECT COUNT(*) AS n FROM product_sizes').get().n > 0;
   const hasTagLibrary = db.prepare('SELECT COUNT(*) AS n FROM tags').get().n > 0;
   res.json({
@@ -286,20 +287,20 @@ app.patch('/api/settings', (req, res) => {
 });
 
 // plan.md -> "Editable Settings & API Keys from Dashboard": dashboard-managed LLM
-// provider API keys, backed by the `api_keys` table (see lib/llm/key-store.js). Full key
-// values are never returned by any of these routes -- list/create both come back through
-// listKeysMasked()-shaped objects (masked to the last 4 chars). `.env`-sourced keys
-// (GEMINI_API_KEYS / CLAUDE_API_KEY) are intentionally NOT listed here -- they're a
-// fallback used only when the DB has zero enabled rows for a provider, and have no `id`
-// to enable/disable/delete, so this is a DB-managed-keys-only view.
+// provider API keys, backed by the `api_keys` table (see lib/llm/key-store.js) -- the
+// ONLY source of truth as of plan.md Rollout step 5 (the earlier .env fallback for
+// GEMINI_API_KEYS / CLAUDE_API_KEY has been removed now that this path is confirmed
+// working). Full key values are never returned by any of these routes -- list/create
+// both come back through listKeysMasked()-shaped objects (masked to the last 4 chars).
+// No auth layer on these routes -- confirmed as not needed, the dashboard is
+// single-user/local (see plan.md's resolved "Open Question for User").
 app.get('/api/settings/api-keys', (req, res) => {
   res.json(listKeysMasked());
 });
 
 // Body: { provider: 'gemini' | 'claude', key_value: string, label?: string }. Provider
-// isn't restricted to a fixed enum here -- key-store.js's ENV_KEYS_BY_PROVIDER only
-// knows about 'gemini'/'claude' for the .env-fallback path, but a DB-only provider with
-// no .env fallback is still a valid row (just never falls back to anything if disabled).
+// isn't restricted to a fixed enum here -- any provider string is a valid row, whether
+// or not gemini.js/claude.js actually know how to consume it.
 app.post('/api/settings/api-keys', (req, res) => {
   const { provider, key_value, label } = req.body || {};
   if (!provider || !key_value) {
