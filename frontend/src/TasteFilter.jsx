@@ -139,7 +139,7 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
             <div className="flex-row" style={{ gap: '0.5rem' }}>
               <button onClick={() => handleLabel(c, 'keep')} className="btn-primary flex-1">Keep</button>
               <button onClick={() => handleLabel(c, 'discard')} className="btn-secondary flex-1">Discard</button>
-              <button onClick={() => handleKeepAndSendToPipeline(c)} className="btn-secondary flex-1">Pipeline</button>
+              <button onClick={() => handleKeepAndSendToPipeline(c)} className="btn-secondary flex-1">Keep & send to pipeline</button>
             </div>
           </>
         )}
@@ -153,14 +153,14 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
         <input
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          placeholder="Category (e.g. square-canvas)"
+          placeholder="e.g. square-canvas"
         />
         <input
           value={promptId}
           onChange={(e) => setPromptId(e.target.value)}
           placeholder="Prompt ID"
         />
-        <button className="btn-secondary" onClick={handleRecompute}>Recompute</button>
+        <button className="btn-secondary" onClick={handleRecompute}>Recompute now</button>
       </div>
 
       <div
@@ -168,7 +168,7 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => { e.preventDefault(); handleImport(e.dataTransfer.files); }}
       >
-        <p className="dropzone-title">Drag and drop images to score</p>
+        <p className="dropzone-title">Drag and drop a batch of candidate images here</p>
         <input type="file" multiple accept="image/*" onChange={(e) => handleImport(e.target.files)} />
       </div>
       {status && <p className="text-muted mono-sm mb-2">{status}</p>}
@@ -182,7 +182,8 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
       {autoSortedCandidates.length > 0 && (
         <div className="mt-4">
           <button className="btn-ghost" onClick={() => setAutoSortedExpanded(!autoSortedExpanded)}>
-            {autoSortedExpanded ? '▾' : '▸'} Auto-sorted ({autoSortedCandidates.length})
+            <span aria-hidden="true">{autoSortedExpanded ? '▾' : '▸'}</span>{' '}
+            <span>Auto-sorted ({autoSortedCandidates.length})</span>
           </button>
           {autoSortedExpanded && (
             <div className="card-grid mt-2">
