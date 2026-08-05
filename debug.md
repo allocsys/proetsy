@@ -1,78 +1,116 @@
-# Debug log — Logic/flow bugs found in product_sizes DB migration review (2026-08-04)
+# Debug log — Silent error audit (2026-08-05)
 
-Review scope: `remove-product-sizes-json-seed` branch (merged into `main`
-2026-08-04) and related backend config/provider code. Found via manual review +
-delegated multi-file investigation.
+Review scope: full-repo audit for "silent errors" — code that fails quietly now
+but will produce hard-to-debug symptoms later (swallowed exceptions, unsurfaced
+async failures, stub logic masquerading as working code).
 
-Sequenced in the order to fix them — each step is picked so it doesn't get
-re-touched or invalidated by a later step.
+Before logging new findings, the previous entry (product_sizes DB migration
+review, 2026-08-04) was re-verified against the current `main` branch. All 5 of
+those fixes are still present and correct:
 
-## Step 1 — ✅ DONE (commit 684c4df) — `backend/server.js`: `PATCH /api/jobs/:id/listings/:listingId`
+- `PATCH /api/jobs/:id/listings/:listingId` — still wrapped in `db.transaction()`.
+- `/api/setup-status` `hasProductSize` — still requires non-empty `dimensions`
+  AND `mockup_template_path`, not just `COUNT(*) > 0`.
+- `getProductSizes()` — still has `isValidProductSizeRow()`, skips invalid rows
+  with `console.warn` instead of throwing.
+- `claude.js` — `generateImage` stub confirmed removed, with a comment
+  explaining `llm/index.js` hardcodes image gen to `gemini.js`.
+- `getPipelineConfig()` — still cached via `pipelineConfigCache`, invalidated on
+  writes, still returns a shallow copy per call.
 
-**Correction after reading the actual code:** this was flagged as a race condition,
-but the handler is fully synchronous — no `await` between the `SELECT` and the
-`UPDATE` — so on Node's single-threaded event loop, nothing can interleave in that
-gap on today's single-process server. Not an active bug as written.
+Superseding that entry with this one since it's fully absorbed above.
 
-**What was done anyway:** wrapped the read-merge-write in
-`db.transaction(() => { ... })`. This is future-proofing, not a fix for a live bug —
-it guarantees atomicity stays true even if async work (e.g. an `await`) is later
-added to the merge/validation step, which would otherwise silently reopen the
-interleaving window without anyone noticing.
+Sequenced in priority order (most dangerous silence first).
 
-## Step 2 — ✅ DONE (commit 3173928) — `backend/server.js`: `/api/setup-status` uses row *count* as "configured" proxy
+## Issue 1 — OPEN — `backend/lib/llm/queue.js:77` (`withRequestSlot`)
 
-**Problem:** `hasProductSize` was computed as `COUNT(*) FROM product_sizes > 0`. Any
-row — including an invalid or placeholder one — made the dashboard report "ready to
-run" even when nothing usable was configured.
+**Problem:**
+```javascript
+export function withRequestSlot(keyIndex, fn) {
+  const previousTail = perKeyTail.get(keyIndex) || Promise.resolve();
+  const runPromise = previousTail.then(
+    () => runSpacedAndBounded(keyIndex, fn),
+    () => runSpacedAndBounded(keyIndex, fn)
+  );
+  perKeyTail.set(keyIndex, runPromise.catch(() => {}));
+  return runPromise;
+}
+```
+`runPromise.catch(() => {})` swallows the rejection used purely for tail
+sequencing, but there's no logging anywhere in that path. A key that's
+persistently failing (bad auth, sustained 429s) produces no signal — the queue
+just keeps dispatching against it forever, one silent failure at a time.
 
-**Fix applied:** `hasProductSize` now requires at least one row where `dimensions`
-and `mockup_template_path` are both present and non-empty. This is the same
-required-field definition step 3 (`getProductSizes()` validation) should reuse, so
-the two checks stay in sync.
+**Proposed fix:** keep the swallow (it needs to stay non-throwing so the chain
+never stalls) but add visibility: `runPromise.catch((err) => { console.warn(\`withRequestSlot: request on key ${keyIndex} failed:\`, err.message); })`.
+Consider also tracking a per-key consecutive-failure counter so a persistently
+broken key can be surfaced to `/api/setup-status` or the rate-limits panel
+instead of only living in server logs.
 
-## Step 3 — ✅ DONE (commit 8321059) — `backend/config/index.js`: `getProductSizes()` had no validation
+## Issue 2 — OPEN — `frontend/src/App.jsx` (empty `.catch(() => {})` on fetch calls)
 
-**Problem:** Read raw rows from the `product_sizes` table and returned them
-unvalidated. That table is dashboard-editable, so a bad edit — empty `dimensions`,
-cleared `mockup_template_path` — flowed straight through to `mockup-generator.js`
-with no guardrail.
+**Problem:** Every background fetch swallows its error with no UI feedback:
+`refreshJobs()` (126), `refreshSetupStatus()` (134), `refreshTrends()` (142),
+`refreshTags()` (150), `refreshWatchStatus()` (158), `refreshRateLimits()` (166),
+`refreshApiKeys()` (174), `refreshPipelineConfig()` (185), the initial
+`useEffect` fetches for `/api/config/pipeline`, `/api/config/shop-conventions`,
+`/api/settings` (200–203), and `runJobsBatch()` (237). If the backend is down or
+a query 500s, the dashboard just stops updating with no indication anything is
+wrong — it can look "stuck" indefinitely.
 
-**Fix applied:** Added `isValidProductSizeRow()` requiring `size_key`, `dimensions`,
-and `mockup_template_path` all present — the same definition step 2's
-`/api/setup-status` check uses. Invalid rows are skipped (with a `console.warn`),
-not thrown, so one bad row doesn't take every configured size down with it.
+**Proposed fix:** introduce one shared error-state setter (e.g. a small
+`useFetchError()` hook or a top-level `lastFetchError` state) and replace each
+`.catch(() => {})` with `.catch((err) => setLastFetchError({ source: 'refreshJobs', err }))`,
+then render a lightweight banner/toast when it's set. `refreshJobs`,
+`refreshTrends`, and `runJobsBatch` should be prioritized first since they gate
+whether the user believes a run actually happened.
 
-## Step 4 — ✅ DONE (commits cc2f567, c1b953a) — `backend/lib/llm/claude.js`: `generateImage` stub throws instead of not existing
+## Issue 3 — PARTIALLY MITIGATED — `backend/lib/mockup-generator.js:174-180` (`outpaintArtwork` temp-file cleanup)
 
-**Correction after reading the actual code:** the "mis-route causes a hard 500"
-scenario doesn't actually happen today. `llm/index.js`'s `generateImage()` already
-hardcodes a direct call to `gemini.js`, bypassing the `LLM_PROVIDER` switch
-entirely — confirmed by `index.test.js`, which explicitly asserts
-`claude.generateImage` is never called even when `LLM_PROVIDER=claude`. So this was
-dead code, not a live mis-routing risk.
+**Current state (already better than initially assumed):**
+```javascript
+} finally {
+  fs.promises.rm(tempPath, { force: true }).catch((err) => {
+    console.warn(`outpaintArtwork: failed to clean up temp file ${tempPath}:`, err.message);
+  });
+}
+```
+This already logs via `console.warn` rather than swallowing silently — correcting
+the earlier read of this line. It's still a *soft* silent failure though: a
+`console.warn` with no dashboard/metric surface means repeated cleanup failures
+(permissions, locked files) only show up as an eventual, unrelated-looking
+"no space left on device" error, well after the actual cause.
 
-**Fix applied:** Removed `generateImage` from `claude.js` (`cc2f567`) and the
-corresponding stub test from `claude.test.js` (`c1b953a`), since `claude.js` no
-longer exports it. No change needed in `llm/index.js` — its existing hardcoded
-routing to `gemini.js` already is the capability check; there was nothing to add.
+**Proposed fix:** track a cumulative cleanup-failure counter (module-level or in
+the jobs table) and surface it on `/api/setup-status` or a health endpoint once
+it crosses a small threshold, so disk pressure is visible before it becomes an
+outage.
 
-## Step 5 — ✅ DONE (commits 1b22aba, 26affde, b5c063f) — `backend/config/index.js`: `getPipelineConfig()` re-queries on every call
+## Issue 4 — OPEN — Stub logic presented as configured functionality
 
-**Problem:** Every call did a fresh `SELECT ... FROM settings` and re-joined against
-the JSON seed. Not wrong, but a needless DB round-trip on a function likely called
-frequently.
+**a. `backend/lib/llm/claude.js:16`**
+```javascript
+export async function generateText(prompt, _options = {}) {
+  if (!getClaudeKey()) {
+    throw new Error('Claude fallback is not configured. Add a Claude key from the dashboard Settings panel.');
+  }
+  // TODO: call Claude's messages API.
+  return { text: `[stub] Claude text response for: ${prompt}`, provider: 'claude' };
+}
+```
+**b. `backend/lib/trends/etsy-api.js:6-11`**
+```javascript
+// TODO: implement the actual GET /listings/active call + frequency tally.
+export async function getTrends(_category) {
+```
+Both modules pass their "is configured" checks (a Claude key is present; the
+Etsy provider is selected) and return successfully, but produce fabricated or
+empty output. Nothing throws, so a user relying on Claude as a fallback
+provider or Etsy trend data has no way to know it's a stub short of reading
+source.
 
-**Fix applied:** Added a module-level `pipelineConfigCache`, populated on first call
-and invalidated by `invalidatePipelineConfigCache()` (`1b22aba`). Wired that
-invalidation into `migratePipelineConfigSeed()` (whenever it actually inserts rows)
-and into `server.js`'s `PATCH /api/settings` (unconditionally, since any settings
-PATCH could touch a pipeline toggle) (`b5c063f`).
-
-**Test-compatibility fix (`26affde`):** the existing test suite has a test asserting
-`getPipelineConfig()` returns a fresh object every call (mutating one call's result
-must not affect the next call's result). A naive "return the cached object" approach
-would have broken that. Fixed by caching the computed data internally but always
-returning a shallow copy (`{ ...cache, pipeline: cache.pipeline.map(e => ({...e})) }`)
-on every call -- the DB round-trip is still skipped on a cache hit, which was the
-actual goal, without changing the function's external contract.
+**Proposed fix:** at minimum, tag stub responses so callers/logs can tell —
+e.g. `{ text: ..., provider: 'claude', stub: true }` — and have
+`/api/setup-status` (or wherever provider health is reported) flag `stub: true`
+responses distinctly from real ones, rather than only distinguishing
+configured/not-configured.
