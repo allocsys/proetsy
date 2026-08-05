@@ -105,6 +105,16 @@ function App() {
   const [activeJobId, setActiveJobId] = useState(null);
   const [activeView, setActiveView] = useState('upload');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
+
+  // Shared handler for background/status fetches (refreshJobs, refreshTrends, etc.) so a
+  // failed request (backend down, 500, network drop) surfaces to the user instead of
+  // silently leaving stale data on screen with no indication anything went wrong. Not used
+  // for user-initiated actions that already have their own try/catch + message state
+  // (addApiKey, saveTags, backfillTagCategories, etc.) -- those already report inline.
+  function reportFetchError(source) {
+    return (err) => setFetchError({ source, message: err.message });
+  }
 
   function goTo(view) {
     setActiveView(view);
@@ -119,49 +129,49 @@ function App() {
     fetch('/api/jobs')
       .then((r) => r.json())
       .then(setJobs)
-      .catch(() => {});
+      .catch(reportFetchError('refreshJobs'));
   }
 
   function refreshSetupStatus() {
     fetch('/api/setup-status')
       .then((r) => r.json())
       .then(setSetupStatus)
-      .catch(() => {});
+      .catch(reportFetchError('refreshSetupStatus'));
   }
 
   function refreshTrends() {
     fetch('/api/trends')
       .then((r) => r.json())
       .then(setTrends)
-      .catch(() => {});
+      .catch(reportFetchError('refreshTrends'));
   }
 
   function refreshTags() {
     fetch('/api/tags')
       .then((r) => r.json())
       .then(setTags)
-      .catch(() => {});
+      .catch(reportFetchError('refreshTags'));
   }
 
   function refreshWatchStatus() {
     fetch('/api/taste-filter/watch-status')
       .then((r) => r.json())
       .then(setWatchStatus)
-      .catch(() => {});
+      .catch(reportFetchError('refreshWatchStatus'));
   }
 
   function refreshRateLimits() {
     fetch('/api/llm/rate-limits')
       .then((r) => r.json())
       .then(setRateLimits)
-      .catch(() => {});
+      .catch(reportFetchError('refreshRateLimits'));
   }
 
   function refreshApiKeys() {
     fetch('/api/settings/api-keys')
       .then((r) => r.json())
       .then(setApiKeys)
-      .catch(() => {});
+      .catch(reportFetchError('refreshApiKeys'));
   }
 
   function refreshPipelineConfig() {
@@ -171,7 +181,7 @@ function App() {
         setPipelineDefault(cfg);
         setOverrides(Object.fromEntries(cfg.pipeline.map((m) => [m.module, m.enabled])));
       })
-      .catch(() => {});
+      .catch(reportFetchError('refreshPipelineConfig'));
   }
 
   useEffect(() => {
@@ -186,10 +196,10 @@ function App() {
         setPipelineDefault(cfg);
         setOverrides(Object.fromEntries(cfg.pipeline.map((m) => [m.module, m.enabled])));
       })
-      .catch(() => {});
+      .catch(reportFetchError('pipelineConfig (initial load)'));
 
-    fetch('/api/config/shop-conventions').then((r) => r.json()).then(setShopConventions).catch(() => {});
-    fetch('/api/settings').then((r) => r.json()).then(setSettings).catch(() => {});
+    fetch('/api/config/shop-conventions').then((r) => r.json()).then(setShopConventions).catch(reportFetchError('shopConventions'));
+    fetch('/api/settings').then((r) => r.json()).then(setSettings).catch(reportFetchError('settings'));
     refreshSetupStatus();
     refreshJobs();
     refreshTrends();
@@ -239,7 +249,7 @@ function App() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ job_ids: jobIds }),
-    }).catch(() => {});
+    }).catch(reportFetchError('runJobsBatch'));
     refreshJobs();
   }
 
@@ -540,6 +550,13 @@ function App() {
             <div className="backend-banner">
               <span>Backend not running — start it with <code className="mono">npm run dev</code> from the backend/ folder.</span>
               <StatusBadge status="pending" />
+            </div>
+          )}
+
+          {fetchError && (
+            <div className="backend-banner" role="alert">
+              <span>Background update failed ({fetchError.source}): {fetchError.message}</span>
+              <button className="btn-secondary btn-sm" onClick={() => setFetchError(null)}>Dismiss</button>
             </div>
           )}
 
