@@ -22,30 +22,26 @@ Superseding that entry with this one since it's fully absorbed above.
 
 Sequenced in priority order (most dangerous silence first).
 
-## Issue 1 — OPEN — `backend/lib/llm/queue.js:77` (`withRequestSlot`)
+## Issue 1 — CORRECTED, NOT AN ACTIVE BUG — `backend/lib/llm/queue.js:77` (`withRequestSlot`)
 
-**Problem:**
-```javascript
-export function withRequestSlot(keyIndex, fn) {
-  const previousTail = perKeyTail.get(keyIndex) || Promise.resolve();
-  const runPromise = previousTail.then(
-    () => runSpacedAndBounded(keyIndex, fn),
-    () => runSpacedAndBounded(keyIndex, fn)
-  );
-  perKeyTail.set(keyIndex, runPromise.catch(() => {}));
-  return runPromise;
-}
-```
-`runPromise.catch(() => {})` swallows the rejection used purely for tail
-sequencing, but there's no logging anywhere in that path. A key that's
-persistently failing (bad auth, sustained 429s) produces no signal — the queue
-just keeps dispatching against it forever, one silent failure at a time.
+**Originally flagged as:** `runPromise.catch(() => {})` silently swallowing
+repeated failures on a broken key with no aggregate signal.
 
-**Proposed fix:** keep the swallow (it needs to stay non-throwing so the chain
-never stalls) but add visibility: `runPromise.catch((err) => { console.warn(\`withRequestSlot: request on key ${keyIndex} failed:\`, err.message); })`.
-Consider also tracking a per-key consecutive-failure counter so a persistently
-broken key can be surfaced to `/api/setup-status` or the rate-limits panel
-instead of only living in server logs.
+**Correction after tracing the full call path:** `withRequestSlot()` is only
+ever called from `cascade()` in `gemini.js`, which already `await`s the exact
+same `runPromise` in a try/catch — the `.catch(() => {})` here only prevents an
+unconsumed rejection sitting in the `perKeyTail` Map from firing Node's
+`unhandledRejection` warning; it does not affect what the caller sees.
+`cascade()` calls `recordFailure(keyIndex, model, {...})` on every retryable
+(429) failure, which (in `rate-limits.js`) already tracks per-(key, model)
+`consecutiveHits`, escalates the cooldown duration on repeat failures, and
+persists all of it to the `llm_rate_limits` table (survives restarts). A
+persistently broken key accumulates escalating cooldowns until every pair is
+skipped, and `cascade()` throws a distinct "all keys/models in cooldown" error
+for that case. Nothing is silently lost.
+
+**No fix applied** — adding logging here would duplicate what `recordFailure`'s
+`reason` field already captures in the DB.
 
 ## Issue 2 — OPEN — `frontend/src/App.jsx` (empty `.catch(() => {})` on fetch calls)
 
