@@ -18,18 +18,7 @@
     "test:e2e:install": "playwright install --with-deps chromium"
   },
   "dependencies": {
-    "ag-psd": "^31.0.2",
-    "better-sqlite3": "^11.3.0",
-    "chokidar": "^4.0.3",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "jimp": "^0.22.12",
-    "multer": "^2.0.2",
-    "electron-updater": "^6.8.9",
-    "onnxruntime-web": "^1.20.1",
-    "pureimage": "^0.4.20",
-    "smartcrop-jimp": "^1.0.3"
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
     "@playwright/test": "^1.48.0",
