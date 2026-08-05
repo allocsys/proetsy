@@ -207,6 +207,10 @@ function App() {
     refreshWatchStatus();
     refreshRateLimits();
     refreshApiKeys();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally run-once-on-
+    // mount (empty dep array by design); the refresh* functions above are plain closures
+    // redefined every render, not memoized, so listing them as deps wouldn't make this
+    // effect more correct -- it would just fight the mount-only intent for no benefit.
   }, []);
 
   const tagCategories = useMemo(
