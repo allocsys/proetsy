@@ -15,7 +15,10 @@
     "test": "npm run test -w backend && npm run test:electron && npm run test -w frontend",
     "test:electron": "vitest run",
     "test:e2e": "playwright test",
-    "test:e2e:install": "playwright install --with-deps chromium"
+    "test:e2e:install": "playwright install --with-deps chromium",
+    "audit:duplication": "node scripts/check-dependency-duplication.js",
+    "audit:structure": "node scripts/validate-workspace-structure.js",
+    "audit:deps": "npm run audit:duplication && npm run audit:structure"
   },
   "dependencies": {
     "electron-updater": "^6.8.9"
