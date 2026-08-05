@@ -634,6 +634,10 @@ describe('App', () => {
       if (url === '/api/trends') return Promise.reject(new Error('trends fetch failed'));
       // Array-returning routes need an array back, or App's jobs.map()/tags.map() crashes.
       if (url === '/api/jobs' || url === '/api/tags') return Promise.resolve({ ok: true, json: async () => [] });
+      // A bare {} here would make refreshPipelineConfig's cfg.pipeline.map(...) throw its
+      // own error, racing with (and sometimes clobbering) the refreshTrends failure this
+      // test is actually checking for -- give it a real, empty-but-valid shape instead.
+      if (url === '/api/config/pipeline') return Promise.resolve({ ok: true, json: async () => ({ pipeline: [] }) });
       return Promise.resolve({ ok: true, json: async () => ({}) });
     });
     const user = userEvent.setup();
