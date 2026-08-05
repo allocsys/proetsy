@@ -71,6 +71,26 @@ export function computeMismatchRatio(artRatio, targetRatio) {
   return Math.abs(artRatio - targetRatio) / targetRatio;
 }
 
+// Cumulative count of temp-file cleanup failures across this process's lifetime
+// (debug.md Issue 3). Each individual failure is already logged via console.warn below,
+// but that's invisible unless someone's tailing server logs. This lets /api/setup-status
+// flag persistent disk/permission trouble (locked files, a read-only tmpdir, disk
+// pressure) before it silently accumulates into an unrelated-looking "no space left on
+// device" error elsewhere. Deliberately in-memory, not persisted to the DB -- what
+// matters is whether this is happening right now, repeatedly, not a full history across
+// restarts (a restart also naturally clears any transient cause, e.g. a since-remounted
+// filesystem).
+let tempCleanupFailureCount = 0;
+
+// Once cumulative failures reach this many, treat it as a real signal worth surfacing
+// (e.g. via /api/setup-status) rather than a one-off blip -- a single failed rm() (a file
+// that vanished between generation and cleanup, a transient lock) isn't itself alarming.
+export const TEMP_CLEANUP_FAILURE_THRESHOLD = 5;
+
+export function getTempCleanupFailureCount() {
+  return tempCleanupFailureCount;
+}
+
 function outpaintFailureWarning(sizeKey, mismatch, err) {
   return (
     `Artwork aspect ratio differs from the "${sizeKey}" template by ${(mismatch * 100).toFixed(1)}% ` +
@@ -167,6 +187,7 @@ export async function outpaintArtwork(artwork, targetWidth, targetHeight) {
     result = await generateImage(prompt, tempPath);
   } finally {
     fs.promises.rm(tempPath, { force: true }).catch((err) => {
+      tempCleanupFailureCount += 1;
       console.warn(`outpaintArtwork: failed to clean up temp file ${tempPath}:`, err.message);
     });
   }
