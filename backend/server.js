@@ -17,7 +17,12 @@ import { createJob, getJobWithModules, setManualNotes, setModuleStatus } from '.
 import { analyzeArtworkForJob } from './lib/image-analyzer/index.js';
 import { generateListingsForJob } from './lib/listing-generator/index.js';
 import { enforceConventions } from './lib/listing-generator/validate.js';
-import { generateMockupForJob, OUTPUT_DIR } from './lib/mockup-generator.js';
+import {
+  generateMockupForJob,
+  OUTPUT_DIR,
+  getTempCleanupFailureCount,
+  TEMP_CLEANUP_FAILURE_THRESHOLD,
+} from './lib/mockup-generator.js';
 import { runPendingModulesForJob, runPendingModulesForJobs } from './lib/pipeline-runner.js';
 import { initRateLimitCache } from './lib/llm/rate-limits.js';
 import { listKeysMasked, addKey, setKeyEnabled, deleteKey, getKeysForProvider } from './lib/llm/key-store.js';
@@ -173,12 +178,21 @@ app.get('/api/setup-status', (req, res) => {
     )
     .get().n > 0;
   const hasTagLibrary = db.prepare('SELECT COUNT(*) AS n FROM tags').get().n > 0;
+  // debug.md Issue 3: mockup-generator's temp-file cleanup failures were only visible via
+  // console.warn. Surfaced here once they cross TEMP_CLEANUP_FAILURE_THRESHOLD so
+  // persistent disk/permission trouble is flagged in the dashboard before it silently
+  // accumulates into an unrelated-looking "no space left on device" error. Below the
+  // threshold, tempCleanupIssue stays false -- a one-off failure isn't itself alarming --
+  // but the raw count is always included so it's visible either way, not just at cutover.
+  const tempCleanupFailureCount = getTempCleanupFailureCount();
   res.json({
     geminiKeyConfigured,
     dbInitialized: true,
     hasProductSize,
     hasTagLibrary,
     readyToRun: geminiKeyConfigured && hasTagLibrary,
+    tempCleanupFailureCount,
+    tempCleanupIssue: tempCleanupFailureCount >= TEMP_CLEANUP_FAILURE_THRESHOLD,
   });
 });
 
