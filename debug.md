@@ -43,7 +43,7 @@ for that case. Nothing is silently lost.
 **No fix applied** — adding logging here would duplicate what `recordFailure`'s
 `reason` field already captures in the DB.
 
-## Issue 2 — OPEN — `frontend/src/App.jsx` (empty `.catch(() => {})` on fetch calls)
+## Issue 2 — ✅ DONE (commits d639b97, ef7dffe) — `frontend/src/App.jsx` (empty `.catch(() => {})` on fetch calls)
 
 **Problem:** Every background fetch swallows its error with no UI feedback:
 `refreshJobs()` (126), `refreshSetupStatus()` (134), `refreshTrends()` (142),
@@ -54,12 +54,19 @@ for that case. Nothing is silently lost.
 a query 500s, the dashboard just stops updating with no indication anything is
 wrong — it can look "stuck" indefinitely.
 
-**Proposed fix:** introduce one shared error-state setter (e.g. a small
-`useFetchError()` hook or a top-level `lastFetchError` state) and replace each
-`.catch(() => {})` with `.catch((err) => setLastFetchError({ source: 'refreshJobs', err }))`,
-then render a lightweight banner/toast when it's set. `refreshJobs`,
-`refreshTrends`, and `runJobsBatch` should be prioritized first since they gate
-whether the user believes a run actually happened.
+**Fix applied (`d639b97`):** added a shared `fetchError` state and a
+`reportFetchError(source)` helper that all 11 background fetches now route
+through (`refreshJobs`, `refreshSetupStatus`, `refreshTrends`, `refreshTags`,
+`refreshWatchStatus`, `refreshRateLimits`, `refreshApiKeys`,
+`refreshPipelineConfig`, the initial `useEffect`'s pipeline/shop-conventions/
+settings fetches, and `runJobsBatch`) instead of swallowing silently. A
+dismissible banner renders whenever `fetchError` is set, naming which fetch
+failed and the underlying error message. User-initiated actions that already
+had their own try/catch + message state (`addApiKey`, `saveTags`,
+`backfillTagCategories`, etc.) were left untouched — they already report
+inline. Test coverage added in `ef7dffe`: banner appears on a background
+fetch failure and names the source, banner is dismissible, and no banner
+appears on the all-success path.
 
 ## Issue 3 — PARTIALLY MITIGATED — `backend/lib/mockup-generator.js:174-180` (`outpaintArtwork` temp-file cleanup)
 
