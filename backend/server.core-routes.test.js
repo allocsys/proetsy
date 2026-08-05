@@ -71,6 +71,19 @@ describe('GET /api/setup-status', () => {
     expect(res.body.hasTagLibrary).toBe(true);
     expect(res.body.readyToRun).toBe(true);
   });
+
+  // debug.md Issue 3: mockup-generator's temp-file cleanup failures used to only ever
+  // reach a console.warn. /api/setup-status now surfaces the cumulative count and a
+  // tempCleanupIssue flag once it crosses TEMP_CLEANUP_FAILURE_THRESHOLD. The counter
+  // itself (incrementing on an actual rm() failure) is covered directly in
+  // mockup-generator.test.js -- this just checks the route wires it through and defaults
+  // sanely when nothing has failed yet.
+  it('reports tempCleanupFailureCount 0 and tempCleanupIssue false when no cleanup has failed', async () => {
+    const res = await request(app).get('/api/setup-status');
+
+    expect(res.body.tempCleanupFailureCount).toBe(0);
+    expect(res.body.tempCleanupIssue).toBe(false);
+  });
 });
 
 describe('GET /api/config/pipeline and /api/config/product-sizes', () => {
