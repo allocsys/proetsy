@@ -68,7 +68,7 @@ inline. Test coverage added in `ef7dffe`: banner appears on a background
 fetch failure and names the source, banner is dismissible, and no banner
 appears on the all-success path.
 
-## Issue 3 — PARTIALLY MITIGATED — `backend/lib/mockup-generator.js:174-180` (`outpaintArtwork` temp-file cleanup)
+## Issue 3 — ✅ DONE (commits 94d96cf, 6787ce5, aa85155, 8bb77e2) — `backend/lib/mockup-generator.js:174-180` (`outpaintArtwork` temp-file cleanup)
 
 **Current state (already better than initially assumed):**
 ```javascript
@@ -84,10 +84,16 @@ the earlier read of this line. It's still a *soft* silent failure though: a
 (permissions, locked files) only show up as an eventual, unrelated-looking
 "no space left on device" error, well after the actual cause.
 
-**Proposed fix:** track a cumulative cleanup-failure counter (module-level or in
-the jobs table) and surface it on `/api/setup-status` or a health endpoint once
-it crosses a small threshold, so disk pressure is visible before it becomes an
-outage.
+**Fix applied:** added a module-level `tempCleanupFailureCount` counter in
+`mockup-generator.js`, incremented on every `rm()` failure alongside the
+existing `console.warn`, plus a `TEMP_CLEANUP_FAILURE_THRESHOLD` (5) and a
+`getTempCleanupFailureCount()` export (`94d96cf`). `/api/setup-status` now
+returns `tempCleanupFailureCount` (always) and `tempCleanupIssue` (true once
+the count reaches the threshold) (`6787ce5`). In-memory, not persisted — what
+matters is whether cleanup is failing right now, repeatedly, not a full
+history across restarts. Tests: route defaults (`aa85155`), and the counter
+itself incrementing on a real `rm()` failure without failing the outpaint call
+(`8bb77e2`).
 
 ## Issue 4 — OPEN — Stub logic presented as configured functionality
 
