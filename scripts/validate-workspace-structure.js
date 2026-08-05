@@ -8,8 +8,12 @@
  * Usage: node scripts/validate-workspace-structure.js
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Packages that SHOULD ONLY be in root (shared tools)
 const SHARED_ONLY = new Set([
