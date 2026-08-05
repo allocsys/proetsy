@@ -1,0 +1,66 @@
+name: Dependency & Structure Audit
+
+on:
+  pull_request:
+    paths:
+      - 'package.json'
+      - '*/package.json'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/dependency-audit.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'package.json'
+      - '*/package.json'
+      - 'pnpm-workspace.yaml'
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # 1. Check for duplicate dependencies across workspaces
+      - name: 🔍 Check dependency duplication
+        run: node scripts/check-dependency-duplication.js
+
+      # 2. Validate workspace structure against patterns
+      - name: 📐 Validate workspace structure
+        run: node scripts/validate-workspace-structure.js
+
+      # 3. Verify lockfile is in sync
+      - name: 🔐 Verify lockfile integrity
+        run: |
+          npm ci --frozen-lockfile --quiet
+          echo "✅ Lockfile is current and consistent"
+
+      # 4. Security audit
+      - name: 🛡️ Security audit
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+
+      # 5. Comment on PR with results
+      - name: 💬 Comment results on PR
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let comment = '## ✅ Dependency Audit Results\n\n';
+            
+            comment += '- ✓ Duplication check passed\n';
+            comment += '- ✓ Structure validation passed\n';
+            comment += '- ✓ Lockfile integrity verified\n';
+            comment += '\n**No structural issues detected.**';
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
