@@ -630,6 +630,7 @@ describe('App', () => {
   // indication anything failed. reportFetchError() now surfaces those to a dismissible banner.
   it('shows a dismissible banner when a background fetch fails, naming the source that failed', async () => {
     global.fetch = vi.fn((url) => {
+      if (url === '/api/health') return Promise.resolve({ ok: true, json: async () => ({ status: 'ok' }) });
       if (url === '/api/trends') return Promise.reject(new Error('trends fetch failed'));
       // Array-returning routes need an array back, or App's jobs.map()/tags.map() crashes.
       if (url === '/api/jobs' || url === '/api/tags') return Promise.resolve({ ok: true, json: async () => [] });
