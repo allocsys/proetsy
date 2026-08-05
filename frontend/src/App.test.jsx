@@ -624,4 +624,34 @@ describe('App', () => {
       );
     });
   });
+
+  // debug.md Issue 2: background fetches (refreshJobs, refreshTrends, etc.) used to swallow
+  // errors with an empty .catch(() => {}), leaving the dashboard silently stale with no
+  // indication anything failed. reportFetchError() now surfaces those to a dismissible banner.
+  it('shows a dismissible banner when a background fetch fails, naming the source that failed', async () => {
+    global.fetch = vi.fn((url) => {
+      if (url === '/api/trends') return Promise.reject(new Error('trends fetch failed'));
+      // Array-returning routes need an array back, or App's jobs.map()/tags.map() crashes.
+      if (url === '/api/jobs' || url === '/api/tags') return Promise.resolve({ ok: true, json: async () => [] });
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('ok');
+
+    expect(
+      await screen.findByText(/Background update failed \(refreshTrends\): trends fetch failed/)
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByText('Dismiss'));
+    expect(screen.queryByText(/Background update failed/)).not.toBeInTheDocument();
+  });
+
+  it('does not show the fetch-error banner when all background fetches succeed', async () => {
+    mockFetchByUrl();
+    render(<App />);
+    await screen.findByText('ok');
+
+    expect(screen.queryByText(/Background update failed/)).not.toBeInTheDocument();
+  });
 });
