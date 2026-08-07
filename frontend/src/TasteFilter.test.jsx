@@ -28,7 +28,7 @@ function makeFile(name = 'candidate.png') {
 describe('TasteFilter', () => {
   it('renders the empty dropzone state with no candidates', () => {
     render(<TasteFilter />);
-    expect(screen.getByText('Drag and drop a batch of candidate images here')).toBeInTheDocument();
+    expect(screen.getByText('Drag & drop a batch of candidate images here')).toBeInTheDocument();
     expect(screen.queryByText('Keep')).not.toBeInTheDocument();
   });
 
