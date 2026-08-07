@@ -1,0 +1,81 @@
+# Render Blueprint for a free trial deployment of ProEtsy.
+#
+# This file is purely additive -- it does not modify backend/, frontend/, or
+# electron/, so it has zero effect on the Electron desktop build
+# (`npm run electron:build`) or any existing dev/test script. Render only
+# reads this file when you deploy via "New +" -> "Blueprint" in the Render
+# dashboard; it's otherwise inert.
+#
+# What this deploys:
+#   1. proetsy-backend  - the existing Express API (backend/server.js),
+#      completely unchanged, run with `npm install && npm start` exactly as
+#      it already runs locally (`npm start -w backend`).
+#   2. proetsy-frontend - the existing Vite/React app (frontend/), built with
+#      `npm run build` (same build Electron already uses) and served as a
+#      static site. Its rewrite rules forward /api/*, /mockup-files/*,
+#      /artwork-files/*, /taste-filter-files/*, and /mockup-template-previews/*
+#      to the backend service, so the frontend's existing relative fetch('/api/...')
+#      calls work unmodified -- no frontend source changes needed.
+#
+# IMPORTANT (free tier caveats):
+#   - Render's free web services spin down after 15 min idle; the first
+#     request after that takes ~30-60s to wake up. Fine for a UI/UX trial.
+#   - Free services have an EPHEMERAL filesystem: better-sqlite3's DB file
+#     (backend/data/proetsy.db) and any uploaded artwork/mockup files are
+#     WIPED on every deploy or restart. Good enough to click around the UI;
+#     not a place to keep real data. Upgrade to a paid instance + persistent
+#     disk (or swap in Render Postgres) before relying on this for anything
+#     durable.
+#
+# First deploy: Render doesn't know proetsy-backend's public URL until after
+# its first deploy, so the destination below is a placeholder --
+# YOUR-BACKEND-URL must be replaced with the real one (shown in the Render
+# dashboard once proetsy-backend is live, e.g. proetsy-backend-xxxx.onrender.com)
+# and the Blueprint re-synced (or just edit the frontend service's Redirects/
+# Rewrites tab directly in the dashboard -- equivalent, no redeploy of code
+# needed either way).
+
+services:
+  - type: web
+    name: proetsy-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 4000
+      - key: LLM_PROVIDER
+        value: gemini
+      - key: TRENDS_PROVIDER
+        value: manual
+      # Add GEMINI_API_KEYS (and any other secrets from backend/.env.example)
+      # in the Render dashboard's Environment tab -- deliberately not set here
+      # so no key ever ends up committed to the repo.
+
+  - type: web
+    name: proetsy-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://YOUR-BACKEND-URL.onrender.com/api/*
+      - type: rewrite
+        source: /mockup-files/*
+        destination: https://YOUR-BACKEND-URL.onrender.com/mockup-files/*
+      - type: rewrite
+        source: /artwork-files/*
+        destination: https://YOUR-BACKEND-URL.onrender.com/artwork-files/*
+      - type: rewrite
+        source: /taste-filter-files/*
+        destination: https://YOUR-BACKEND-URL.onrender.com/taste-filter-files/*
+      - type: rewrite
+        source: /mockup-template-previews/*
+        destination: https://YOUR-BACKEND-URL.onrender.com/mockup-template-previews/*
+      - type: rewrite
+        source: /*
+        destination: /index.html
