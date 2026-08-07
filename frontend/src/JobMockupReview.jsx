@@ -27,7 +27,7 @@ function MockupCard({ mockup, onVariantChange }) {
   }
 
   return (
-    <div className="glass-card paper-card mb-4">
+    <div className="card paper-card mb-4">
       <div className="settings-readonly-header mb-4">
         <h4 className="m-0 font-bold text-ink">
           {mockup.size_key} {mockup.dimensions ? `(${mockup.dimensions})` : ''}
