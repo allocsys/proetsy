@@ -78,7 +78,7 @@ function ListingCard({ listing, onSaved }) {
         </label>
         <input
           id={`listing-title-${listing.id}`}
-          className="glass-input"
+          className="input"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
@@ -90,7 +90,7 @@ function ListingCard({ listing, onSaved }) {
         </label>
         <textarea
           id={`listing-desc-${listing.id}`}
-          className="listing-textarea glass-input"
+          className="listing-textarea input"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
@@ -102,7 +102,7 @@ function ListingCard({ listing, onSaved }) {
         </label>
         <input
           id={`listing-tags-${listing.id}`}
-          className="glass-input"
+          className="input"
           value={tagsText}
           onChange={(e) => setTagsText(e.target.value)}
         />
@@ -114,7 +114,7 @@ function ListingCard({ listing, onSaved }) {
         </label>
         <input
           id={`listing-alt-tags-${listing.id}`}
-          className="glass-input"
+          className="input"
           value={tagAltText}
           onChange={(e) => setTagAltText(e.target.value)}
         />
