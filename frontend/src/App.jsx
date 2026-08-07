@@ -104,10 +104,11 @@ function App() {
   const [jobIdInput, setJobIdInput] = useState('');
   const [activeJobId, setActiveJobId] = useState(null);
   const [activeView, setActiveView] = useState('upload');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [fetchError, setFetchError] = useState(null);
   const [reviewTab, setReviewTab] = useState('analysis');
   const [activeJobInfo, setActiveJobInfo] = useState(null);
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
 
   useEffect(() => {
     if (!activeJobId) {
@@ -147,6 +148,13 @@ function App() {
       refreshApiKeys();
       refreshPipelineConfig();
     }
+  }
+
+  function refreshHealth() {
+    fetch('/api/health')
+      .then((r) => r.json())
+      .then(setHealth)
+      .catch(() => setHealth({ status: 'unreachable' }));
   }
 
   function refreshJobs() {
@@ -209,10 +217,7 @@ function App() {
   }
 
   useEffect(() => {
-    fetch('/api/health')
-      .then((r) => r.json())
-      .then(setHealth)
-      .catch(() => setHealth({ status: 'unreachable' }));
+    refreshHealth();
 
     fetch('/api/config/pipeline')
       .then((r) => r.json())
@@ -463,6 +468,7 @@ function App() {
     <div className="app-shell">
       <header className="app-titlebar glass-nav">
         <div className="wordmark-container">
+          <div className="logo-badge" aria-hidden="true">M</div>
           <h1 className="wordmark">ProEtsy</h1>
           <span className="status-pill success" aria-label="Status: Local Print Pipeline active">
             <span className="status-dot" aria-hidden="true" />
@@ -470,12 +476,26 @@ function App() {
           </span>
         </div>
         <div className="header-right">
-          <span className="text-muted mono-sm">
-            Backend:{' '}
-            <strong style={{ color: health?.status === 'unreachable' ? 'var(--state-danger)' : 'var(--state-success)' }}>
-              {health ? health.status : 'checking...'}
-            </strong>
-          </span>
+          <div className="backend-status-row">
+            <span className="text-muted mono-sm">
+              Backend:{' '}
+              <strong style={{ color: health?.status === 'unreachable' ? 'var(--state-danger)' : 'var(--state-success)' }}>
+                {health ? health.status : 'checking...'}
+              </strong>
+            </span>
+            <button
+              className="btn-secondary btn-sm retry-btn"
+              onClick={refreshHealth}
+              title="Retry health check"
+              aria-label="Retry health check"
+            >
+              <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M23 4v6h-6M1 20v-6h6" />
+                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+              </svg>
+              Retry
+            </button>
+          </div>
           <UpdaterStatus />
           <button className="btn-secondary" onClick={() => goTo(activeView === 'settings' ? 'upload' : 'settings')}>
             {activeView === 'settings' ? 'Close settings' : '⚙ Settings'}
@@ -549,6 +569,14 @@ function App() {
               ) : (
                 <span className="pipeline-legend-item">No jobs yet</span>
               )}
+            </div>
+          </div>
+
+          <div className="sidebar-user-footer">
+            <div className="user-avatar" aria-hidden="true">PS</div>
+            <div className="user-info">
+              <span className="user-name">Print Studio</span>
+              <span className="user-role">Admin</span>
             </div>
           </div>
         </nav>
@@ -922,8 +950,34 @@ function App() {
           )}
 
           {activeView === 'upload' && (
-            <section className="paper-card glass-card">
-              <h2 style={{ marginTop: 0 }}>Upload & Curation Pipeline</h2>
+            <section className="paper-card glass-card upload-pipeline-card">
+              <div className="upload-header-row">
+                <div>
+                  <h2 style={{ marginTop: 0, marginBottom: '0.25rem' }}>Upload & Curation Pipeline</h2>
+                  <p className="upload-subtitle text-muted">Upload candidate images and curate them through the pipeline.</p>
+                </div>
+                <button
+                  className="btn-secondary btn-sm how-it-works-btn"
+                  onClick={() => setShowHowItWorks((prev) => !prev)}
+                  type="button"
+                >
+                  <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="16" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12.01" y2="8" />
+                  </svg>
+                  How it works
+                </button>
+              </div>
+
+              {showHowItWorks && (
+                <div className="how-it-works-info-box">
+                  <strong>How the pipeline works:</strong>
+                  <p style={{ margin: '0.25rem 0 0 0', fontSize: '12.5px' }}>
+                    Upload candidate images to score them with the Taste Filter curation model. High-scoring candidates can be promoted straight to full listing and mockup processing.
+                  </p>
+                </div>
+              )}
 
               <div className="upload-lane">
                 <h3 style={{ marginTop: 0 }}>Curation</h3>
@@ -931,7 +985,17 @@ function App() {
               </div>
 
               <details className="upload-lane-collapsible">
-                <summary>Direct upload (skips curation — uploads go straight into the pipeline)</summary>
+                <summary className="direct-upload-summary">
+                  <div className="direct-upload-title-group">
+                    <svg className="summary-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                    </svg>
+                    <span>Direct upload (skips curation — uploads go straight into the pipeline)</span>
+                  </div>
+                  <svg className="summary-chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </summary>
                 <div className="upload-lane">
                   <h3>Pipeline</h3>
                   <p className="text-muted" style={{ marginTop: 0 }}>Defaults come from <code>pipeline.config.json</code>; toggles here apply only to artwork uploaded next.</p>
@@ -965,6 +1029,19 @@ function App() {
                   </div>
                 </div>
               </details>
+
+              <div className="pipeline-card-footer">
+                <div className="pipeline-footer-left">
+                  <svg className="footer-shield-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  </svg>
+                  <span>Your files are secure and processed privately.</span>
+                </div>
+                <div className="pipeline-footer-right">
+                  <span>Need help? </span>
+                  <a href="#" className="docs-link" onClick={(e) => e.preventDefault()}>View docs</a>
+                </div>
+              </div>
             </section>
           )}
 
