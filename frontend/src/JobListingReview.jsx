@@ -66,7 +66,7 @@ function ListingCard({ listing, onSaved }) {
   }
 
   return (
-    <div className="glass-card paper-card mb-4">
+    <div className="card paper-card mb-4">
       <div className="settings-readonly-header mb-4">
         <h4 className="listing-card-title">{listing.variation?.replace('_', ' ')}</h4>
         <span className="read-only-badge">AI Listing</span>
