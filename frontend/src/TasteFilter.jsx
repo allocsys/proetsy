@@ -125,7 +125,7 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
           <p className="text-danger">{c.error}</p>
         ) : (
           <>
-            <div className="crop-frame mb-2" style={{ aspectRatio: '1/1', background: '#000', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
+            <div className="taste-card-img-frame mb-2" style={{ aspectRatio: '1/1', background: '#000', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
               <img src={c.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </div>
             <div className="mb-2">
@@ -172,7 +172,7 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
       </div>
 
       <div
-        className="dropzone crop-frame my-2"
+        className="dropzone my-2"
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => { e.preventDefault(); handleImport(e.dataTransfer.files); }}
       >

@@ -44,7 +44,7 @@ function NavIcon({ name }) {
     case 'review':
       return (
         <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 022 2h2a2 2 0 022-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
         </svg>
       );
     case 'prompt':
@@ -136,11 +136,6 @@ function App() {
       });
   }, [activeJobId]);
 
-  // Shared handler for background/status fetches (refreshJobs, refreshTrends, etc.) so a
-  // failed request (backend down, 500, network drop) surfaces to the user instead of
-  // silently leaving stale data on screen with no indication anything went wrong. Not used
-  // for user-initiated actions that already have their own try/catch + message state
-  // (addApiKey, saveTags, backfillTagCategories, etc.) -- those already report inline.
   function reportFetchError(source) {
     return (err) => setFetchError({ source, message: err.message });
   }
@@ -236,10 +231,6 @@ function App() {
     refreshWatchStatus();
     refreshRateLimits();
     refreshApiKeys();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally run-once-on-
-    // mount (empty dep array by design); the refresh* functions above are plain closures
-    // redefined every render, not memoized, so listing them as deps wouldn't make this
-    // effect more correct -- it would just fight the mount-only intent for no benefit.
   }, []);
 
   const tagCategories = useMemo(
@@ -314,7 +305,7 @@ function App() {
       }
       refreshJobs();
 
-      setUploadStatus(`Running pipeline for ${jobIds.length} job${jobIds.length > 1 ? 's' : ''} on the server… (bulk mode — each runs independently; safe to navigate away)`);
+      setUploadStatus(`Running pipeline for ${jobIds.length} job${jobIds.length > 1 ? 's' : ''} on the server…`);
       await runJobsBatch(jobIds);
       setUploadStatus(`Done. ${jobIds.length} job${jobIds.length > 1 ? 's' : ''} processed — see history.`);
       if (jobIds.length === 1) setActiveJobId(String(jobIds[0]));
@@ -375,10 +366,6 @@ function App() {
       try {
         data = await res.json();
       } catch {
-        // res.json() only throws like this on an empty/non-JSON body -- not a missing
-        // JSON file (this route never reads one). In practice this means nothing was
-        // listening on the other end of the fetch, so say that plainly instead of
-        // surfacing the raw 'Unexpected end of JSON input' parse error.
         throw new Error(`No response from backend (status ${res.status}). Is the backend server running?`);
       }
       setTagsBackfillMessage(
@@ -407,10 +394,6 @@ function App() {
     refreshWatchStatus();
   }
 
-  // plan.md -> "Editable Settings & API Keys from Dashboard" -> Frontend step 1. Full key
-  // values only ever leave the input field here on the way to POST -- every response from
-  // the backend (including this add call's own response) only ever contains maskedKey,
-  // never key_value, so nothing round-trips the raw value back into state.
   async function addApiKey() {
     if (!newKeyValue.trim()) return;
     setApiKeysMessage('Adding key…');
@@ -450,12 +433,6 @@ function App() {
     refreshApiKeys();
   }
 
-  // plan.md -> Frontend step 2: dashboard-editable pipeline module toggles, backed by
-  // the same `pipeline_module_<name>_enabled` settings keys getPipelineConfig() reads
-  // (backend/config/index.js). Distinct from toggleModule()/`overrides` above, which is
-  // a per-upload-session override that's never persisted -- this PATCHes the saved
-  // default straight away, then re-fetches so pipelineDefault (and the Upload view's
-  // checkboxes, which start from it) reflect the new default immediately.
   async function togglePersistedModule(moduleName, currentlyEnabled, required) {
     if (required) return;
     await saveSettings({ [`pipeline_module_${moduleName}_enabled`]: !currentlyEnabled });
@@ -484,33 +461,12 @@ function App() {
 
   return (
     <div className="app-shell">
-      {/* Custom Windows 11 Fluent Titlebar */}
-      <div className="win11-titlebar">
-        <div className="win11-titlebar-left">
-          <div className="win11-app-icon">E</div>
-          <span className="win11-title-text">ProEtsy - Print Pipeline Studio</span>
-        </div>
-        <div className="win11-titlebar-controls">
-          <button className="win11-control-btn" title="Minimize">
-            <svg viewBox="0 0 10 1"><rect width="10" height="1" fill="currentColor"/></svg>
-          </button>
-          <button className="win11-control-btn" title="Maximize">
-            <svg viewBox="0 0 10 10"><rect width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1"/></svg>
-          </button>
-          <button className="win11-control-btn close" title="Close">
-            <svg viewBox="0 0 10 10"><path d="M 0,0 L 10,10 M 10,0 L 0,10" stroke="currentColor" strokeWidth="1"/></svg>
-          </button>
-        </div>
-      </div>
-
       <header className="app-titlebar glass-nav">
         <div className="wordmark-container">
-          <div className="wordmark-crop">
-            <h1 className="wordmark">ProEtsy</h1>
-          </div>
+          <h1 className="wordmark">ProEtsy</h1>
           <span className="status-pill success" aria-label="Status: Local Print Pipeline active">
             <span className="status-dot" aria-hidden="true" />
-            Local Print Pipeline
+            Print Studio Active
           </span>
         </div>
         <div className="header-right">
@@ -965,7 +921,7 @@ function App() {
             </div>
           )}
 
-{activeView === 'upload' && (
+          {activeView === 'upload' && (
             <section className="paper-card glass-card">
               <h2 style={{ marginTop: 0 }}>Upload & Curation Pipeline</h2>
 
@@ -995,7 +951,7 @@ function App() {
                   </div>
 
                   <div
-                    className={`dropzone crop-frame ${dragActive ? 'active' : ''}`}
+                    className={`dropzone ${dragActive ? 'active' : ''}`}
                     onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
                     onDragLeave={() => setDragActive(false)}
                     onDrop={onDrop}
@@ -1121,7 +1077,6 @@ function App() {
 
               {activeJobId && activeJobInfo ? (
                 <div>
-                  {/* Job Header Info */}
                   <div className="workspace-artwork-preview-card">
                     {activeJobInfo.filePath && (
                       <img
@@ -1137,7 +1092,6 @@ function App() {
                     </div>
                   </div>
 
-                  {/* Sub-Tabs Navigation */}
                   <div className="workspace-tabs">
                     <button
                       className={`workspace-tab-btn ${reviewTab === 'analysis' ? 'active' : ''}`}
@@ -1174,7 +1128,6 @@ function App() {
                     </button>
                   </div>
 
-                  {/* Sub-Tab Panel Body (hidden display toggle keeps elements mounted for testing and state preservation) */}
                   <div className="workspace-panel-body">
                     <div style={{ display: reviewTab === 'analysis' ? 'block' : 'none' }}>
                       <JobArtworkAnalysisReview jobId={activeJobId} />
