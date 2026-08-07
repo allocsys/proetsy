@@ -105,7 +105,7 @@ export default function JobArtworkAnalysisReview({ jobId }) {
   }
 
   return (
-    <div className="glass-card artwork-analysis-card">
+    <div className="card artwork-analysis-card">
       <div className="flex-row mb-4" style={{ gap: 'var(--space-2)' }}>
         <button className="btn-primary" onClick={loadJobAndAnalysis} disabled={!jobId || loading}>
           {loading ? 'Loading…' : 'Load analysis'}
