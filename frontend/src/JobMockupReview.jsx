@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 /**
- * One mockup's review card — polished with glassmorphism design system.
+ * One mockup's review card.
  */
 function MockupCard({ mockup, onVariantChange }) {
   const [saving, setSaving] = useState(false);
@@ -44,7 +44,7 @@ function MockupCard({ mockup, onVariantChange }) {
             <div className="mockup-variant-col">
               <span className="mockup-variant-label">Option A: Smart Crop</span>
               {mockup.smart_crop_url && (
-                <div className="glass-surface p-2 m-0">
+                <div className="surface p-2 m-0">
                   <img src={mockup.smart_crop_url} alt="Smart crop variant" className="mockup-variant-image" />
                 </div>
               )}
@@ -55,7 +55,7 @@ function MockupCard({ mockup, onVariantChange }) {
             <div className="mockup-variant-col">
               <span className="mockup-variant-label">Option B: AI Extended</span>
               {mockup.ai_extended_url && (
-                <div className="glass-surface p-2 m-0">
+                <div className="surface p-2 m-0">
                   <img src={mockup.ai_extended_url} alt="AI-extended variant" className="mockup-variant-image" />
                 </div>
               )}
@@ -68,7 +68,7 @@ function MockupCard({ mockup, onVariantChange }) {
       ) : (
         <div className="mockup-variant-col" style={{ alignItems: 'flex-start' }}>
           {mockup.file_url && (
-            <div className="glass-surface p-3 m-0">
+            <div className="surface p-3 m-0">
               <img src={mockup.file_url} alt="Selected mockup" className="mockup-variant-image" style={{ width: 'min(240px, 100%)' }} />
             </div>
           )}
@@ -142,14 +142,14 @@ function MockupCategorySelector({ jobId, onGenerated }) {
   if (!loaded) return null;
 
   return (
-    <div className="glass-panel paper-card mockup-category-selector">
+    <div className="panel paper-card mockup-category-selector">
       <h4 style={{ marginTop: 0, marginBottom: '0.75rem' }}>Select Mockup Categories to Generate</h4>
       {categories.length ? (
         <>
           <div className="mockup-category-checklist">
             {categories.map((c) => (
               <label key={c} className="settings-checkbox-row">
-                <input type="checkbox" className="glass-input" checked={!!checked[c]} onChange={() => toggleCategory(c)} />
+                <input type="checkbox" className="input" checked={!!checked[c]} onChange={() => toggleCategory(c)} />
                 <span style={{ fontWeight: 600 }}>{c}</span>
               </label>
             ))}
@@ -172,7 +172,7 @@ function MockupCategorySelector({ jobId, onGenerated }) {
 }
 
 /**
- * Loads and reviews a job's mockups with glassmorphism design system.
+ * Loads and reviews a job's mockups.
  */
 export default function JobMockupReview({ jobId }) {
   const [mockups, setMockups] = useState([]);
