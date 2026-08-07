@@ -235,14 +235,14 @@ function MockupTemplates() {
     <div className="panel" style={{ padding: '2rem', border: 'none', background: 'transparent', boxShadow: 'none' }}>
       <h2 style={{ marginTop: 0, marginBottom: '1.5rem', fontFamily: 'var(--font-body)', fontWeight: 700 }}>Mockup Templates</h2>
 
-      <div className="glass-card settings-section-card">
+      <div className="card settings-section-card">
         <h3 className="settings-section-title">Templates folder</h3>
         <div className="settings-subsection" style={{ marginBottom: 0 }}>
           <div className="settings-field-row">
             <div className="settings-field" style={{ flex: 1, minWidth: '260px' }}>
               <span className="settings-field-label">Folder path</span>
               <input
-                className="glass-input"
+                className="input"
                 value={folder}
                 onChange={(e) => { setFolder(e.target.value); setFolderSavedMessage(''); }}
                 onBlur={(e) => saveFolder(e.target.value)}
@@ -260,11 +260,11 @@ function MockupTemplates() {
       </div>
 
       {scanFiles.length > 0 && (
-        <div className="glass-card settings-section-card">
+        <div className="card settings-section-card">
           <h3 className="settings-section-title">Select templates to configure</h3>
           <div className="taste-grid">
             {scanFiles.map((f) => (
-              <div key={f.path} className="glass-surface taste-card mockup-template-card">
+              <div key={f.path} className="surface taste-card mockup-template-card">
                 <TemplateThumb url={null} alt={f.filename} />
                 <label className="mockup-template-select-row">
                   <input type="checkbox" checked={!!selected[f.path]} onChange={() => toggleSelected(f.path)} />
@@ -280,7 +280,7 @@ function MockupTemplates() {
                   <div className="settings-field" style={{ marginTop: '0.5rem' }}>
                     <span className="settings-field-label">Size key</span>
                     <input
-                      className="glass-input"
+                      className="input"
                       value={perFileSizeKey[f.path] ?? ''}
                       onChange={(e) => setPerFileSizeKey((prev) => ({ ...prev, [f.path]: e.target.value }))}
                     />
@@ -288,7 +288,7 @@ function MockupTemplates() {
                       <>
                         <span className="settings-field-label" style={{ marginTop: '0.5rem' }}>Placement layer</span>
                         <input
-                          className="glass-input"
+                          className="input"
                           value={perFilePlacementLayer[f.path] ?? ''}
                           onChange={(e) => setPerFilePlacementLayer((prev) => ({ ...prev, [f.path]: e.target.value }))}
                           placeholder="e.g. artwork"
@@ -307,20 +307,20 @@ function MockupTemplates() {
               <div className="settings-field-row">
                 <div className="settings-field">
                   <span className="settings-field-label">Dimensions</span>
-                  <input className="glass-input" value={bulkDimensions} onChange={(e) => setBulkDimensions(e.target.value)} placeholder="8x10" />
+                  <input className="input" value={bulkDimensions} onChange={(e) => setBulkDimensions(e.target.value)} placeholder="8x10" />
                 </div>
                 <div className="settings-field">
                   <span className="settings-field-label">DPI</span>
-                  <input className="glass-input" value={bulkDpi} onChange={(e) => setBulkDpi(e.target.value)} placeholder="300" />
+                  <input className="input" value={bulkDpi} onChange={(e) => setBulkDpi(e.target.value)} placeholder="300" />
                 </div>
                 <div className="settings-field">
                   <span className="settings-field-label">Orientation</span>
-                  <input className="glass-input" value={bulkOrientation} onChange={(e) => setBulkOrientation(e.target.value)} placeholder="portrait" />
+                  <input className="input" value={bulkOrientation} onChange={(e) => setBulkOrientation(e.target.value)} placeholder="portrait" />
                 </div>
                 <div className="settings-field">
                   <span className="settings-field-label">Category</span>
                   <input
-                    className="glass-input"
+                    className="input"
                     list="mockup-category-options"
                     value={bulkCategory}
                     onChange={(e) => setBulkCategory(e.target.value)}
@@ -337,20 +337,20 @@ function MockupTemplates() {
         </div>
       )}
 
-      <div className="glass-card settings-section-card">
+      <div className="card settings-section-card">
         <h3 className="settings-section-title">Configured templates</h3>
         {configuredStatus && <p className="text-muted mono-sm" style={{ marginTop: 0 }}>{configuredStatus}</p>}
         {configured.length ? (
           <div className="taste-grid">
             {configured.map((row) => (
-              <div key={row.size_key} className="glass-surface taste-card mockup-template-card">
+              <div key={row.size_key} className="surface taste-card mockup-template-card">
                 <TemplateThumb url={row.preview_url} alt={row.size_key} />
                 <p className="taste-card-meta mockup-template-filename">{row.size_key}</p>
                 <div className="settings-field-row">
                   <div className="settings-field">
                     <span className="settings-field-label">Dimensions</span>
                     <input
-                      className="glass-input"
+                      className="input"
                       value={getConfiguredValue(row, 'dimensions')}
                       onChange={(e) => updateConfiguredEdit(row.size_key, 'dimensions', e.target.value)}
                     />
@@ -358,7 +358,7 @@ function MockupTemplates() {
                   <div className="settings-field">
                     <span className="settings-field-label">DPI</span>
                     <input
-                      className="glass-input"
+                      className="input"
                       value={getConfiguredValue(row, 'dpi')}
                       onChange={(e) => updateConfiguredEdit(row.size_key, 'dpi', e.target.value)}
                     />
@@ -366,7 +366,7 @@ function MockupTemplates() {
                   <div className="settings-field">
                     <span className="settings-field-label">Orientation</span>
                     <input
-                      className="glass-input"
+                      className="input"
                       value={getConfiguredValue(row, 'orientation')}
                       onChange={(e) => updateConfiguredEdit(row.size_key, 'orientation', e.target.value)}
                     />
@@ -374,7 +374,7 @@ function MockupTemplates() {
                   <div className="settings-field">
                     <span className="settings-field-label">Category</span>
                     <input
-                      className="glass-input"
+                      className="input"
                       list="mockup-category-options"
                       value={getConfiguredValue(row, 'category')}
                       onChange={(e) => updateConfiguredEdit(row.size_key, 'category', e.target.value)}
@@ -385,7 +385,7 @@ function MockupTemplates() {
                   <div className="settings-field" style={{ marginTop: '0.5rem' }}>
                     <span className="settings-field-label">Placement layer</span>
                     <input
-                      className="glass-input"
+                      className="input"
                       value={getConfiguredValue(row, 'placement_layer')}
                       onChange={(e) => updateConfiguredEdit(row.size_key, 'placement_layer', e.target.value)}
                     />
