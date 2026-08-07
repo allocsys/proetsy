@@ -17,6 +17,28 @@
 #      to the backend service, so the frontend's existing relative fetch('/api/...')
 #      calls work unmodified -- no frontend source changes needed.
 #
+# SELF-IDENTIFYING CONFIG:
+#   Render auto-injects a handful of env vars into every web service without
+#   you setting them -- notably RENDER_EXTERNAL_URL (this service's own full
+#   public https:// URL) and RENDER_EXTERNAL_HOSTNAME. The `BACKEND_URL`
+#   envVar below on proetsy-frontend uses `fromService`/`envVarKey` to read
+#   proetsy-backend's auto-set RENDER_EXTERNAL_URL directly -- so it always
+#   reflects the backend's real, current URL with nothing hardcoded, and you
+#   can see the resolved value any time in proetsy-frontend's Environment tab
+#   in the Render dashboard.
+#
+#   Caveat: Render Blueprints do NOT support variable interpolation inside
+#   `routes` destinations (this is a platform limitation, not something this
+#   file can work around) -- so the rewrite rules' destinations below still
+#   need the literal backend URL pasted in once. What the BACKEND_URL envVar
+#   buys you is that you never have to go hunting for that URL: after the
+#   first deploy, open proetsy-frontend -> Environment -> BACKEND_URL, copy
+#   the resolved value, and paste it into the 5 rewrite destinations below
+#   (dashboard -> proetsy-frontend -> Redirects/Rewrites tab; takes effect
+#   immediately, no redeploy needed). If proetsy-backend's URL ever changes
+#   (e.g. you rename the service), BACKEND_URL updates itself automatically
+#   on the next deploy -- only the rewrite rules need a manual refresh.
+#
 # IMPORTANT (free tier caveats):
 #   - Render's free web services spin down after 15 min idle; the first
 #     request after that takes ~30-60s to wake up. Fine for a UI/UX trial.
@@ -26,14 +48,6 @@
 #     not a place to keep real data. Upgrade to a paid instance + persistent
 #     disk (or swap in Render Postgres) before relying on this for anything
 #     durable.
-#
-# First deploy: Render doesn't know proetsy-backend's public URL until after
-# its first deploy, so the destination below is a placeholder --
-# YOUR-BACKEND-URL must be replaced with the real one (shown in the Render
-# dashboard once proetsy-backend is live, e.g. proetsy-backend-xxxx.onrender.com)
-# and the Blueprint re-synced (or just edit the frontend service's Redirects/
-# Rewrites tab directly in the dashboard -- equivalent, no redeploy of code
-# needed either way).
 
 services:
   - type: web
@@ -60,7 +74,22 @@ services:
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
+    envVars:
+      # Auto-populated from proetsy-backend's own RENDER_EXTERNAL_URL -- see
+      # "SELF-IDENTIFYING CONFIG" above. Purely informational/for future use
+      # (e.g. if fetch calls are ever switched to an absolute API base URL);
+      # today's relative fetch('/api/...') calls are served via the rewrite
+      # rules below instead, since routes can't read envVars directly.
+      - key: BACKEND_URL
+        fromService:
+          name: proetsy-backend
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
     routes:
+      # NOTE: destinations below can't reference BACKEND_URL (Render doesn't
+      # support interpolation in routes -- see comment block above). Replace
+      # YOUR-BACKEND-URL with the value shown for BACKEND_URL in this
+      # service's Environment tab after proetsy-backend's first deploy.
       - type: rewrite
         source: /api/*
         destination: https://YOUR-BACKEND-URL.onrender.com/api/*
