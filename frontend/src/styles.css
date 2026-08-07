@@ -1,45 +1,31 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-/*
-  DESIGN SYSTEM — PRINT STUDIO & LIGHT TABLE AT NIGHT
-  ----------------------------------------------------
-  Direction: Immersive, gallery-grade print review studio.
-  Metaphor: A darkroom light table where high-resolution artwork and product mockups
-  are inspected and approved under calibrated neutral illumination.
-  Palette: Calibrated dark neutral surfaces (deep studio slate/charcoal) with
-  Cadmium Amber proofing accent.
-*/
+/* Print Studio & Light Table */
 
 :root {
-  /* Print Studio Named Palette Tokens */
-  --studio-canvas: #131417;       /* Deep matte darkroom backdrop */
-  --studio-surface: #1a1c20;      /* Light table frame & major studio panels */
-  --studio-raised: #23262e;       /* Raised artwork review cards & controls */
-  --studio-sunken: #0d0e10;       /* Recessed wells, dropzones & code blocks */
-  --studio-overlay: #2c303a;      /* Active selection & hover overlays */
+  --studio-canvas: #131417;
+  --studio-surface: #1a1c20;
+  --studio-raised: #23262e;
+  --studio-sunken: #0d0e10;
+  --studio-overlay: #2c303a;
 
-  /* Print Proofing Accent: Cadmium Amber */
-  --studio-accent: #f09838;       /* Proofing backlight amber */
-  --studio-accent-hover: #f5a850; /* Brightened proofing highlight */
-  --studio-accent-dim: rgba(240, 152, 56, 0.12); /* Subtle badge / pill tint */
-  --studio-accent-border: rgba(240, 152, 56, 0.35); /* Crisp proofing border */
+  --studio-accent: #f09838;
+  --studio-accent-hover: #f5a850;
+  --studio-accent-dim: rgba(240, 152, 56, 0.12);
+  --studio-accent-border: rgba(240, 152, 56, 0.35);
 
-  /* High-Contrast Print Typography Ink */
-  --studio-ink: #f1f3f5;          /* Crisp proofing white */
-  --studio-ink-soft: #8e95a2;     /* Neutral studio grey for metadata */
-  --studio-ink-dim: #5c6270;      /* Secondary captions & disabled text */
+  --studio-ink: #f1f3f5;
+  --studio-ink-soft: #8e95a2;
+  --studio-ink-dim: #5c6270;
 
-  /* Razor Hairlines & Borders */
   --studio-hairline: rgba(255, 255, 255, 0.08);
   --studio-hairline-subtle: rgba(255, 255, 255, 0.04);
 
-  /* Status Colors (Calibrated for Print Pipeline) */
-  --state-success: #22c55e;       /* Approved / Success green */
-  --state-danger: #ef4444;        /* Rejected / Danger red */
-  --state-pending: #f59e0b;       /* Processing / Pending amber */
-  --state-info: #3b82f6;          /* System info blue */
+  --state-success: #22c55e;
+  --state-danger: #ef4444;
+  --state-pending: #f59e0b;
+  --state-info: #3b82f6;
 
-  /* Legacy variable aliases for full component compatibility */
   --canvas: var(--studio-canvas);
   --surface: var(--studio-surface);
   --surface-raised: var(--studio-raised);
@@ -55,11 +41,9 @@
   --border-subtle: 1px solid var(--studio-hairline-subtle);
   --border-accent: 1px solid var(--studio-accent-border);
 
-  /* Typography Pairing */
-  --font-body: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'IBM Plex Mono', Courier, monospace;
+  --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', Courier, monospace;
 
-  /* Spacing Scale */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -69,13 +53,11 @@
   --space-7: 3rem;
   --space-8: 4rem;
 
-  /* Border Radius Scale */
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 10px;
   --radius-pill: 999px;
 
-  /* Studio Shadow & Lighting */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.6);
   --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.7);
@@ -106,7 +88,6 @@ body {
   overflow-x: hidden;
 }
 
-/* Scrollbar styling for studio darkroom feel */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -122,27 +103,22 @@ body {
   background: #3e4452;
 }
 
-/* ============ STUDIO SURFACE COMPONENTS ============ */
-.glass-surface, .glass-panel, .glass-card, .glass-nav, .glass-sidebar {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-
-.glass-surface {
+/* Surface components */
+.surface {
   background: var(--studio-sunken);
   border: var(--border-light);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
 }
 
-.glass-panel {
+.panel {
   background: var(--studio-surface);
   border: var(--border-light);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
 }
 
-.glass-card {
+.card {
   background: var(--studio-raised);
   border: var(--border-light);
   border-radius: var(--radius-md);
@@ -150,27 +126,26 @@ body {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.glass-card:hover {
+.card:hover {
   border-color: var(--studio-accent-border);
   box-shadow: var(--shadow-lg);
 }
 
-.glass-nav {
+.nav {
   background: var(--studio-surface);
   border-bottom: var(--border-light);
 }
 
-.glass-sidebar {
+.sidebar-shell {
   background: #0f1013;
   border-right: var(--border-light);
 }
 
-.glass-input {
+.input {
   background: var(--studio-sunken) !important;
   border: var(--border-light) !important;
 }
 
-/* Accessibility Utilities */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -183,7 +158,6 @@ body {
   border: 0;
 }
 
-/* Typography Hierarchy */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-body);
   color: var(--studio-ink);
@@ -206,7 +180,6 @@ code, pre, .mono {
   color: #ffd8b5;
 }
 
-/* Focus States */
 a:focus-visible,
 button:focus-visible,
 input:focus-visible,
@@ -216,7 +189,6 @@ textarea:focus-visible {
   outline-offset: 1px;
 }
 
-/* ============ APP SHELL & HEADER ============ */
 .app-shell {
   display: flex;
   flex-direction: column;
@@ -256,7 +228,7 @@ textarea:focus-visible {
   width: 28px;
   height: 28px;
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, #f09838 0%, #a855f7 100%);
+  background: var(--studio-accent);
   color: #131417;
   font-weight: 800;
   font-size: 15px;
@@ -290,7 +262,6 @@ textarea:focus-visible {
   flex-shrink: 0;
 }
 
-/* ============ APP BODY & SIDEBAR ============ */
 .app-body {
   display: flex;
   flex: 1;
@@ -436,7 +407,6 @@ textarea:focus-visible {
   flex: 1;
 }
 
-/* Sidebar user footer */
 .sidebar-user-footer {
   border-top: var(--border-light);
   padding-top: var(--space-3);
@@ -450,7 +420,7 @@ textarea:focus-visible {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #f09838 0%, #a855f7 100%);
+  background: var(--studio-accent);
   color: #131417;
   font-weight: 800;
   font-size: 12px;
@@ -493,7 +463,6 @@ textarea:focus-visible {
   display: none;
 }
 
-/* ============ SIGNATURE ELEMENT: PIPELINE STATUS STRIP ============ */
 .sidebar-pipeline-strip {
   border-top: var(--border-light);
   padding-top: var(--space-3);
@@ -564,7 +533,6 @@ textarea:focus-visible {
   width: 100%;
 }
 
-/* Mobile navigation strip */
 .mobile-nav-strip {
   display: none;
   background: var(--studio-surface);
@@ -623,7 +591,6 @@ textarea:focus-visible {
   .flex-row { flex-wrap: wrap; }
 }
 
-/* ============ CONSOLIDATED CARDS & PANELS ============ */
 .paper-card,
 .settings-section-card {
   background-color: var(--studio-surface);
@@ -658,7 +625,6 @@ textarea:focus-visible {
   box-shadow: var(--shadow-sm);
 }
 
-/* Alert / notice banners */
 .backend-banner {
   background: rgba(245, 158, 11, 0.08);
   border: 1px solid rgba(245, 158, 11, 0.3);
@@ -682,7 +648,6 @@ textarea:focus-visible {
 }
 .setup-alert ul { margin: var(--space-2) 0 0 1.25rem; padding: 0; color: var(--studio-ink-soft); }
 
-/* Status Badges & Pills */
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -724,7 +689,6 @@ textarea:focus-visible {
   color: var(--studio-ink);
 }
 
-/* Studio Buttons */
 button, .btn {
   font-family: var(--font-body);
   font-size: 12px;
@@ -748,10 +712,8 @@ button {
 button:hover:not(:disabled) {
   background-color: var(--studio-overlay);
   border-color: rgba(255, 255, 255, 0.15);
-  transform: translateY(-0.5px);
 }
 button:active {
-  transform: translateY(0.5px);
 }
 
 .btn-primary {
@@ -766,7 +728,7 @@ button:active {
   filter: brightness(1.05);
 }
 
-button:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .btn-secondary {
   background-color: rgba(255, 255, 255, 0.02);
@@ -778,7 +740,6 @@ button:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important;
 .btn-sm { padding: 0.35rem var(--space-3); font-size: 11px; }
 .btn-xs { padding: 0.15rem 0.4rem; font-size: 10px; }
 
-/* Form Inputs */
 input[type="text"],
 input[type="number"],
 input[type="password"],
@@ -802,7 +763,6 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 2px rgba(240, 152, 56, 0.2);
 }
 
-/* Upload & Curation Section */
 .upload-header-row {
   display: flex;
   justify-content: space-between;
@@ -830,7 +790,6 @@ input:focus, select:focus, textarea:focus {
   color: var(--studio-ink-soft);
 }
 
-/* Taste Filter Inputs & Button */
 .taste-input-field {
   display: flex;
   flex-direction: column;
@@ -850,7 +809,6 @@ input:focus, select:focus, textarea:focus {
   gap: 0.35rem;
 }
 
-/* Taste Filter Dropzone */
 .taste-dropzone {
   padding: var(--space-7) var(--space-5);
   display: flex;
@@ -919,7 +877,6 @@ input:focus, select:focus, textarea:focus {
   white-space: nowrap;
 }
 
-/* Collapsible Pipeline & Direct Upload */
 .upload-lane-collapsible {
   border: var(--border-light);
   background: var(--studio-sunken);
@@ -986,46 +943,14 @@ input:focus, select:focus, textarea:focus {
 .pipeline-card-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   border-top: var(--border-light);
   margin-top: var(--space-5);
   padding-top: var(--space-4);
   font-size: 12px;
   color: var(--studio-ink-soft);
-  flex-wrap: wrap;
-  gap: var(--space-3);
 }
 
-.pipeline-footer-left {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.pipeline-footer-right {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.footer-shield-icon {
-  width: 15px;
-  height: 15px;
-  color: var(--studio-accent);
-  flex-shrink: 0;
-}
-
-.docs-link {
-  color: var(--studio-accent);
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.docs-link:hover {
-  text-decoration: underline;
-}
-
-/* Dropzone (legacy) */
 .dropzone {
   border: 1px dashed rgba(255, 255, 255, 0.15);
   background-color: var(--studio-raised);
@@ -1044,7 +969,6 @@ input:focus, select:focus, textarea:focus {
 
 .dropzone p { margin: var(--space-1) 0; color: var(--studio-ink-soft); }
 
-/* Tables */
 .data-table { width: 100%; border-collapse: collapse; margin-top: var(--space-2); }
 .data-table th, .data-table td {
   padding: 0.6rem var(--space-3);
@@ -1057,7 +981,6 @@ input:focus, select:focus, textarea:focus {
 
 .empty-state { color: var(--studio-ink-soft); font-style: italic; padding: var(--space-4) 0; }
 
-/* Grids */
 .taste-grid,
 .card-grid {
   display: grid;
@@ -1084,7 +1007,6 @@ input:focus, select:focus, textarea:focus {
   aspect-ratio: 1;
 }
 
-/* Artwork Analysis Review */
 .artwork-analysis-card {
   background: var(--studio-surface);
   border: none;
@@ -1106,7 +1028,6 @@ input:focus, select:focus, textarea:focus {
 .manual-notes-label { display: block; font-weight: 500; font-size: 12.5px; color: var(--studio-ink); }
 .manual-notes-textarea { display: block; width: 100%; min-height: 3rem; margin-top: var(--space-1); margin-bottom: var(--space-2); }
 
-/* Job Mockup Review */
 .mockup-card { margin-bottom: var(--space-4); background-color: var(--studio-surface); border: none; padding: 0; }
 .mockup-review-status { color: var(--state-pending); margin-top: 0; font-size: 12.5px; }
 .mockup-variants-row { display: flex; gap: var(--space-4); align-items: flex-start; flex-wrap: wrap; }
@@ -1118,14 +1039,12 @@ input:focus, select:focus, textarea:focus {
 .mockup-category-selector { margin-bottom: var(--space-4); padding: var(--space-4); }
 .mockup-category-checklist { display: flex; flex-wrap: wrap; gap: var(--space-4); margin-bottom: var(--space-2); }
 
-/* Listing Review */
 .listing-card { margin-bottom: var(--space-4); background-color: var(--studio-surface); border: none; padding: 0; }
 .listing-card-title { margin-top: 0; text-transform: capitalize; color: var(--studio-ink); font-size: 14px; font-weight: 600; }
 .listing-field-label { display: block; margin-bottom: var(--space-1); color: var(--studio-ink-soft); font-size: 12px; font-weight: 500; }
 .listing-textarea { min-height: 4.5rem; margin-top: var(--space-1); }
 .listing-warnings-list { color: var(--state-pending); font-size: 12px; margin-top: var(--space-3); padding-left: 1.25rem; }
 
-/* Prompt Helper */
 .prompt-filter-row { display: flex; flex-wrap: wrap; margin-bottom: var(--space-4); gap: var(--space-4); }
 .prompt-filter-label { display: flex; align-items: center; gap: var(--space-2); }
 .prompt-add-row { display: flex; flex-wrap: wrap; margin-bottom: var(--space-4); gap: var(--space-2); }
@@ -1140,7 +1059,6 @@ input:focus, select:focus, textarea:focus {
 .prompt-history-item { margin-bottom: var(--space-1); }
 .mono-sm { font-size: 11.5px; }
 
-/* Taste Filter Specifics */
 .taste-intro { margin-top: 0; }
 .taste-field-label { display: flex; align-items: center; gap: var(--space-2); }
 .input-auto { width: auto; }
@@ -1151,7 +1069,6 @@ input:focus, select:focus, textarea:focus {
 .taste-error { color: var(--state-danger); font-size: 12.5px; }
 .flex-1 { flex: 1; }
 
-/* Utility classes */
 .flex-row { display: flex; gap: var(--space-4); align-items: center; }
 .flex-wrap { flex-wrap: wrap; }
 .mt-1 { margin-top: var(--space-2); }
@@ -1165,7 +1082,6 @@ input:focus, select:focus, textarea:focus {
 .text-danger { color: var(--state-danger); }
 .text-pending { color: var(--state-pending); }
 
-/* Settings Dashboard Grid & Layout */
 .settings-section-title {
   font-size: 15px;
   font-weight: 600;
@@ -1313,7 +1229,6 @@ input:focus, select:focus, textarea:focus {
   }
 }
 
-/* Mockup Template Manager */
 .mockup-template-card {
   gap: var(--space-2);
 }
@@ -1354,7 +1269,6 @@ input:focus, select:focus, textarea:focus {
   word-break: break-all;
 }
 
-/* ============ WORKSPACE REVIEW TAB PANEL (STUDIO PROOFING) ============ */
 .workspace-tabs {
   display: flex;
   border-bottom: var(--border-light);
@@ -1441,7 +1355,6 @@ input:focus, select:focus, textarea:focus {
   color: var(--studio-ink-soft);
 }
 
-/* Stats Cards */
 .stats-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
