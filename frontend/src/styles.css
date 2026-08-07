@@ -10,17 +10,17 @@
 
 :root {
   /* Obsidian & Slate Color Palette */
-  --canvas: #090b0f;
-  --surface: #101216;
-  --surface-raised: #181b22;
-  --surface-sunken: #07080a;
-  --surface-overlay: #1e222b;
+  --canvas: #0f1417;
+  --surface: #1b2023;
+  --surface-raised: #262b2e;
+  --surface-sunken: #0a0f12;
+  --surface-overlay: #303539;
 
   /* Crisp Professional Accents (Indigo-Blue) */
-  --accent: #5f5cf2;
-  --accent-strong: #4a47d4;
-  --accent-soft: rgba(95, 92, 242, 0.12);
-  --accent-border: rgba(95, 92, 242, 0.25);
+  --accent: #60cdff;
+  --accent-strong: #0078d4;
+  --accent-soft: rgba(96, 205, 255, 0.12);
+  --accent-border: rgba(96, 205, 255, 0.25);
 
   /* Status Colors */
   --info: #0ea5e9;
@@ -41,7 +41,7 @@
   --hairline-paper: #334155;
 
   /* Fonts */
-  --font-body: 'Manrope', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-body: 'Segoe UI Variable Text', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
   --font-mono: 'IBM Plex Mono', Courier, monospace;
 
   /* Spacing Scale */
@@ -61,8 +61,8 @@
   --radius-pill: 999px;
 
   /* Desktop Matte Shadow & Border styling */
-  --border-light: 1px solid rgba(255, 255, 255, 0.06);
-  --border-subtle: 1px solid rgba(255, 255, 255, 0.04);
+  --border-light: 1px solid rgba(255, 255, 255, 0.08);
+  --border-subtle: 1px solid rgba(255, 255, 255, 0.05);
   --border-accent: 1px solid var(--accent-border);
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
@@ -1160,4 +1160,191 @@ input:focus, select:focus, textarea:focus {
   .settings-full-width-card {
     grid-column: auto;
   }
+}
+
+/* ============ WINDOWS 11 FLUENT APP TITLEBAR STYLING ============ */
+.win11-titlebar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 32px;
+  background-color: var(--canvas);
+  border-bottom: var(--border-subtle);
+  padding: 0 0 0 var(--space-3);
+  user-select: none;
+  font-family: var(--font-body);
+}
+
+.win11-titlebar-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.win11-app-icon {
+  width: 14px;
+  height: 14px;
+  background-color: var(--accent);
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 8px;
+  color: var(--canvas);
+}
+
+.win11-title-text {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.win11-titlebar-controls {
+  display: flex;
+  height: 100%;
+}
+
+.win11-control-btn {
+  width: 46px;
+  height: 100%;
+  background: transparent;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 0.1s ease, color 0.1s ease;
+}
+
+.win11-control-btn:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.win11-control-btn.close:hover {
+  background-color: #e81123 !important;
+  color: #ffffff !important;
+}
+
+.win11-control-btn svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* Side navigation item line accent */
+.sidebar-nav-item {
+  position: relative;
+}
+
+.sidebar-nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  background-color: var(--accent);
+  border-radius: 0 4px 4px 0;
+}
+
+/* Stats cards enhancements */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.stat-card {
+  background: var(--surface);
+  border: var(--border-light);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-sm);
+}
+
+.stat-header {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-2);
+}
+
+.stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+
+/* Additional Windows 11 high fidelity styling refinements */
+.paper-card,
+.settings-section-card {
+  background-color: var(--surface);
+  border: var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-md);
+  transition: transform 0.1s ease, border-color 0.15s ease;
+}
+
+.paper-card:hover {
+  border-color: rgba(96, 205, 255, 0.15);
+}
+
+/* Primary actions buttons high-fidelity Fluent Blue */
+button, .btn-primary {
+  font-family: var(--font-body);
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-4);
+  transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+button:hover {
+  filter: brightness(1.1);
+  transform: translateY(-0.5px);
+}
+
+button:active {
+  transform: translateY(0.5px);
+}
+
+/* Figma-style Workspace tabs */
+.workspace-tabs {
+  background-color: var(--surface-sunken);
+  border-bottom: var(--border-light);
+  border-top-left-radius: var(--radius-md);
+  border-top-right-radius: var(--radius-md);
+}
+
+.workspace-tab-btn {
+  border-top-left-radius: var(--radius-sm);
+  border-top-right-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.workspace-tab-btn:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--ink);
+}
+
+.workspace-tab-btn.active {
+  background-color: var(--surface);
+  color: var(--accent);
+  border-bottom: 2px solid var(--accent);
+}
+
+/* Scrollbar sleek adjustments */
+::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.25);
 }
