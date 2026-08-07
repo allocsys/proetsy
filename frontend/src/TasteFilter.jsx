@@ -149,7 +149,7 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
 
   function renderCandidateCard(c) {
     return (
-      <div key={c.imagePath} className="glass-card p-4">
+      <div key={c.imagePath} className="card p-4">
         {c.error ? (
           <p className="text-danger">{c.error}</p>
         ) : (
@@ -177,13 +177,13 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
   }
 
   return (
-    <div className="glass-panel p-5">
+    <div className="panel p-5">
       <div className="control-row mb-4" style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <div className="taste-input-field" style={{ flex: '1', minWidth: '160px' }}>
           <label htmlFor="taste-category-input" className="sr-only">Category</label>
           <input
             id="taste-category-input"
-            className="glass-input"
+            className="input"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
             placeholder="e.g. square-canvas"
@@ -194,7 +194,7 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
           <label htmlFor="taste-prompt-id-input" className="sr-only">Prompt ID</label>
           <input
             id="taste-prompt-id-input"
-            className="glass-input"
+            className="input"
             value={promptId}
             onChange={(e) => setPromptId(e.target.value)}
             placeholder="links to Module 4"
