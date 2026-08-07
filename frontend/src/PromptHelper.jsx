@@ -112,16 +112,16 @@ export default function PromptHelper() {
   }
 
   return (
-    <div className="glass-panel" style={{ padding: '2rem', border: 'none', background: 'transparent', boxShadow: 'none' }}>
+    <div className="panel" style={{ padding: '2rem', border: 'none', background: 'transparent', boxShadow: 'none' }}>
       <h2 style={{ marginTop: 0, marginBottom: '1.5rem', fontFamily: 'var(--font-body)', fontWeight: 700 }}>Prompt Helper & Trends</h2>
       
-      <div className="glass-card settings-section-card">
+      <div className="card settings-section-card">
         <h3 className="settings-section-title">Generate Prompts</h3>
         <div className="settings-field-row mb-3">
           <div className="settings-field flex-1">
             <label className="settings-field-label" htmlFor="prompt-category-select">Category:</label>
             <select 
-              className="glass-input" 
+              className="input" 
               id="prompt-category-select"
               value={category} 
               onChange={(e) => setCategory(e.target.value)}
@@ -134,7 +134,7 @@ export default function PromptHelper() {
           <div className="settings-field flex-1">
             <span className="settings-field-label" id="prompt-trend-label">Trend</span>
             <select 
-              className="glass-input" 
+              className="input" 
               aria-labelledby="prompt-trend-label"
               value={selectedTrendId} 
               onChange={(e) => setSelectedTrendId(e.target.value)} 
@@ -152,13 +152,13 @@ export default function PromptHelper() {
         </div>
       </div>
 
-      <div className="glass-card settings-section-card">
+      <div className="card settings-section-card">
         <h3 className="settings-section-title">Add Trend</h3>
         <div className="settings-field-row mb-3">
           <div className="settings-field flex-1">
             <span className="settings-field-label">New trend term</span>
             <input
-              className="glass-input"
+              className="input"
               placeholder="Add a new trend"
               aria-label="Add a new trend"
               value={newTrendTerm}
@@ -168,7 +168,7 @@ export default function PromptHelper() {
           <div className="settings-field flex-1">
             <span className="settings-field-label">Category</span>
             <input
-              className="glass-input"
+              className="input"
               placeholder="Category"
               aria-label="Trend category"
               value={newTrendCategory}
@@ -183,7 +183,7 @@ export default function PromptHelper() {
         <div className="mt-2 text-muted mono-sm mb-2 settings-field" style={{ marginTop: '1rem' }}>
           <span className="settings-field-label">Import CSV (<code>term</code>, <code>category</code>)</span>
           <div className="settings-field-row" style={{ marginTop: '0.35rem' }}>
-            <input className="glass-input input-auto" id="csv-file-input" type="file" accept=".csv,text/csv" onChange={(e) => importTrendsCsv(e.target.files?.[0])} />
+            <input className="input input-auto" id="csv-file-input" type="file" accept=".csv,text/csv" onChange={(e) => importTrendsCsv(e.target.files?.[0])} />
             {csvMessage && <span className="text-muted mono-sm">{csvMessage}</span>}
           </div>
         </div>
@@ -192,11 +192,11 @@ export default function PromptHelper() {
       {error && <p className="text-danger mt-2">{error}</p>}
 
       {generated.length > 0 && (
-        <div className="glass-card settings-section-card">
+        <div className="card settings-section-card">
           <h3 className="settings-section-title">Generated Prompts</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {generated.map((p) => (
-              <div key={p.id} className="glass-surface p-4" style={{ padding: '1rem', borderRadius: 'var(--radius-md)' }}>
+              <div key={p.id} className="surface p-4" style={{ padding: '1rem', borderRadius: 'var(--radius-md)' }}>
                 <code className="prompt-code-block block mb-2">{p.prompt_text}</code>
                 <button className="btn-secondary btn-sm" onClick={() => copyToClipboard(p.prompt_text)}>Copy</button>
                 {p.warnings.length > 0 && (
@@ -211,11 +211,11 @@ export default function PromptHelper() {
       )}
 
       {history.length > 0 && (
-        <div className="glass-card settings-section-card">
+        <div className="card settings-section-card">
           <h3 className="settings-section-title">History: &quot;{category}&quot;</h3>
           <ul className="prompt-history-list" style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {history.map((p) => (
-              <li key={p.id} className="prompt-history-item flex-row items-center justify-between glass-surface" style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <li key={p.id} className="prompt-history-item flex-row items-center justify-between surface" style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <code className="mono-sm" style={{ wordBreak: 'break-all', marginRight: '1rem' }}>{p.prompt_text}</code> 
                 <button className="btn-ghost btn-sm" onClick={() => copyToClipboard(p.prompt_text)}>Copy</button>
               </li>
