@@ -7,6 +7,8 @@
   "main": "electron/main.js",
   "workspaces": ["backend", "frontend"],
   "scripts": {
+    "install:test": "npm install --omit=optional",
+    "install:full": "npm install",
     "dev": "concurrently -n backend,frontend -c blue,green \"npm run dev -w backend\" \"npm run dev -w frontend\"",
     "electron:dev": "concurrently -n frontend,electron -c green,magenta \"npm run dev -w frontend\" \"electron electron/main.js\"",
     "electron:rebuild": "electron-builder install-app-deps",
@@ -34,14 +36,16 @@
   "devDependencies": {
     "@playwright/test": "^1.48.0",
     "concurrently": "^9.0.0",
-    "electron": "^33.0.0",
-    "electron-builder": "^25.1.0",
     "@eslint/js": "^9.13.0",
     "eslint": "^9.13.0",
     "eslint-plugin-react": "^7.37.1",
     "eslint-plugin-react-hooks": "^5.0.0",
     "globals": "^15.11.0",
     "vitest": "^4.1.10"
+  },
+  "optionalDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.0"
   },
   "build": {
     "appId": "com.allocsys.proetsy",
