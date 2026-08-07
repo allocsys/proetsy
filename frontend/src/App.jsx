@@ -758,8 +758,8 @@ function App() {
                 <h3 className="settings-section-title">API Keys</h3>
 
                 <div className="settings-subsection">
-                  <p className="text-muted" style={{ marginTop: 0 }}>
-                    Keys are stored in the database — this is the only place the app reads API keys from. Values are never shown again after saving — only the last 4 characters are kept visible.
+                  <p className="text-muted mono-sm" style={{ marginTop: 0, marginBottom: '0.5rem' }}>
+                    Securely stored API keys for Gemini & Claude providers. Key values are masked after saving.
                   </p>
                   {apiKeys.length ? (
                     <table className="data-table">
@@ -830,8 +830,8 @@ function App() {
                 <h3 className="settings-section-title">Pipeline Modules</h3>
 
                 <div className="settings-subsection" style={{ marginBottom: 0 }}>
-                  <p className="text-muted" style={{ marginTop: 0 }}>
-                    Default enable/disable for each pipeline module. Applies to new uploads going forward — matches the checkboxes on the Upload view, but saved here instead of one-off per session.
+                  <p className="text-muted mono-sm" style={{ marginTop: 0, marginBottom: '0.75rem' }}>
+                    Configure default enabled pipeline steps for new artwork uploads.
                   </p>
                   <div className="flex-row flex-wrap" style={{ gap: '1.5rem' }}>
                     {pipelineDefault?.pipeline?.map((m) => (
