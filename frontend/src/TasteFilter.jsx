@@ -14,7 +14,7 @@ function ScoreBadge({ label, score, confident }) {
   return (
     <span className={`status-pill ${LABEL_CLASS[label] || 'skipped'}`} aria-label={`Score: ${text}`}>
       <span className="status-dot" aria-hidden="true" />
-      {label} ({score.toFixed(3)}){confident === false ? ' · cold start' : ''}
+      {label} ({score.toFixed(3)})${confident === false ? ' · cold start' : ''}
     </span>
   );
 }
@@ -25,6 +25,9 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
   const [candidates, setCandidates] = useState([]);
   const [status, setStatus] = useState('');
   const [autoSortedExpanded, setAutoSortedExpanded] = useState(false);
+  const [selectedFileName, setSelectedFileName] = useState('');
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef(null);
   const seenPathsRef = useRef(new Set());
 
   useEffect(() => {
@@ -63,6 +66,32 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
       setStatus(`Scored ${data.candidates.length} image${data.candidates.length > 1 ? 's' : ''}.`);
     } catch (err) {
       setStatus(`Import failed: ${err.message}`);
+    }
+  }
+
+  function handleFileChange(e) {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      if (files.length === 1) {
+        setSelectedFileName(files[0].name);
+      } else {
+        setSelectedFileName(`${files.length} files selected`);
+      }
+      handleImport(files);
+    }
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    setDragActive(false);
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      if (files.length === 1) {
+        setSelectedFileName(files[0].name);
+      } else {
+        setSelectedFileName(`${files.length} files selected`);
+      }
+      handleImport(files);
     }
   }
 
@@ -149,37 +178,73 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
 
   return (
     <div className="glass-panel p-5">
-      <div className="control-row mb-4" style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-        <label htmlFor="taste-category-input" className="sr-only">Category</label>
-        <input
-          id="taste-category-input"
-          className="glass-input"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          placeholder="e.g. square-canvas"
-          style={{ flex: '1', minWidth: '160px' }}
-        />
-        <label htmlFor="taste-prompt-id-input" className="sr-only">Prompt ID</label>
-        <input
-          id="taste-prompt-id-input"
-          className="glass-input"
-          value={promptId}
-          onChange={(e) => setPromptId(e.target.value)}
-          placeholder="links to Module 4"
-          style={{ flex: '1', minWidth: '160px' }}
-        />
-        <button className="btn-secondary" onClick={handleRecompute}>Recompute now</button>
+      <div className="control-row mb-4" style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div className="taste-input-field" style={{ flex: '1', minWidth: '160px' }}>
+          <label htmlFor="taste-category-input" className="sr-only">Category</label>
+          <input
+            id="taste-category-input"
+            className="glass-input"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            placeholder="e.g. square-canvas"
+          />
+          <span className="input-helper-text">Curation name (optional)</span>
+        </div>
+        <div className="taste-input-field" style={{ flex: '1', minWidth: '160px' }}>
+          <label htmlFor="taste-prompt-id-input" className="sr-only">Prompt ID</label>
+          <input
+            id="taste-prompt-id-input"
+            className="glass-input"
+            value={promptId}
+            onChange={(e) => setPromptId(e.target.value)}
+            placeholder="links to Module 4"
+          />
+          <span className="input-helper-text">Module link (optional)</span>
+        </div>
+        <button className="btn-primary recompute-btn" onClick={handleRecompute} type="button">
+          <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M23 4v6h-6M1 20v-6h6" />
+            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+          </svg>
+          Recompute now
+        </button>
       </div>
 
       <div
-        className="dropzone my-2"
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => { e.preventDefault(); handleImport(e.dataTransfer.files); }}
+        className={`dropzone taste-dropzone ${dragActive ? 'active' : ''}`}
+        onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+        onDragLeave={() => setDragActive(false)}
+        onDrop={handleDrop}
       >
-        <p className="dropzone-title">Drag and drop a batch of candidate images here</p>
-        <input type="file" multiple accept="image/*" aria-label="Upload candidate images" onChange={(e) => handleImport(e.target.files)} />
+        <div className="dropzone-icon-badge">
+          <svg className="upload-cloud-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M16 16l-4-4m0 0l-4 4m4-4v12" />
+            <path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3" />
+          </svg>
+        </div>
+        <p className="dropzone-title">Drag & drop a batch of candidate images here</p>
+        <p className="dropzone-subtitle">Supports JPG, PNG, WEBP • Max 50MB per file</p>
+        <div className="dropzone-file-control">
+          <button
+            type="button"
+            className="btn-secondary btn-sm"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Choose Files
+          </button>
+          <span className="dropzone-file-name">{selectedFileName || 'No file chosen'}</span>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*"
+            aria-label="Upload candidate images"
+            style={{ display: 'none' }}
+            onChange={handleFileChange}
+          />
+        </div>
       </div>
-      {status && <p className="text-muted mono-sm mb-2">{status}</p>}
+      {status && <p className="text-muted mono-sm mb-2 mt-2">{status}</p>}
 
       {mainCandidates.length > 0 && (
         <div className="card-grid">
