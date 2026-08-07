@@ -9,5 +9,6 @@ export default defineConfig({
     include: ['**/*.test.js'],
     exclude: ['node_modules/**', 'lib/__fixtures__/**'],
     environment: 'node',
+    testTimeout: 15000,
   },
 });

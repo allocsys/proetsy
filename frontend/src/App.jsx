@@ -484,6 +484,25 @@ function App() {
 
   return (
     <div className="app-shell">
+      {/* Custom Windows 11 Fluent Titlebar */}
+      <div className="win11-titlebar">
+        <div className="win11-titlebar-left">
+          <div className="win11-app-icon">E</div>
+          <span className="win11-title-text">ProEtsy - Print Pipeline Studio</span>
+        </div>
+        <div className="win11-titlebar-controls">
+          <button className="win11-control-btn" title="Minimize">
+            <svg viewBox="0 0 10 1"><rect width="10" height="1" fill="currentColor"/></svg>
+          </button>
+          <button className="win11-control-btn" title="Maximize">
+            <svg viewBox="0 0 10 10"><rect width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1"/></svg>
+          </button>
+          <button className="win11-control-btn close" title="Close">
+            <svg viewBox="0 0 10 10"><path d="M 0,0 L 10,10 M 10,0 L 0,10" stroke="currentColor" strokeWidth="1"/></svg>
+          </button>
+        </div>
+      </div>
+
       <header className="app-titlebar glass-nav">
         <div className="wordmark-container">
           <div className="wordmark-crop">
@@ -739,8 +758,8 @@ function App() {
                 <h3 className="settings-section-title">API Keys</h3>
 
                 <div className="settings-subsection">
-                  <p className="text-muted" style={{ marginTop: 0 }}>
-                    Keys are stored in the database — this is the only place the app reads API keys from. Values are never shown again after saving — only the last 4 characters are kept visible.
+                  <p className="text-muted mono-sm" style={{ marginTop: 0, marginBottom: '0.5rem' }}>
+                    Securely stored API keys for Gemini & Claude providers. Key values are masked after saving.
                   </p>
                   {apiKeys.length ? (
                     <table className="data-table">
@@ -811,8 +830,8 @@ function App() {
                 <h3 className="settings-section-title">Pipeline Modules</h3>
 
                 <div className="settings-subsection" style={{ marginBottom: 0 }}>
-                  <p className="text-muted" style={{ marginTop: 0 }}>
-                    Default enable/disable for each pipeline module. Applies to new uploads going forward — matches the checkboxes on the Upload view, but saved here instead of one-off per session.
+                  <p className="text-muted mono-sm" style={{ marginTop: 0, marginBottom: '0.75rem' }}>
+                    Configure default enabled pipeline steps for new artwork uploads.
                   </p>
                   <div className="flex-row flex-wrap" style={{ gap: '1.5rem' }}>
                     {pipelineDefault?.pipeline?.map((m) => (
