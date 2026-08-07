@@ -484,6 +484,25 @@ function App() {
 
   return (
     <div className="app-shell">
+      {/* Custom Windows 11 Fluent Titlebar */}
+      <div className="win11-titlebar">
+        <div className="win11-titlebar-left">
+          <div className="win11-app-icon">E</div>
+          <span className="win11-title-text">ProEtsy - Print Pipeline Studio</span>
+        </div>
+        <div className="win11-titlebar-controls">
+          <button className="win11-control-btn" title="Minimize">
+            <svg viewBox="0 0 10 1"><rect width="10" height="1" fill="currentColor"/></svg>
+          </button>
+          <button className="win11-control-btn" title="Maximize">
+            <svg viewBox="0 0 10 10"><rect width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1"/></svg>
+          </button>
+          <button className="win11-control-btn close" title="Close">
+            <svg viewBox="0 0 10 10"><path d="M 0,0 L 10,10 M 10,0 L 0,10" stroke="currentColor" strokeWidth="1"/></svg>
+          </button>
+        </div>
+      </div>
+
       <header className="app-titlebar glass-nav">
         <div className="wordmark-container">
           <div className="wordmark-crop">
