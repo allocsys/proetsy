@@ -232,7 +232,7 @@ function MockupTemplates() {
   }
 
   return (
-    <div className="glass-panel" style={{ padding: '2rem', border: 'none', background: 'transparent', boxShadow: 'none' }}>
+    <div className="panel" style={{ padding: '2rem', border: 'none', background: 'transparent', boxShadow: 'none' }}>
       <h2 style={{ marginTop: 0, marginBottom: '1.5rem', fontFamily: 'var(--font-body)', fontWeight: 700 }}>Mockup Templates</h2>
 
       <div className="glass-card settings-section-card">
