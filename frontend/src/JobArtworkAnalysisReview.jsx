@@ -118,7 +118,7 @@ export default function JobArtworkAnalysisReview({ jobId }) {
       {error && <p className="text-danger mt-2">{error}</p>}
 
       {analysis ? (
-        <div className="settings-readonly-box glass-panel" style={{ marginTop: '1rem', marginBottom: '1rem' }}>
+        <div className="settings-readonly-box panel" style={{ marginTop: '1rem', marginBottom: '1rem' }}>
           <div className="settings-readonly-header">
             <span className="settings-readonly-title">AI Analysis Result</span>
             <span className="read-only-badge">AI Generated</span>
