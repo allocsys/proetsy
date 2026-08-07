@@ -106,6 +106,35 @@ function App() {
   const [activeView, setActiveView] = useState('upload');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [fetchError, setFetchError] = useState(null);
+  const [reviewTab, setReviewTab] = useState('analysis');
+  const [activeJobInfo, setActiveJobInfo] = useState(null);
+
+  useEffect(() => {
+    if (!activeJobId) {
+      setActiveJobInfo(null);
+      return;
+    }
+    fetch(`/api/jobs/${activeJobId}`)
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        return r.json();
+      })
+      .then((jobData) => {
+        setActiveJobInfo({
+          id: jobData.id,
+          filePath: jobData.artwork_file_path || '',
+          filename: jobData.artwork_file_path?.split('/').pop() || `Job #${jobData.id}`,
+          status: jobData.overall_status,
+        });
+      })
+      .catch(() => {
+        setActiveJobInfo({
+          id: activeJobId,
+          filename: `Job #${activeJobId}`,
+          status: 'unknown',
+        });
+      });
+  }, [activeJobId]);
 
   // Shared handler for background/status fetches (refreshJobs, refreshTrends, etc.) so a
   // failed request (backend down, 500, network drop) surfaces to the user instead of
@@ -1051,37 +1080,95 @@ function App() {
           )}
 
           {activeView === 'review' && (
-            <section className="paper-card glass-card">
-              <h2 style={{ marginTop: 0 }}>Review a Specific Job</h2>
-              <div className="flex-row mb-2">
-                <input
-                  type="number"
-                  placeholder="Job ID"
-                  value={jobIdInput}
-                  onChange={(e) => setJobIdInput(e.target.value)}
-                  style={{ maxWidth: '160px' }}
-                />
-                <button className="btn-primary" onClick={() => setActiveJobId(jobIdInput)} disabled={!jobIdInput}>
-                  Load job
-                </button>
+            <section className="paper-card" style={{ padding: 0, background: 'transparent', border: 'none', boxShadow: 'none' }}>
+              <div className="paper-card" style={{ marginBottom: '1rem' }}>
+                <h2 style={{ marginTop: 0, marginBottom: '1rem' }}>Job Workspace</h2>
+                <div className="flex-row mb-2" style={{ gap: '0.5rem' }}>
+                  <input
+                    type="number"
+                    placeholder="Job ID"
+                    value={jobIdInput}
+                    onChange={(e) => setJobIdInput(e.target.value)}
+                    style={{ maxWidth: '140px' }}
+                  />
+                  <button className="btn-primary" onClick={() => { setActiveJobId(jobIdInput); setReviewTab('analysis'); }} disabled={!jobIdInput}>
+                    Load job
+                  </button>
+                </div>
               </div>
-              {activeJobId ? (
-                <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                  <div>
-                    <h3 style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.4rem' }}>Image Analysis</h3>
-                    <JobArtworkAnalysisReview jobId={activeJobId} />
+
+              {activeJobId && activeJobInfo ? (
+                <div>
+                  {/* Job Header Info */}
+                  <div className="workspace-artwork-preview-card">
+                    {activeJobInfo.filePath && (
+                      <img
+                        src={`/api/artworks/file/${activeJobInfo.filePath.split('/').pop()}`}
+                        alt={activeJobInfo.filename}
+                        className="workspace-artwork-preview-img"
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                    )}
+                    <div className="workspace-artwork-preview-info">
+                      <span className="workspace-artwork-preview-filename">{activeJobInfo.filename}</span>
+                      <span className="workspace-artwork-preview-jobid">Job ID: #{activeJobInfo.id} · <span className={`text-muted`}>{activeJobInfo.status}</span></span>
+                    </div>
                   </div>
-                  <div>
-                    <h3 style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.4rem' }}>Listings</h3>
-                    <JobListingReview jobId={activeJobId} />
+
+                  {/* Sub-Tabs Navigation */}
+                  <div className="workspace-tabs">
+                    <button
+                      className={`workspace-tab-btn ${reviewTab === 'analysis' ? 'active' : ''}`}
+                      onClick={() => setReviewTab('analysis')}
+                    >
+                      <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '14px', height: '14px' }}>
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                      </svg>
+                      Image Analysis
+                    </button>
+                    <button
+                      className={`workspace-tab-btn ${reviewTab === 'listings' ? 'active' : ''}`}
+                      onClick={() => setReviewTab('listings')}
+                    >
+                      <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '14px', height: '14px' }}>
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="16" y1="13" x2="8" y2="13" />
+                        <line x1="16" y1="17" x2="8" y2="17" />
+                        <polyline points="10 9 9 9 8 9" />
+                      </svg>
+                      Listings
+                    </button>
+                    <button
+                      className={`workspace-tab-btn ${reviewTab === 'mockups' ? 'active' : ''}`}
+                      onClick={() => setReviewTab('mockups')}
+                    >
+                      <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '14px', height: '14px' }}>
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <polyline points="21 15 16 10 5 21" />
+                      </svg>
+                      Mockups
+                    </button>
                   </div>
-                  <div>
-                    <h3 style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.4rem' }}>Mockups</h3>
-                    <JobMockupReview jobId={activeJobId} />
+
+                  {/* Sub-Tab Panel Body (hidden display toggle keeps elements mounted for testing and state preservation) */}
+                  <div className="workspace-panel-body">
+                    <div style={{ display: reviewTab === 'analysis' ? 'block' : 'none' }}>
+                      <JobArtworkAnalysisReview jobId={activeJobId} />
+                    </div>
+                    <div style={{ display: reviewTab === 'listings' ? 'block' : 'none' }}>
+                      <JobListingReview jobId={activeJobId} />
+                    </div>
+                    <div style={{ display: reviewTab === 'mockups' ? 'block' : 'none' }}>
+                      <JobMockupReview jobId={activeJobId} />
+                    </div>
                   </div>
                 </div>
               ) : (
-                <p className="empty-state">Enter a job ID above, or open one from Listing History.</p>
+                <div className="paper-card">
+                  <p className="empty-state">Enter a job ID above, or open one from Listing History to start reviewing.</p>
+                </div>
               )}
             </section>
           )}
