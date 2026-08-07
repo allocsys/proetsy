@@ -20,7 +20,7 @@ function slugify(filename) {
 function TemplateThumb({ url, alt }) {
   if (!url) return <div className="mockup-template-thumb-placeholder" aria-hidden="true" />;
   return (
-    <div className="crop-frame mockup-template-thumb-frame">
+    <div className="mockup-template-thumb-frame">
       <img src={url} alt={alt} className="mockup-template-thumb" />
     </div>
   );
