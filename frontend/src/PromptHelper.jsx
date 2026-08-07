@@ -119,10 +119,10 @@ export default function PromptHelper() {
         <h3 className="settings-section-title">Generate Prompts</h3>
         <div className="settings-field-row mb-3">
           <div className="settings-field flex-1">
-            <span className="settings-field-label" id="prompt-category-label">Category</span>
+            <label className="settings-field-label" htmlFor="prompt-category-select">Category:</label>
             <select 
               className="glass-input" 
-              aria-labelledby="prompt-category-label"
+              id="prompt-category-select"
               value={category} 
               onChange={(e) => setCategory(e.target.value)}
             >
