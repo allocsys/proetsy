@@ -596,9 +596,9 @@ function App() {
             <div className="setup-alert">
               <strong>Setup incomplete</strong>
               <ul>
-                <li><span className="text-success" style={{ color: 'var(--state-success)', fontWeight: 600 }}>{setupStatus.geminiKeyConfigured ? 'Ready' : 'Action Required'}</span> Gemini API key configured — add one below in Settings</li>
-                <li><span className="text-success" style={{ color: 'var(--state-success)', fontWeight: 600 }}>{setupStatus.hasTagLibrary ? 'Ready' : 'Action Required'}</span> Tag library has at least one tag — add one below in Settings</li>
-                <li><span className="text-success" style={{ color: 'var(--state-success)', fontWeight: 600 }}>{setupStatus.hasProductSize ? 'Ready' : 'Optional'}</span> At least one product size / mockup template configured</li>
+                <li><span style={{ color: setupStatus.geminiKeyConfigured ? 'var(--state-success)' : 'var(--state-pending)', fontWeight: 600 }}>{setupStatus.geminiKeyConfigured ? 'Ready' : 'Action Required'}</span> Gemini API key configured — add one below in Settings</li>
+                <li><span style={{ color: setupStatus.hasTagLibrary ? 'var(--state-success)' : 'var(--state-pending)', fontWeight: 600 }}>{setupStatus.hasTagLibrary ? 'Ready' : 'Action Required'}</span> Tag library has at least one tag — add one below in Settings</li>
+                <li><span style={{ color: setupStatus.hasProductSize ? 'var(--state-success)' : 'var(--studio-ink-soft)', fontWeight: 600 }}>{setupStatus.hasProductSize ? 'Ready' : 'Optional'}</span> At least one product size / mockup template configured</li>
               </ul>
             </div>
           )}
@@ -1042,9 +1042,6 @@ function App() {
                 </div>
               </details>
 
-              <div className="pipeline-card-footer">
-                <span className="text-muted mono-sm">Secure local print studio pipeline</span>
-              </div>
             </section>
           )}
 
