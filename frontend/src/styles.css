@@ -1140,3 +1140,24 @@ input:focus, select:focus, textarea:focus {
   font-size: 11px;
   color: var(--ink-soft);
 }
+
+/* ============ SETTINGS DASHBOARD GRID LAYOUT ============ */
+.settings-dashboard-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.settings-full-width-card {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 900px) {
+  .settings-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  .settings-full-width-card {
+    grid-column: auto;
+  }
+}

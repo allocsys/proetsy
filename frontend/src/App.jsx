@@ -608,7 +608,9 @@ function App() {
             <div>
               <h2 style={{ marginTop: 0, marginBottom: '1.5rem' }}>Shop Settings & Tag Library</h2>
 
-              <div className="settings-section-card glass-card">
+              <div className="settings-dashboard-grid">
+
+              <div className="settings-section-card glass-card settings-card-tags">
                 <h3 className="settings-section-title">Tags & Trends</h3>
 
                 <div className="settings-subsection">
@@ -685,7 +687,7 @@ function App() {
                 </div>
               </div>
 
-              <div className="settings-section-card glass-card">
+              <div className="settings-section-card glass-card settings-card-defaults">
                 <h3 className="settings-section-title">Shop Defaults & Conventions</h3>
 
                 <div className="settings-subsection">
@@ -733,7 +735,7 @@ function App() {
 
               </div>
 
-              <div className="settings-section-card glass-card">
+              <div className="settings-section-card glass-card settings-card-keys">
                 <h3 className="settings-section-title">API Keys</h3>
 
                 <div className="settings-subsection">
@@ -805,7 +807,7 @@ function App() {
                 </div>
               </div>
 
-              <div className="settings-section-card glass-card">
+              <div className="settings-section-card glass-card settings-card-modules">
                 <h3 className="settings-section-title">Pipeline Modules</h3>
 
                 <div className="settings-subsection" style={{ marginBottom: 0 }}>
@@ -833,7 +835,7 @@ function App() {
                 </div>
               </div>
 
-              <div className="settings-section-card glass-card">
+              <div className="settings-section-card glass-card settings-card-automation">
                 <h3 className="settings-section-title">Automation & Diagnostics</h3>
 
                 <div className="settings-subsection">
@@ -940,10 +942,11 @@ function App() {
                   </div>
                 </div>
               </div>
+              </div>
             </div>
           )}
 
-          {activeView === 'upload' && (
+{activeView === 'upload' && (
             <section className="paper-card glass-card">
               <h2 style={{ marginTop: 0 }}>Upload & Curation Pipeline</h2>
 
