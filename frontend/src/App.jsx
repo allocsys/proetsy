@@ -44,7 +44,7 @@ function NavIcon({ name }) {
     case 'review':
       return (
         <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 022 2h2a2 2 0 022-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 022 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 022 2h2a2 2 0 022-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
         </svg>
       );
     case 'prompt':
@@ -654,7 +654,7 @@ function App() {
                       <input type="file" accept=".csv,text/csv" onChange={(e) => importTagsCsv(e.target.files?.[0])} />
                     </label>
                     {tagsCsvMessage && <span className="text-muted mono-sm">{tagsCsvMessage}</span>}
-                    <button onClick={backfillTagCategories} disabled={tagsBackfillRunning}>
+                    <button className="btn-secondary btn-sm" onClick={backfillTagCategories} disabled={tagsBackfillRunning}>
                       Suggest categories for uncategorized tags
                     </button>
                     {tagsBackfillMessage && <span className="text-muted mono-sm">{tagsBackfillMessage}</span>}
@@ -675,17 +675,23 @@ function App() {
                     <p className="empty-state">No trends added yet.</p>
                   )}
                   <div className="flex-row flex-wrap mt-2">
-                    <input
-                      value={newTrendTerm}
-                      onChange={(e) => setNewTrendTerm(e.target.value)}
-                      placeholder="Trend term"
-                    />
-                    <input
-                      value={newTrendCategory}
-                      onChange={(e) => setNewTrendCategory(e.target.value)}
-                      placeholder="Category (optional)"
-                    />
-                    <button onClick={addTrendFromSettings} disabled={!newTrendTerm.trim()}>Add trend</button>
+                    <div className="settings-field" style={{ flex: 1, minWidth: '140px' }}>
+                      <span className="settings-field-label">Trend term</span>
+                      <input
+                        value={newTrendTerm}
+                        onChange={(e) => setNewTrendTerm(e.target.value)}
+                        placeholder="Trend term"
+                      />
+                    </div>
+                    <div className="settings-field" style={{ flex: 1, minWidth: '140px' }}>
+                      <span className="settings-field-label">Category (optional)</span>
+                      <input
+                        value={newTrendCategory}
+                        onChange={(e) => setNewTrendCategory(e.target.value)}
+                        placeholder="Category (optional)"
+                      />
+                    </div>
+                    <button className="btn-secondary btn-sm" onClick={addTrendFromSettings} disabled={!newTrendTerm.trim()}>Add trend</button>
                   </div>
                 </div>
               </div>
@@ -1049,7 +1055,13 @@ function App() {
             <section className="paper-card glass-card">
               <h2 style={{ marginTop: 0 }}>Listing History</h2>
               {jobs.length === 0 ? (
-                <p className="empty-state">No jobs yet — drop some artwork on the Upload view to get started.</p>
+                <div className="empty-state-box" style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--studio-ink-soft)' }}>
+                  <svg style={{ width: '40px', height: '40px', opacity: 0.5, marginBottom: '0.75rem' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7v5l3 3" />
+                  </svg>
+                  <p className="empty-state" style={{ margin: 0, fontStyle: 'normal', fontWeight: 500, fontSize: '13.5px' }}>No jobs yet — drop some artwork on the Upload view to get started.</p>
+                </div>
               ) : (
                 <div style={{ overflowX: 'auto' }}>
                   <table className="data-table">
@@ -1073,7 +1085,13 @@ function App() {
                               <td><StatusBadge status={job.overall_status} /></td>
                               <td className="text-muted mono mono-sm">{job.updated_at}</td>
                               <td>
-                                <button onClick={() => openJob(job.id)}>Review</button>
+                                <button className="btn-secondary btn-sm" onClick={() => openJob(job.id)}>
+                                  <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                    <circle cx="12" cy="12" r="3" />
+                                  </svg>
+                                  Review
+                                </button>
                               </td>
                             </tr>
                           );
@@ -1096,6 +1114,8 @@ function App() {
                                 <button
                                   className="btn-secondary btn-sm"
                                   onClick={() => setExpandedBatches((prev) => ({ ...prev, [batchId]: !prev[batchId] }))}
+                                  aria-label={expanded ? 'Collapse batch' : 'Expand batch'}
+                                  title={expanded ? 'Collapse batch' : 'Expand batch'}
                                 >
                                   {expanded ? '▾' : '▸'}
                                 </button>
@@ -1120,7 +1140,13 @@ function App() {
                                 <td><StatusBadge status={job.overall_status} /></td>
                                 <td className="text-muted mono mono-sm">{job.updated_at}</td>
                                 <td>
-                                  <button onClick={() => openJob(job.id)}>Review</button>
+                                  <button className="btn-secondary btn-sm" onClick={() => openJob(job.id)}>
+                                    <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                      <circle cx="12" cy="12" r="3" />
+                                    </svg>
+                                    Review
+                                  </button>
                                 </td>
                               </tr>
                             ))}
@@ -1136,17 +1162,21 @@ function App() {
 
           {activeView === 'review' && (
             <section className="paper-card" style={{ padding: 0, background: 'transparent', border: 'none', boxShadow: 'none' }}>
-              <div className="paper-card" style={{ marginBottom: '1rem' }}>
+              <div className="paper-card glass-card" style={{ marginBottom: '1rem' }}>
                 <h2 style={{ marginTop: 0, marginBottom: '1rem' }}>Job Workspace</h2>
-                <div className="flex-row mb-2" style={{ gap: '0.5rem' }}>
-                  <input
-                    type="number"
-                    placeholder="Job ID"
-                    value={jobIdInput}
-                    onChange={(e) => setJobIdInput(e.target.value)}
-                    style={{ maxWidth: '140px' }}
-                  />
-                  <button className="btn-primary" onClick={() => { setActiveJobId(jobIdInput); setReviewTab('analysis'); }} disabled={!jobIdInput}>
+                <div className="settings-field-row" style={{ alignItems: 'flex-start' }}>
+                  <div className="settings-field">
+                    <span className="settings-field-label">Job ID (optional)</span>
+                    <input
+                      type="number"
+                      placeholder="Job ID"
+                      value={jobIdInput}
+                      onChange={(e) => setJobIdInput(e.target.value)}
+                      style={{ maxWidth: '160px' }}
+                    />
+                    <span className="input-helper-text">Enter an active or completed job ID to inspect pipeline output.</span>
+                  </div>
+                  <button className="btn-primary" onClick={() => { setActiveJobId(jobIdInput); setReviewTab('analysis'); }} disabled={!jobIdInput} style={{ height: '34px', marginTop: '1.25rem' }}>
                     Load job
                   </button>
                 </div>
@@ -1218,7 +1248,7 @@ function App() {
                   </div>
                 </div>
               ) : (
-                <div className="paper-card">
+                <div className="paper-card glass-card">
                   <p className="empty-state">Enter a job ID above, or open one from Listing History to start reviewing.</p>
                 </div>
               )}

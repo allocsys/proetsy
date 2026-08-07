@@ -106,7 +106,7 @@ export default function JobArtworkAnalysisReview({ jobId }) {
 
   return (
     <div className="glass-card artwork-analysis-card">
-      <div className="flex-row mb-3" style={{ justifyContent: 'space-between' }}>
+      <div className="flex-row mb-4" style={{ gap: 'var(--space-2)' }}>
         <button className="btn-primary" onClick={loadJobAndAnalysis} disabled={!jobId || loading}>
           {loading ? 'Loading…' : 'Load analysis'}
         </button>
@@ -132,8 +132,8 @@ export default function JobArtworkAnalysisReview({ jobId }) {
       {job && (
         <div className="manual-notes-section">
           <div className="settings-field">
-            <span className="settings-field-label">Manual notes fallback</span>
-            <span className="text-muted mono-sm">Used by listing generator when AI analysis is skipped or fails.</span>
+            <label className="settings-field-label">Manual notes fallback</label>
+            <span className="input-helper-text">Used by listing generator when AI analysis is skipped or fails.</span>
             <textarea
               className="listing-textarea glass-input"
               value={manualNotes}
@@ -142,7 +142,7 @@ export default function JobArtworkAnalysisReview({ jobId }) {
             />
           </div>
           <div className="mt-2">
-            <button className="btn-secondary" onClick={saveManualNotes} disabled={savingNotes}>
+            <button className="btn-primary" onClick={saveManualNotes} disabled={savingNotes}>
               {savingNotes ? 'Saving notes…' : 'Save manual notes'}
             </button>
           </div>

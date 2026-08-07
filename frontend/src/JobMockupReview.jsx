@@ -27,7 +27,7 @@ function MockupCard({ mockup, onVariantChange }) {
   }
 
   return (
-    <div className="glass-card mockup-card">
+    <div className="glass-card paper-card mb-4">
       <div className="settings-readonly-header mb-4">
         <h4 className="m-0 font-bold text-ink">
           {mockup.size_key} {mockup.dimensions ? `(${mockup.dimensions})` : ''}
@@ -142,7 +142,7 @@ function MockupCategorySelector({ jobId, onGenerated }) {
   if (!loaded) return null;
 
   return (
-    <div className="glass-panel mockup-category-selector">
+    <div className="glass-panel paper-card mockup-category-selector">
       <h4 style={{ marginTop: 0, marginBottom: '0.75rem' }}>Select Mockup Categories to Generate</h4>
       {categories.length ? (
         <>

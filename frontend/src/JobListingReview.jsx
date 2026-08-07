@@ -66,14 +66,14 @@ function ListingCard({ listing, onSaved }) {
   }
 
   return (
-    <div className="glass-card listing-card">
-      <div className="settings-readonly-header" style={{ marginBottom: '1rem' }}>
+    <div className="glass-card paper-card mb-4">
+      <div className="settings-readonly-header mb-4">
         <h4 className="listing-card-title">{listing.variation?.replace('_', ' ')}</h4>
         <span className="read-only-badge">AI Listing</span>
       </div>
 
       <div className="settings-field mb-3">
-        <label className="listing-field-label" htmlFor={`listing-title-${listing.id}`}>
+        <label className="settings-field-label" htmlFor={`listing-title-${listing.id}`}>
           Title (max 140 chars)
         </label>
         <input
@@ -85,7 +85,7 @@ function ListingCard({ listing, onSaved }) {
       </div>
 
       <div className="settings-field mb-3">
-        <label className="listing-field-label" htmlFor={`listing-desc-${listing.id}`}>
+        <label className="settings-field-label" htmlFor={`listing-desc-${listing.id}`}>
           Description
         </label>
         <textarea
@@ -97,7 +97,7 @@ function ListingCard({ listing, onSaved }) {
       </div>
 
       <div className="settings-field mb-3">
-        <label className="listing-field-label" htmlFor={`listing-tags-${listing.id}`}>
+        <label className="settings-field-label" htmlFor={`listing-tags-${listing.id}`}>
           Tags (comma-separated, max 13)
         </label>
         <input
@@ -109,7 +109,7 @@ function ListingCard({ listing, onSaved }) {
       </div>
 
       <div className="settings-field mb-4">
-        <label className="listing-field-label" htmlFor={`listing-alt-tags-${listing.id}`}>
+        <label className="settings-field-label" htmlFor={`listing-alt-tags-${listing.id}`}>
           Alternate tags (comma-separated)
         </label>
         <input

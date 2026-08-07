@@ -391,9 +391,9 @@ function MockupTemplates() {
                     />
                   </div>
                 )}
-                <div className="flex-row taste-card-actions">
-                  <button className="flex-1" onClick={() => saveConfiguredEdit(row)}>Save</button>
-                  <button className="btn-secondary flex-1" onClick={() => removeConfigured(row.size_key)}>Remove</button>
+                <div className="flex-row taste-card-actions" style={{ marginTop: '0.75rem', gap: '0.5rem' }}>
+                  <button className="btn-primary flex-1 btn-sm" onClick={() => saveConfiguredEdit(row)}>Save</button>
+                  <button className="btn-secondary flex-1 btn-sm" onClick={() => removeConfigured(row.size_key)}>Remove</button>
                 </div>
               </div>
             ))}
