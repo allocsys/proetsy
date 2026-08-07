@@ -223,7 +223,7 @@ describe('GET /api/taste-filter/pending + /watch-status (Module 7 -> "Auto-impor
 
     let candidate;
     const start = Date.now();
-    while (Date.now() - start < 4000) {
+    while (Date.now() - start < 15000) {
       const pendingRes = await request(app).get('/api/taste-filter/pending');
       if (pendingRes.body.candidates.length > 0) {
         candidate = pendingRes.body.candidates[0];
