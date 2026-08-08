@@ -1,6 +1,6 @@
 # Plan: Dashboard-Editable Shop Conventions
 
-**Status:** steps 1-2 (backend getter/setter, call sites) done. This file is the working scope doc for this change — check
+**Status:** steps 1-3 (backend getter/setter, call sites, server.js routes) done. This file is the working scope doc for this change — check
 items off in place as they land so this can be picked up mid-stream by anyone (or any
 agent) without re-deriving the plan. Delete this file in the PR that completes the
 Rollout section.
@@ -176,36 +176,23 @@ errors into a 400, e.g. `upsertConfiguredTemplate`'s pattern in `mockup-template
   other updated test files. Verified: 8/8 tests pass.
 
 ### 8. `backend/server.js`
-- [ ] Update the import: `import { SHOP_CONVENTIONS, MIDJOURNEY_CONVENTIONS } from
-      './config/shop-conventions.js'` → import `getShopConventions, setShopConventions`
-      from `./config/index.js` instead (drop the direct `shop-conventions.js` import
-      from server.js entirely).
-- [ ] Change `GET /api/config/shop-conventions`:
-  ```js
-  app.get('/api/config/shop-conventions', (req, res) => {
-    res.json(getShopConventions());
-  });
-  ```
-  Update its comment — remove the "read-only view... not an editable-then-PATCH
-  resource" line, replace with a note pointing at the new PATCH route below.
-- [ ] Add `PATCH /api/config/shop-conventions`:
-  ```js
-  app.patch('/api/config/shop-conventions', (req, res) => {
-    try {
-      res.json(setShopConventions(req.body || {}));
-    } catch (err) {
-      res.status(400).json({ error: err.message });
-    }
-  });
-  ```
-  Body shape: `{ listing?: {...partial SHOP_CONVENTIONS fields}, midjourney?: {...partial
-  MIDJOURNEY_CONVENTIONS fields} }` — partial at the top level AND within each of
-  `listing`/`midjourney`, matching `PATCH /api/settings`'s "each key upserted
-  independently" behavior.
-- [ ] New route file `backend/server.config-routes.test.js` already exists and covers
-      `/api/config/*` — add cases there rather than a new test file: GET reflects
-      defaults on an empty DB, PATCH updates and persists, PATCH validation-rejects an
-      invalid field with 400, a partial PATCH doesn't clobber unrelated fields.
+- [x] Updated the import: dropped the direct `import { SHOP_CONVENTIONS,
+      MIDJOURNEY_CONVENTIONS } from './config/shop-conventions.js'` and now imports
+      `getShopConventions, setShopConventions` from `./config/index.js` instead.
+- [x] `GET /api/config/shop-conventions` now calls `getShopConventions()`. Comment
+      updated — no longer says "read-only... not an editable-then-PATCH resource",
+      points at the PATCH route below instead.
+- [x] Added `PATCH /api/config/shop-conventions` — same shape as planned: catches
+      `setShopConventions()`'s thrown validation errors into a 400, same pattern as
+      `POST /api/mockup-templates`.
+- [x] `backend/server.config-routes.test.js` — added: GET-returns-defaults-on-empty-DB
+      (renamed from the old "returns the hardcoded..." description, since that's no
+      longer accurate), PATCH updates-and-persists, PATCH rejects an invalid field with
+      400 and writes nothing, PATCH rejects an invalid stylize trio, partial PATCH
+      doesn't clobber unrelated fields. Verified: 7/7 new/updated tests pass; full
+      backend suite run is 506/515 (the same 9 pre-existing `lib/tags/user-list.test.js`
+      failures as before this step, unrelated `dryRun`-field drift, not touched by this
+      branch).
 
 ### 9. Frontend — `frontend/src/App.jsx`
 - [ ] `shopConventions` state (line ~94) already exists and is fetched read-only
@@ -271,7 +258,7 @@ errors into a 400, e.g. `upsertConfiguredTemplate`'s pattern in `mockup-template
        files pass (74/74 tests); the only failures in a full `vitest run` are 9
        pre-existing failures in `lib/tags/user-list.test.js` (unrelated `dryRun`-field
        drift from a separate in-flight change, not touched by this branch).
-3. [ ] `server.js` GET/PATCH routes + `server.config-routes.test.js` cases.
+3. [x] `server.js` GET/PATCH routes + `server.config-routes.test.js` cases. Done.
 4. [ ] Frontend editable form + tests.
 5. [ ] `ARCHITECTURE.md` updates.
 6. [ ] Delete this `plan.md` in the same PR that lands step 5.
