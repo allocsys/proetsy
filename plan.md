@@ -1,6 +1,6 @@
 # Plan: Dashboard-Editable Shop Conventions
 
-**Status:** step 1 (backend getter/setter) done. This file is the working scope doc for this change — check
+**Status:** steps 1-2 (backend getter/setter, call sites) done. This file is the working scope doc for this change — check
 items off in place as they land so this can be picked up mid-stream by anyone (or any
 agent) without re-deriving the plan. Delete this file in the PR that completes the
 Rollout section.
@@ -133,27 +133,26 @@ errors into a 400, e.g. `upsertConfiguredTemplate`'s pattern in `mockup-template
   not in config" fallback text, not a load-bearing constraint here.
 
 ### 4. `backend/lib/listing-generator/validate.js`
-- [ ] Change `import { SHOP_CONVENTIONS } from '../../config/shop-conventions.js'` to
+- [x] Change `import { SHOP_CONVENTIONS } from '../../config/shop-conventions.js'` to
       `import { getShopConventions } from '../../config/index.js'`.
-- [ ] Inside `enforceConventions(variation)`, add `const SHOP_CONVENTIONS =
+- [x] Inside `enforceConventions(variation)`, add `const SHOP_CONVENTIONS =
       getShopConventions().listing;` as the first line (keeps the rest of the function
       body untouched — every reference below it is already `SHOP_CONVENTIONS.xxx`).
-- [ ] `validate.test.js` — seed the `settings` table (or stub `getShopConventions`) per
-      the project's existing DB-test convention (check how `mockup-templates/index.test.js`
-      seeds `product_sizes` for its equivalent test setup) instead of relying on the
-      static import.
+- [x] `validate.test.js` — seed the `settings` table (env-var-before-import pattern,
+      DB_PATH set before the dynamic import) instead of relying on the static import.
+      Verified: 13/13 tests pass.
 
 ### 5. `backend/lib/listing-generator/prompt.js`
-- [ ] Same swap as validate.js: `getShopConventions().listing` in place of the static
+- [x] Same swap as validate.js: `getShopConventions().listing` in place of the static
       `SHOP_CONVENTIONS` import, `LISTING_VARIATIONS` stays a static import (unchanged,
       out of scope — see above).
-- [ ] `prompt.test.js` — same seeding approach as validate.test.js.
+- [x] `prompt.test.js` — same seeding approach as validate.test.js. Verified: 14/14 tests pass.
 
 ### 6. `backend/lib/prompt-helper/prompt.js` and `backend/lib/prompt-helper/validate.js`
-- [ ] Same swap, using `getShopConventions().midjourney` instead of the static
+- [x] Same swap, using `getShopConventions().midjourney` instead of the static
       `MIDJOURNEY_CONVENTIONS` import.
-- [ ] Update `prompt-helper/prompt.test.js` and `prompt-helper/validate.test.js`
-      accordingly.
+- [x] Updated `prompt-helper/prompt.test.js` and `prompt-helper/validate.test.js`
+      accordingly. Verified: 11/11 and 12/12 tests pass.
 
 ### 7. `backend/lib/llm/fixture.test.js`
 - [ ] This test currently imports `SHOP_CONVENTIONS` directly from
@@ -167,6 +166,14 @@ errors into a 400, e.g. `upsertConfiguredTemplate`'s pattern in `mockup-template
       deterministic/config-independent (used by the Playwright E2E suite per
       ARCHITECTURE.md) — but read the existing comment in full and use judgment before
       changing it.
+
+  **Resolved:** kept `fixture.test.js` on the static `SHOP_CONVENTIONS`/`LISTING_VARIATIONS`
+  import for building expected values in assertions (fixture.js's own output is meant to
+  be deterministic/config-independent, matching the Playwright E2E suite's expectations).
+  It does now dynamic-import `enforceConventions`/`enforceMidjourneyConventions` with
+  `DB_PATH` set first, since those two run the fixture's output through the live
+  DB-backed validators as a compliance check — same env-var-before-import pattern as the
+  other updated test files. Verified: 8/8 tests pass.
 
 ### 8. `backend/server.js`
 - [ ] Update the import: `import { SHOP_CONVENTIONS, MIDJOURNEY_CONVENTIONS } from
@@ -257,10 +264,13 @@ errors into a 400, e.g. `upsertConfiguredTemplate`'s pattern in `mockup-template
 ## Rollout (do in this order)
 
 1. [x] `config/index.js`: `getShopConventions()` + `setShopConventions()` + tests.
-2. [ ] Swap the four call sites (`validate.js` x2, `prompt.js` x2) to the getter +
+2. [x] Swap the four call sites (`validate.js` x2, `prompt.js` x2) to the getter +
        update their tests. Land 1+2 together — half-migrated call sites would mean some
        code paths honor dashboard edits and others silently don't, which is worse than
-       not shipping yet.
+       not shipping yet. Done — full backend suite run confirms all 6 affected test
+       files pass (74/74 tests); the only failures in a full `vitest run` are 9
+       pre-existing failures in `lib/tags/user-list.test.js` (unrelated `dryRun`-field
+       drift from a separate in-flight change, not touched by this branch).
 3. [ ] `server.js` GET/PATCH routes + `server.config-routes.test.js` cases.
 4. [ ] Frontend editable form + tests.
 5. [ ] `ARCHITECTURE.md` updates.
