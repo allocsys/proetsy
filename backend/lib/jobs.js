@@ -37,7 +37,20 @@ export function createJob(artworkId, overrides = {}, batchId = null) {
 
 export function getJobWithModules(jobId) {
   const db = getDb();
-  const job = db.prepare('SELECT * FROM jobs WHERE id = ?').get(jobId);
+  // Joins artworks for artwork_file_path -- same alias GET /api/jobs' list query uses
+  // (see server.js) -- so a job fetched by id carries the same field the dashboard's
+  // Job Workspace preview (App.jsx's activeJobInfo) and Listing History table already
+  // rely on from the list endpoint. Previously a bare `SELECT * FROM jobs` here, which
+  // silently broke the Job Workspace artwork preview/filename for a job loaded by id
+  // (jobData.artwork_file_path was always undefined).
+  const job = db
+    .prepare(
+      `SELECT jobs.*, artworks.file_path AS artwork_file_path
+       FROM jobs
+       JOIN artworks ON artworks.id = jobs.artwork_id
+       WHERE jobs.id = ?`
+    )
+    .get(jobId);
   if (!job) return null;
   const modules = db.prepare('SELECT * FROM job_modules WHERE job_id = ? ORDER BY id').all(jobId);
   return { ...job, modules };

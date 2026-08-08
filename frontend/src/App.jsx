@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import StatusPill from './components/StatusPill.jsx';
 import JobArtworkAnalysisReview from './JobArtworkAnalysisReview.jsx';
 import JobListingReview from './JobListingReview.jsx';
 import JobMockupReview from './JobMockupReview.jsx';
@@ -10,10 +11,9 @@ import UpdaterStatus from './UpdaterStatus.jsx';
 function StatusBadge({ status }) {
   const statusText = status || 'pending';
   return (
-    <span className={`status-pill ${statusText}`} aria-label={`Status: ${statusText}`}>
-      <span className="status-dot" aria-hidden="true" />
+    <StatusPill variant={statusText} ariaLabel={`Status: ${statusText}`}>
       {statusText}
-    </span>
+    </StatusPill>
   );
 }
 
@@ -896,10 +896,9 @@ function App() {
                               <td>{key.label || <span className="text-muted">—</span>}</td>
                               <td className="mono mono-sm">{key.maskedKey}</td>
                               <td>
-                                <span className={`status-pill ${key.enabled ? 'success' : 'pending'}`}>
-                                  <span className="status-dot" aria-hidden="true" />
+                                <StatusPill variant={key.enabled ? 'success' : 'pending'} ariaLabel={`API key status: ${key.enabled ? 'Enabled' : 'Disabled'}`}>
                                   {key.enabled ? 'Enabled' : 'Disabled'}
-                                </span>
+                                </StatusPill>
                               </td>
                               <td>
                                 <div className="flex-row" style={{ gap: '0.5rem' }}>
@@ -1091,10 +1090,9 @@ function App() {
                                 <td className="mono">{r.keyIndex}</td>
                                 <td className="mono">{r.model}</td>
                                 <td>
-                                  <span className={`status-pill ${r.currentlyLimited ? 'danger' : 'success'}`}>
-                                    <span className="status-dot" aria-hidden="true" />
+                                  <StatusPill variant={r.currentlyLimited ? 'danger' : 'success'} ariaLabel={`Rate limit status: ${r.currentlyLimited ? 'Cooling down' : 'OK'}`}>
                                     {r.currentlyLimited ? 'Cooling down' : 'OK'}
-                                  </span>
+                                  </StatusPill>
                                 </td>
                                 <td>{r.consecutiveHits}</td>
                                 <td className="text-muted mono mono-sm">{r.currentlyLimited ? r.limitedUntil : '—'}</td>
@@ -1333,7 +1331,7 @@ function App() {
                   <div className="workspace-artwork-preview-card">
                     {activeJobInfo.filePath && (
                       <img
-                        src={`/api/artworks/file/${activeJobInfo.filePath.split('/').pop()}`}
+                        src={`/artwork-files/${activeJobInfo.filePath.split('/').pop()}`}
                         alt={activeJobInfo.filename}
                         className="workspace-artwork-preview-img"
                         onError={(e) => { e.target.style.display = 'none'; }}

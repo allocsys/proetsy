@@ -187,6 +187,15 @@ describe('POST /api/jobs + GET /api/jobs/:id + GET /api/jobs', () => {
     expect(Array.isArray(res.body.modules)).toBe(true);
   });
 
+  it('GET /api/jobs/:id includes artwork_file_path, same as the list endpoint (dashboard Job Workspace preview relies on this)', async () => {
+    const createRes = await request(app).post('/api/jobs').send({ artwork_id: artworkId });
+
+    const res = await request(app).get(`/api/jobs/${createRes.body.id}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.artwork_file_path).toBe('/tmp/job-art.png');
+  });
+
   it('GET /api/jobs/:id 404s for a nonexistent job', async () => {
     const res = await request(app).get('/api/jobs/999999');
     expect(res.status).toBe(404);

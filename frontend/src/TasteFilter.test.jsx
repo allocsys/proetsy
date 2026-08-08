@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TasteFilter from './TasteFilter.jsx';
 
@@ -17,13 +17,52 @@ const CANDIDATE = {
   categoryConfident: false,
 };
 
+// jsdom has no built-in EventSource -- a minimal stand-in that records every instance
+// TasteFilter.jsx constructs (one per mount, via the watched-folder SSE effect) and lets
+// a test fire a synthetic message straight at the component's own onmessage handler, the
+// same way the real backend stream would. Declared here (not per-describe-block) because
+// every test mounts TasteFilter, and TasteFilter always opens this connection on mount --
+// not just the tests that exercise it directly.
+let sourceInstances;
+
 beforeEach(() => {
   global.fetch = vi.fn();
+  // TasteFilter's mount-time effect fires these two GETs first, unconditionally, before
+  // any interaction a test below cares about -- neither response needs to be realistic,
+  // since centroids/prompts only feed datalist suggestions no test asserts on. Queuing
+  // them here (ahead of whatever a test queues next) keeps `fetch` a plain, fully-featured
+  // vi.fn() -- every matcher (toHaveBeenCalledWith, toHaveBeenLastCalledWith, etc.) keeps
+  // working unmodified -- at the cost of shifting fetch.mock.calls by a constant +2 for
+  // any test that indexes into it directly; those few call sites account for the offset
+  // explicitly (see MOUNT_TIME_CALLS below).
+  fetch.mockResolvedValueOnce({ ok: true, json: async () => [] }); // /api/taste-filter/centroids
+  fetch.mockResolvedValueOnce({ ok: true, json: async () => [] }); // /api/prompts
+
+  sourceInstances = [];
+  global.EventSource = class {
+    constructor(url) {
+      this.url = url;
+      this.onmessage = null;
+      this.closed = false;
+      sourceInstances.push(this);
+    }
+    close() {
+      this.closed = true;
+    }
+  };
+});
+
+afterEach(() => {
+  delete global.EventSource;
 });
 
 function makeFile(name = 'candidate.png') {
   return new File(['fake-image-bytes'], name, { type: 'image/png' });
 }
+
+// Every test's fetch.mock.calls[0] and [1] are the mount-time centroids/prompts calls
+// pre-queued in beforeEach above; a test's own first real call is at this index.
+const MOUNT_TIME_CALLS = 2;
 
 describe('TasteFilter', () => {
   it('renders the empty dropzone state with no candidates', () => {
@@ -58,7 +97,7 @@ describe('TasteFilter', () => {
     const input = document.querySelector('input[type="file"]');
     await user.upload(input, makeFile());
 
-    const [, options] = fetch.mock.calls[0];
+    const [, options] = fetch.mock.calls[MOUNT_TIME_CALLS];
     const body = options.body;
     expect(body.get('category')).toBe('square-canvas');
     expect(body.get('prompt_id')).toBe('17');
@@ -133,16 +172,16 @@ describe('TasteFilter', () => {
 
     await user.click(screen.getByText('Keep & send to pipeline'));
 
-    const calledUrls = fetch.mock.calls.slice(1).map(([url]) => url);
+    const calledUrls = fetch.mock.calls.slice(MOUNT_TIME_CALLS + 1).map(([url]) => url);
     expect(calledUrls).toEqual(['/api/taste-filter/label', '/api/taste-filter/promote', '/api/jobs']);
 
-    expect(fetch.mock.calls[2][1]).toEqual(
+    expect(fetch.mock.calls[MOUNT_TIME_CALLS + 2][1]).toEqual(
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ image_path: CANDIDATE.imagePath }),
       })
     );
-    expect(fetch.mock.calls[3][1]).toEqual(
+    expect(fetch.mock.calls[MOUNT_TIME_CALLS + 3][1]).toEqual(
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ artwork_id: 42, pipeline_overrides: overrides }),
@@ -266,40 +305,63 @@ describe('TasteFilter — Step 2.9: collapsed Auto-sorted section for autoDecisi
   });
 });
 
-describe('TasteFilter — watched-folder auto-import polling (Module 7 -> "Auto-import via watched folder", step 7)', () => {
-  beforeEach(() => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-  });
+describe('TasteFilter — watched-folder auto-import via SSE (Module 7 -> "Auto-import via watched folder", step 7)', () => {
+  // global.EventSource and sourceInstances come from the shared outer beforeEach above --
+  // every test mounts TasteFilter, which always opens this connection, not just this block.
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('does not poll before the interval elapses', () => {
+  it('opens a stream connection to /api/taste-filter/pending/stream on mount', () => {
     render(<TasteFilter />);
-    expect(fetch).not.toHaveBeenCalled();
+    expect(sourceInstances).toHaveLength(1);
+    expect(sourceInstances[0].url).toBe('/api/taste-filter/pending/stream');
   });
 
-  it('merges a watcher-detected candidate into the grid once the poll interval elapses', async () => {
+  it('merges a watcher-pushed candidate into the grid when a message event arrives', async () => {
     const watched = { ...CANDIDATE, imagePath: '/data/taste-filter/from-watcher.png', imageUrl: '/taste-filter-files/from-watcher.png' };
-    fetch.mockResolvedValue({ ok: true, json: async () => ({ candidates: [watched] }) });
-
     render(<TasteFilter />);
-    await vi.advanceTimersByTimeAsync(5000);
+    const [source] = sourceInstances;
 
-    expect(fetch).toHaveBeenCalledWith('/api/taste-filter/pending');
+    act(() => {
+      source.onmessage({ data: JSON.stringify(watched) });
+    });
+
     expect(await screen.findByText('Keep')).toBeInTheDocument();
   });
 
-  it('does not re-add a candidate already merged in from an earlier poll', async () => {
+  it('does not re-add a candidate already merged in from an earlier event', async () => {
     const watched = { ...CANDIDATE, imagePath: '/data/taste-filter/from-watcher.png', imageUrl: '/taste-filter-files/from-watcher.png' };
-    fetch.mockResolvedValue({ ok: true, json: async () => ({ candidates: [watched] }) });
-
     render(<TasteFilter />);
-    await vi.advanceTimersByTimeAsync(5000);
+    const [source] = sourceInstances;
+
+    act(() => {
+      source.onmessage({ data: JSON.stringify(watched) });
+    });
     await screen.findByText('Keep');
-    await vi.advanceTimersByTimeAsync(5000);
+
+    act(() => {
+      source.onmessage({ data: JSON.stringify(watched) });
+    });
 
     expect(screen.getAllByText('Keep')).toHaveLength(1);
+  });
+
+  it('ignores a malformed message instead of throwing', async () => {
+    render(<TasteFilter />);
+    const [source] = sourceInstances;
+
+    expect(() => {
+      act(() => {
+        source.onmessage({ data: 'not json' });
+      });
+    }).not.toThrow();
+    expect(screen.queryByText('Keep')).not.toBeInTheDocument();
+  });
+
+  it('closes the stream connection on unmount', () => {
+    const { unmount } = render(<TasteFilter />);
+    const [source] = sourceInstances;
+
+    unmount();
+
+    expect(source.closed).toBe(true);
   });
 });

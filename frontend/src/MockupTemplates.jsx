@@ -26,6 +26,25 @@ function TemplateThumb({ url, alt }) {
   );
 }
 
+// Shared label+input block used by both the bulk-assign row and the configured-templates
+// row -- same `settings-field` wrapper, `settings-field-label` span, and `input` markup
+// either section used inline before. onChange here takes the raw string value (not the
+// event) so call sites can pass a plain setter or a partial-update closure directly.
+function FormField({ label, value, onChange, placeholder, list, style }) {
+  return (
+    <div className="settings-field" style={style}>
+      <span className="settings-field-label">{label}</span>
+      <input
+        className="input"
+        list={list}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+      />
+    </div>
+  );
+}
+
 function MockupTemplates() {
   const [folder, setFolder] = useState('');
   const [folderSavedMessage, setFolderSavedMessage] = useState('');
@@ -45,6 +64,11 @@ function MockupTemplates() {
   const [configured, setConfigured] = useState([]);
   const [configuredEdits, setConfiguredEdits] = useState({}); // size_key -> partial fields
   const [configuredStatus, setConfiguredStatus] = useState('');
+
+  // Single source of truth for whether the Electron preload bridge is present, instead of
+  // checking `window.mockupTemplatesAPI` separately in handleBrowse and in the JSX render
+  // condition below.
+  const hasFolderPicker = typeof window !== 'undefined' && !!window.mockupTemplatesAPI;
 
   function refreshConfigured() {
     fetch('/api/mockup-templates')
@@ -86,7 +110,7 @@ function MockupTemplates() {
   // same way a manual edit's onBlur would -- a cancelled dialog (selectFolder() resolves
   // null) leaves the field untouched.
   async function handleBrowse() {
-    if (!window.mockupTemplatesAPI) return;
+    if (!hasFolderPicker) return;
     const picked = await window.mockupTemplatesAPI.selectFolder();
     if (!picked) return;
     setFolder(picked);
@@ -249,7 +273,7 @@ function MockupTemplates() {
                 placeholder="/home/you/etsy-mockup-packs"
               />
             </div>
-            {typeof window !== 'undefined' && window.mockupTemplatesAPI && (
+            {hasFolderPicker && (
               <button className="btn-secondary" onClick={handleBrowse}>Browse…</button>
             )}
             <button className="btn-primary" onClick={handleScan}>Scan folder</button>
@@ -305,28 +329,16 @@ function MockupTemplates() {
             <div className="settings-subsection" style={{ marginTop: '1.5rem' }}>
               <h4 className="settings-sub-heading">Assign {selectedFiles.length} selected file{selectedFiles.length === 1 ? '' : 's'}</h4>
               <div className="settings-field-row">
-                <div className="settings-field">
-                  <span className="settings-field-label">Dimensions</span>
-                  <input className="input" value={bulkDimensions} onChange={(e) => setBulkDimensions(e.target.value)} placeholder="8x10" />
-                </div>
-                <div className="settings-field">
-                  <span className="settings-field-label">DPI</span>
-                  <input className="input" value={bulkDpi} onChange={(e) => setBulkDpi(e.target.value)} placeholder="300" />
-                </div>
-                <div className="settings-field">
-                  <span className="settings-field-label">Orientation</span>
-                  <input className="input" value={bulkOrientation} onChange={(e) => setBulkOrientation(e.target.value)} placeholder="portrait" />
-                </div>
-                <div className="settings-field">
-                  <span className="settings-field-label">Category</span>
-                  <input
-                    className="input"
-                    list="mockup-category-options"
-                    value={bulkCategory}
-                    onChange={(e) => setBulkCategory(e.target.value)}
-                    placeholder="e.g. bedroom, mug, nature"
-                  />
-                </div>
+                <FormField label="Dimensions" value={bulkDimensions} onChange={setBulkDimensions} placeholder="8x10" />
+                <FormField label="DPI" value={bulkDpi} onChange={setBulkDpi} placeholder="300" />
+                <FormField label="Orientation" value={bulkOrientation} onChange={setBulkOrientation} placeholder="portrait" />
+                <FormField
+                  label="Category"
+                  value={bulkCategory}
+                  onChange={setBulkCategory}
+                  placeholder="e.g. bedroom, mug, nature"
+                  list="mockup-category-options"
+                />
                 <button className="btn-primary" onClick={handleBulkAssign} disabled={assigning}>
                   Assign {selectedFiles.length} file{selectedFiles.length === 1 ? '' : 's'}
                 </button>
@@ -347,49 +359,35 @@ function MockupTemplates() {
                 <TemplateThumb url={row.preview_url} alt={row.size_key} />
                 <p className="taste-card-meta mockup-template-filename">{row.size_key}</p>
                 <div className="settings-field-row">
-                  <div className="settings-field">
-                    <span className="settings-field-label">Dimensions</span>
-                    <input
-                      className="input"
-                      value={getConfiguredValue(row, 'dimensions')}
-                      onChange={(e) => updateConfiguredEdit(row.size_key, 'dimensions', e.target.value)}
-                    />
-                  </div>
-                  <div className="settings-field">
-                    <span className="settings-field-label">DPI</span>
-                    <input
-                      className="input"
-                      value={getConfiguredValue(row, 'dpi')}
-                      onChange={(e) => updateConfiguredEdit(row.size_key, 'dpi', e.target.value)}
-                    />
-                  </div>
-                  <div className="settings-field">
-                    <span className="settings-field-label">Orientation</span>
-                    <input
-                      className="input"
-                      value={getConfiguredValue(row, 'orientation')}
-                      onChange={(e) => updateConfiguredEdit(row.size_key, 'orientation', e.target.value)}
-                    />
-                  </div>
-                  <div className="settings-field">
-                    <span className="settings-field-label">Category</span>
-                    <input
-                      className="input"
-                      list="mockup-category-options"
-                      value={getConfiguredValue(row, 'category')}
-                      onChange={(e) => updateConfiguredEdit(row.size_key, 'category', e.target.value)}
-                    />
-                  </div>
+                  <FormField
+                    label="Dimensions"
+                    value={getConfiguredValue(row, 'dimensions')}
+                    onChange={(v) => updateConfiguredEdit(row.size_key, 'dimensions', v)}
+                  />
+                  <FormField
+                    label="DPI"
+                    value={getConfiguredValue(row, 'dpi')}
+                    onChange={(v) => updateConfiguredEdit(row.size_key, 'dpi', v)}
+                  />
+                  <FormField
+                    label="Orientation"
+                    value={getConfiguredValue(row, 'orientation')}
+                    onChange={(v) => updateConfiguredEdit(row.size_key, 'orientation', v)}
+                  />
+                  <FormField
+                    label="Category"
+                    value={getConfiguredValue(row, 'category')}
+                    onChange={(v) => updateConfiguredEdit(row.size_key, 'category', v)}
+                    list="mockup-category-options"
+                  />
                 </div>
                 {row.mockup_template_path && row.mockup_template_path.toLowerCase().endsWith('.psd') && (
-                  <div className="settings-field" style={{ marginTop: '0.5rem' }}>
-                    <span className="settings-field-label">Placement layer</span>
-                    <input
-                      className="input"
-                      value={getConfiguredValue(row, 'placement_layer')}
-                      onChange={(e) => updateConfiguredEdit(row.size_key, 'placement_layer', e.target.value)}
-                    />
-                  </div>
+                  <FormField
+                    label="Placement layer"
+                    value={getConfiguredValue(row, 'placement_layer')}
+                    onChange={(v) => updateConfiguredEdit(row.size_key, 'placement_layer', v)}
+                    style={{ marginTop: '0.5rem' }}
+                  />
                 )}
                 <div className="flex-row taste-card-actions" style={{ marginTop: '0.75rem', gap: '0.5rem' }}>
                   <button className="btn-primary flex-1 btn-sm" onClick={() => saveConfiguredEdit(row)}>Save</button>

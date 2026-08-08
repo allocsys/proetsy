@@ -22,6 +22,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { EventEmitter } from 'node:events';
 import chokidar from 'chokidar';
 import { getDb } from '../../db/init.js';
 import { embedImage } from './embeddings.js';
@@ -46,6 +47,15 @@ let lastError = null;
 // returns per-candidate, so TasteFilter.jsx can merge results from both sources without
 // a separate code path.
 const pending = new Map();
+
+// Fires a 'candidate' event with the freshly-scored candidate object every time one is
+// added to `pending` in handleNewFile below -- lets server.js push it straight to any
+// open SSE connection (GET /api/taste-filter/pending/stream) instead of the dashboard
+// having to poll GET /api/taste-filter/pending on a timer. GET /api/taste-filter/pending
+// itself is unchanged and still returns the full current queue -- kept as the source of
+// truth for a client's initial snapshot (and for anything that isn't SSE-capable); this
+// emitter is purely an additional live-push channel on top of it, not a replacement.
+const emitter = new EventEmitter();
 
 function readSettings() {
   const db = getDb();
@@ -84,14 +94,16 @@ async function handleNewFile(sourcePath, candidatesDir, category) {
     const categoryCentroids = category ? getCentroids(category) : null;
     const scores = scoreCandidate(embedding, { global: globalCentroids, category: categoryCentroids });
 
-    pending.set(destPath, {
+    const candidate = {
       imagePath: destPath,
       imageUrl: `/taste-filter-files/${path.basename(destPath)}`,
       category,
       promptId: null,
       embedding: Array.from(embedding),
       ...scores,
-    });
+    };
+    pending.set(destPath, candidate);
+    emitter.emit('candidate', candidate);
     lastError = null;
   } catch (err) {
     lastError = err.message;
@@ -161,6 +173,20 @@ export function getPendingCandidates() {
 }
 
 /**
+ * Subscribes to newly-detected pending candidates as they're scored, for a live-push
+ * channel (GET /api/taste-filter/pending/stream in server.js) instead of requiring a
+ * client to poll GET /api/taste-filter/pending on a timer. Returns an unsubscribe
+ * function -- callers (one per open SSE connection) must call it when their connection
+ * closes, or the listener leaks for the lifetime of the process.
+ * @param {(candidate: object) => void} listener
+ * @returns {() => void} unsubscribe
+ */
+export function onPendingCandidate(listener) {
+  emitter.on('candidate', listener);
+  return () => emitter.off('candidate', listener);
+}
+
+/**
  * Drops a candidate from the pending queue once it's been labeled (called from POST
  * /api/taste-filter/label). A no-op for any imagePath not currently in the queue -- e.g.
  * a manually drag-and-dropped candidate, which was never added here in the first place.
@@ -199,4 +225,5 @@ export function _resetForTests() {
   watchedCategory = null;
   pending.clear();
   lastError = null;
+  emitter.removeAllListeners();
 }

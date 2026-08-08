@@ -98,6 +98,16 @@ function mockFetchByUrl(overrides = {}) {
   });
 }
 
+// The header Settings button renders an SVG icon plus a "Settings"/"Close settings" text
+// node (App.jsx), not a single '⚙ Settings' text run -- Testing Library's accessible-name
+// computation still resolves it to plain "Settings" (the icon is aria-hidden and
+// contributes no name), so a role-based query is both accurate and resilient to the
+// icon/text split, unlike a getByText string match against the old (never-actually-
+// rendered) '⚙ Settings' literal.
+function openSettings(user) {
+  return user.click(screen.getByRole('button', { name: 'Settings' }));
+}
+
 beforeEach(() => {
   vi.restoreAllMocks();
 });
@@ -319,7 +329,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await user.click(screen.getByText('⚙ Settings'));
+    await openSettings(user);
     const textarea = await screen.findByPlaceholderText(/wall art/);
     await user.type(textarea, 'boho decor');
     await user.click(screen.getByText('Save tags'));
@@ -342,7 +352,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await user.click(screen.getByText('⚙ Settings'));
+    await openSettings(user);
     const textarea = await screen.findByPlaceholderText(/wall art/);
     await user.type(textarea, 'macrame wall hanging');
     const categoryInput = screen.getByPlaceholderText(/e\.g\. botanical, boho, minimalist/);
@@ -371,7 +381,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await user.click(screen.getByText('⚙ Settings'));
+    await openSettings(user);
     // No <label htmlFor> associates this input with its description text, so query
     // directly by its distinguishing accept attribute instead.
     const input = document.querySelector('input[type="file"][accept=".csv,text/csv"]');
@@ -387,7 +397,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await user.click(screen.getByText('⚙ Settings'));
+    await openSettings(user);
     await user.type(await screen.findByPlaceholderText('Trend term'), 'cottagecore');
     await user.click(screen.getByText('Add trend'));
 
@@ -408,7 +418,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await user.click(screen.getByText('⚙ Settings'));
+    await openSettings(user);
 
     expect(await screen.findByText('|')).toBeInTheDocument();
     expect(screen.getByText(/Tags per listing: 13/)).toBeInTheDocument();
@@ -422,7 +432,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await user.click(screen.getByText('⚙ Settings'));
+    await openSettings(user);
 
     expect(await screen.findByText(/Watching \/home\/you\/midjourney/)).toBeInTheDocument();
     expect(screen.getByText(/2 pending/)).toBeInTheDocument();
@@ -436,7 +446,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await user.click(screen.getByText('⚙ Settings'));
+    await openSettings(user);
     await user.click(await screen.findByLabelText('Auto-import from folder'));
 
     await waitFor(() => {
@@ -464,7 +474,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await user.click(screen.getByText('⚙ Settings'));
+    await openSettings(user);
 
     expect(await screen.findByText('primary')).toBeInTheDocument();
     expect(screen.getByText('********...abcd')).toBeInTheDocument();
@@ -477,7 +487,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await user.click(screen.getByText('⚙ Settings'));
+    await openSettings(user);
 
     expect(await screen.findByText(/No dashboard-managed keys yet/)).toBeInTheDocument();
   });
@@ -493,7 +503,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await user.click(screen.getByText('⚙ Settings'));
+    await openSettings(user);
     await user.type(await screen.findByPlaceholderText('Paste API key'), 'AIzaSyD-fake-key-1234567890');
     await user.type(screen.getByPlaceholderText('e.g. backup key'), 'backup');
     await user.click(screen.getByText('Add key'));
@@ -538,7 +548,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await user.click(screen.getByText('⚙ Settings'));
+    await openSettings(user);
     await user.type(await screen.findByPlaceholderText('Paste API key'), 'short');
     await user.click(screen.getByText('Add key'));
 
@@ -551,7 +561,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await user.click(screen.getByText('⚙ Settings'));
+    await openSettings(user);
     await user.click(await screen.findByText('Disable'));
 
     await waitFor(() => {
@@ -569,7 +579,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await user.click(screen.getByText('⚙ Settings'));
+    await openSettings(user);
     await user.click(await screen.findByText('Delete'));
 
     expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('gemini'));
@@ -589,7 +599,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await user.click(screen.getByText('⚙ Settings'));
+    await openSettings(user);
 
     expect(await screen.findByText('Pipeline Modules')).toBeInTheDocument();
     const checkboxes = screen.getAllByRole('checkbox', { name: /listing_generator/ });
@@ -606,7 +616,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await user.click(screen.getByText('⚙ Settings'));
+    await openSettings(user);
 
     const settingsPanelCheckbox = document
       .querySelector('.settings-checkbox-row input[type="checkbox"]');

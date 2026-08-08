@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useAsyncTask } from './hooks/useAsyncTask.js';
 
 const CATEGORIES = ['portrait', 'landscape', 'square'];
 
@@ -7,6 +8,8 @@ function copyToClipboard(text) {
     navigator.clipboard.writeText(text);
   }
 }
+
+const COPIED_FEEDBACK_MS = 1500;
 
 export default function PromptHelper() {
   const [trends, setTrends] = useState([]);
@@ -17,10 +20,15 @@ export default function PromptHelper() {
   const [generated, setGenerated] = useState([]);
   const [history, setHistory] = useState([]);
   const [loadingTrends, setLoadingTrends] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [addingTrend, setAddingTrend] = useState(false);
   const [csvMessage, setCsvMessage] = useState('');
-  const [error, setError] = useState(null);
+  const [copiedId, setCopiedId] = useState(null);
+  // addTrend and generate already shared one loading+error pair before this hook existed
+  // (loadTrends/loadHistory intentionally fail silently with no error state, and the CSV
+  // import has its own message-based feedback instead -- neither matches this pending/
+  // error shape, so both are left as local state below).
+  const addTrendTask = useAsyncTask();
+  const generateTask = useAsyncTask();
+  const error = addTrendTask.error || generateTask.error;
 
   async function loadTrends() {
     setLoadingTrends(true);
@@ -47,11 +55,9 @@ export default function PromptHelper() {
     loadHistory(category);
   }, [category]);
 
-  async function addTrend() {
+  function addTrend() {
     if (!newTrendTerm.trim()) return;
-    setAddingTrend(true);
-    setError(null);
-    try {
+    addTrendTask.run(async () => {
       const res = await fetch('/api/trends', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -63,11 +69,7 @@ export default function PromptHelper() {
       setNewTrendCategory('');
       await loadTrends();
       setSelectedTrendId(String(data.id));
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setAddingTrend(false);
-    }
+    });
   }
 
   async function importTrendsCsv(file) {
@@ -88,10 +90,16 @@ export default function PromptHelper() {
     }
   }
 
-  async function generate() {
-    setGenerating(true);
-    setError(null);
-    try {
+  function handleCopy(id, text) {
+    copyToClipboard(text);
+    setCopiedId(id);
+    setTimeout(() => {
+      setCopiedId((current) => (current === id ? null : current));
+    }, COPIED_FEEDBACK_MS);
+  }
+
+  function generate() {
+    generateTask.run(async () => {
       const res = await fetch('/api/prompts/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -104,11 +112,7 @@ export default function PromptHelper() {
       if (!res.ok) throw new Error(data.error || 'Prompt generation failed');
       setGenerated(data.prompts);
       await loadHistory(category);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setGenerating(false);
-    }
+    });
   }
 
   return (
@@ -146,8 +150,8 @@ export default function PromptHelper() {
               ))}
             </select>
           </div>
-          <button className="btn-primary" onClick={generate} disabled={generating}>
-            {generating ? 'Generating…' : 'Generate prompts'}
+          <button className="btn-primary" onClick={generate} disabled={generateTask.pending}>
+            {generateTask.pending ? 'Generating…' : 'Generate prompts'}
           </button>
         </div>
       </div>
@@ -175,8 +179,8 @@ export default function PromptHelper() {
               onChange={(e) => setNewTrendCategory(e.target.value)}
             />
           </div>
-          <button className="btn-secondary" onClick={addTrend} disabled={addingTrend || !newTrendTerm.trim()}>
-            {addingTrend ? 'Adding…' : 'Add trend'}
+          <button className="btn-secondary" onClick={addTrend} disabled={addTrendTask.pending || !newTrendTerm.trim()}>
+            {addTrendTask.pending ? 'Adding…' : 'Add trend'}
           </button>
         </div>
 
@@ -198,7 +202,9 @@ export default function PromptHelper() {
             {generated.map((p) => (
               <div key={p.id} className="surface p-4" style={{ padding: '1rem', borderRadius: 'var(--radius-md)' }}>
                 <code className="prompt-code-block block mb-2">{p.prompt_text}</code>
-                <button className="btn-secondary btn-sm" onClick={() => copyToClipboard(p.prompt_text)}>Copy</button>
+                <button className="btn-secondary btn-sm" onClick={() => handleCopy(`generated-${p.id}`, p.prompt_text)}>
+                  {copiedId === `generated-${p.id}` ? 'Copied!' : 'Copy'}
+                </button>
                 {p.warnings.length > 0 && (
                   <ul className="prompt-warnings-list mt-2">
                     {p.warnings.map((w, i) => <li key={i}>{w}</li>)}
@@ -217,7 +223,9 @@ export default function PromptHelper() {
             {history.map((p) => (
               <li key={p.id} className="prompt-history-item flex-row items-center justify-between surface" style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <code className="mono-sm" style={{ wordBreak: 'break-all', marginRight: '1rem' }}>{p.prompt_text}</code> 
-                <button className="btn-ghost btn-sm" onClick={() => copyToClipboard(p.prompt_text)}>Copy</button>
+                <button className="btn-ghost btn-sm" onClick={() => handleCopy(`history-${p.id}`, p.prompt_text)}>
+                  {copiedId === `history-${p.id}` ? 'Copied!' : 'Copy'}
+                </button>
               </li>
             ))}
           </ul>
