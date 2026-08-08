@@ -8,18 +8,20 @@ import path from 'node:path';
 // listing-generator/index.idempotency.test.js and the server.*-routes.test.js suites.
 let getDb;
 let createJob;
+let createJobsBulk;
 let getJobWithModules;
 let setManualNotes;
 let setModuleStatus;
 let tmpRoot;
 let artworkId;
+let secondArtworkId;
 
 beforeAll(async () => {
   tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'proetsy-jobs-unit-'));
   process.env.DB_PATH = path.join(tmpRoot, 'test.db');
 
   ({ getDb } = await import('../db/init.js'));
-  ({ createJob, getJobWithModules, setManualNotes, setModuleStatus } = await import('./jobs.js'));
+  ({ createJob, createJobsBulk, getJobWithModules, setManualNotes, setModuleStatus } = await import('./jobs.js'));
 });
 
 afterAll(() => {
@@ -28,8 +30,8 @@ afterAll(() => {
 
 beforeEach(() => {
   const db = getDb();
-  const { lastInsertRowid } = db.prepare('INSERT INTO artworks (file_path) VALUES (?)').run('artwork.png');
-  artworkId = lastInsertRowid;
+  artworkId = db.prepare('INSERT INTO artworks (file_path) VALUES (?)').run('artwork.png').lastInsertRowid;
+  secondArtworkId = db.prepare('INSERT INTO artworks (file_path) VALUES (?)').run('artwork-2.png').lastInsertRowid;
 });
 
 describe('createJob (ARCHITECTURE.md -> Step control model)', () => {
@@ -79,6 +81,53 @@ describe('createJob (ARCHITECTURE.md -> Step control model)', () => {
     // Overrides apply only to the run they were passed to — a fresh job with no
     // overrides should fall back to the config default (enabled) again.
     expect(statuses.image_analyzer).toBe('pending');
+  });
+});
+
+// plan.md step 6: bulk-upload previously fired one POST /api/jobs per uploaded
+// file. createJobsBulk creates every job for a batch in a single call/transaction.
+describe('createJobsBulk (plan.md step 6)', () => {
+  it('throws for a missing or empty artworkIds array', () => {
+    expect(() => createJobsBulk([])).toThrow(/non-empty array/i);
+    expect(() => createJobsBulk(null)).toThrow(/non-empty array/i);
+  });
+
+  it('creates one job per artwork id, each seeded with the pipeline config', () => {
+    const jobIds = createJobsBulk([artworkId, secondArtworkId]);
+
+    expect(jobIds).toHaveLength(2);
+    for (const jobId of jobIds) {
+      const job = getJobWithModules(jobId);
+      const statuses = Object.fromEntries(job.modules.map((m) => [m.module_name, m.status]));
+      expect(statuses).toEqual({
+        image_analyzer: 'pending',
+        listing_generator: 'pending',
+        mockup_composer: 'pending',
+      });
+    }
+  });
+
+  it('applies overrides and batch_id to every job in the batch, same as createJob does for one', () => {
+    const jobIds = createJobsBulk([artworkId, secondArtworkId], { image_analyzer: false }, 'bulk-batch-1');
+
+    for (const jobId of jobIds) {
+      const job = getJobWithModules(jobId);
+      expect(job.batch_id).toBe('bulk-batch-1');
+      const statuses = Object.fromEntries(job.modules.map((m) => [m.module_name, m.status]));
+      expect(statuses.image_analyzer).toBe('skipped');
+      // Required module ignores the override, same rule as createJob.
+      expect(statuses.listing_generator).toBe('pending');
+    }
+  });
+
+  it('is all-or-nothing: a bad artwork_id anywhere in the array creates none of the jobs', () => {
+    const db = getDb();
+    const before = db.prepare('SELECT COUNT(*) AS n FROM jobs').get().n;
+
+    expect(() => createJobsBulk([artworkId, 999999])).toThrow(/not found/i);
+
+    const after = db.prepare('SELECT COUNT(*) AS n FROM jobs').get().n;
+    expect(after).toBe(before);
   });
 });
 
