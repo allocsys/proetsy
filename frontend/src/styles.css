@@ -1094,6 +1094,7 @@ input:focus, select:focus, textarea:focus {
 .text-muted { color: var(--studio-ink-soft); }
 .text-danger { color: var(--state-danger); }
 .text-pending { color: var(--state-pending); }
+.text-success { color: var(--state-success); }
 
 .settings-section-title {
   font-size: 15px;
