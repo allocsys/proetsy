@@ -125,6 +125,7 @@ function App() {
   const [rateLimitsLoading, setRateLimitsLoading] = useState(true);
   const [rateLimitsUpdatedAt, setRateLimitsUpdatedAt] = useState(null);
   const [savedFlashes, setSavedFlashes] = useState({});
+  const [confirmAction, setConfirmAction] = useState(null); // { message, onConfirm } | null
 
   useEffect(() => {
     if (!activeJobId) {
@@ -166,6 +167,23 @@ function App() {
         return next;
       });
     }, 2000);
+  }
+
+  // Shared in-app confirmation modal for destructive actions (tags, trends, API
+  // keys), replacing native window.confirm() popups so the styling and UX stays
+  // consistent with the rest of the dashboard.
+  function requestConfirm(message, onConfirm) {
+    setConfirmAction({ message, onConfirm });
+  }
+
+  async function confirmActionAccept() {
+    if (!confirmAction) return;
+    await confirmAction.onConfirm();
+    setConfirmAction(null);
+  }
+
+  function confirmActionCancel() {
+    setConfirmAction(null);
   }
 
   function goTo(view) {
@@ -392,15 +410,17 @@ function App() {
   }
 
   async function deleteTag(id, tagText) {
-    if (!window.confirm(`Delete tag "${tagText}"? This can't be undone.`)) return;
-    await fetch(`/api/tags/${id}`, { method: 'DELETE' });
-    refreshTags();
+    requestConfirm(`Delete tag "${tagText}"? This can't be undone.`, async () => {
+      await fetch(`/api/tags/${id}`, { method: 'DELETE' });
+      refreshTags();
+    });
   }
 
   async function deleteTrend(id, term) {
-    if (!window.confirm(`Delete trend "${term}"? This can't be undone.`)) return;
-    await fetch(`/api/trends/${id}`, { method: 'DELETE' });
-    refreshTrends();
+    requestConfirm(`Delete trend "${term}"? This can't be undone.`, async () => {
+      await fetch(`/api/trends/${id}`, { method: 'DELETE' });
+      refreshTrends();
+    });
   }
 
   async function importTagsCsv(file) {
@@ -525,9 +545,13 @@ function App() {
   }
 
   async function deleteApiKey(key) {
-    if (!window.confirm(`Delete ${key.provider} key${key.label ? ` "${key.label}"` : ''} (${key.maskedKey})? This can't be undone.`)) return;
-    await fetch(`/api/settings/api-keys/${key.id}`, { method: 'DELETE' });
-    refreshApiKeys();
+    requestConfirm(
+      `Delete ${key.provider} key${key.label ? ` "${key.label}"` : ''} (${key.maskedKey})? This can't be undone.`,
+      async () => {
+        await fetch(`/api/settings/api-keys/${key.id}`, { method: 'DELETE' });
+        refreshApiKeys();
+      }
+    );
   }
 
   async function togglePersistedModule(moduleName, currentlyEnabled, required) {
@@ -1566,6 +1590,24 @@ function App() {
 
         </main>
       </div>
+
+      {confirmAction && (
+        <div className="modal-overlay" role="presentation" onClick={confirmActionCancel}>
+          <div
+            className="modal-box"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="confirm-dialog-message"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p id="confirm-dialog-message" className="modal-message">{confirmAction.message}</p>
+            <div className="modal-actions">
+              <button className="btn-secondary" onClick={confirmActionCancel}>Cancel</button>
+              <button className="btn-primary modal-btn-danger" onClick={confirmActionAccept}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
