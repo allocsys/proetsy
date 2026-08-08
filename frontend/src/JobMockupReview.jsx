@@ -116,10 +116,13 @@ function MockupCategorySelector({ jobId, onGenerated }) {
     return templates.filter((t) => t.category && checkedCategories.has(t.category)).map((t) => t.size_key);
   }, [checked, templates]);
 
-  function handleGenerate() {
+  async function handleGenerate() {
     if (!jobId || !resolvedSizeKeys.length) return;
     setStatus('Generating mockups…');
-    run(async () => {
+    // useAsyncTask's run() catches internally rather than rejecting, so it always
+    // resolves -- use its return value (the task's own return, or undefined on
+    // failure) to tell success from failure here, rather than a .catch().
+    const succeeded = await run(async () => {
       const res = await fetch(`/api/jobs/${jobId}/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -129,9 +132,9 @@ function MockupCategorySelector({ jobId, onGenerated }) {
       if (!res.ok) throw new Error(data.error || 'Failed to generate mockups');
       setStatus(`Generated mockups for ${resolvedSizeKeys.length} template${resolvedSizeKeys.length === 1 ? '' : 's'}.`);
       onGenerated?.();
-    }).catch(() => {
-      setStatus('');
+      return true;
     });
+    if (!succeeded) setStatus('');
   }
 
   if (!loaded) return null;
