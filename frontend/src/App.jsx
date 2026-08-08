@@ -74,6 +74,18 @@ const NAV_ITEMS = [
   { id: 'settings', label: 'Shop Settings & Tags', group: 'Configuration', icon: 'settings' },
 ];
 
+// plan.md step 7: Settings was one long scroll (tags, trends, shop conventions, API
+// keys, automation/watch-folder config, rate-limit diagnostics) with sensitive key
+// management sitting directly next to trivial fields. Split into sub-tabs so each
+// concern gets its own screen -- API Keys (sensitive) now has a tab of its own,
+// visually and navigationally separated from everything else.
+const SETTINGS_TABS = [
+  { id: 'tags-trends', label: 'Tags & Trends' },
+  { id: 'general', label: 'Shop & Pipeline' },
+  { id: 'api-keys', label: 'API Keys' },
+  { id: 'automation', label: 'Automation & Diagnostics' },
+];
+
 function App() {
   const [health, setHealth] = useState(null);
   const [setupStatus, setSetupStatus] = useState(null);
@@ -126,6 +138,7 @@ function App() {
   const [rateLimitsUpdatedAt, setRateLimitsUpdatedAt] = useState(null);
   const [savedFlashes, setSavedFlashes] = useState({});
   const [confirmAction, setConfirmAction] = useState(null); // { message, onConfirm } | null
+  const [settingsTab, setSettingsTab] = useState('tags-trends'); // plan.md step 7: which Settings sub-tab is active
 
   useEffect(() => {
     if (!activeJobId) {
@@ -739,8 +752,21 @@ function App() {
             <div>
               <h2 style={{ marginTop: 0, marginBottom: '1.5rem' }}>Shop Settings & Tags</h2>
 
+              <div className="workspace-tabs settings-tabs-nav">
+                {SETTINGS_TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    className={`workspace-tab-btn ${settingsTab === tab.id ? 'active' : ''}`}
+                    onClick={() => setSettingsTab(tab.id)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
               <div className="settings-dashboard-grid">
 
+              {settingsTab === 'tags-trends' && (
               <div className="settings-section-card card settings-card-tags">
                 <h3 className="settings-section-title">Tags & Trends</h3>
 
@@ -918,7 +944,9 @@ function App() {
                   </div>
                 </div>
               </div>
+              )}
 
+              {settingsTab === 'general' && (
               <div className="settings-section-card card settings-card-defaults">
                 <h3 className="settings-section-title">Shop Defaults & Conventions</h3>
 
@@ -974,7 +1002,9 @@ function App() {
                 </div>
 
               </div>
+              )}
 
+              {settingsTab === 'api-keys' && (
               <div className="settings-section-card card settings-card-keys settings-full-width-card">
                 <h3 className="settings-section-title">API Keys</h3>
 
@@ -1056,7 +1086,9 @@ function App() {
                   {apiKeysMessage && <p className="text-muted mono-sm" style={{ marginTop: '0.5rem' }}>{apiKeysMessage}</p>}
                 </div>
               </div>
+              )}
 
+              {settingsTab === 'general' && (
               <div className="settings-section-card card settings-card-modules settings-full-width-card">
                 <h3 className="settings-section-title">Pipeline Modules</h3>
 
@@ -1084,7 +1116,9 @@ function App() {
                   </div>
                 </div>
               </div>
+              )}
 
+              {settingsTab === 'automation' && (
               <div className="settings-section-card card settings-card-automation settings-full-width-card">
                 <h3 className="settings-section-title">Automation & Diagnostics</h3>
 
@@ -1214,6 +1248,7 @@ function App() {
                   </div>
                 </div>
               </div>
+              )}
               </div>
             </div>
           )}
