@@ -14,8 +14,41 @@ const LISTING = {
   warnings: [],
 };
 
+const SHOP_CONVENTIONS_RESPONSE = {
+  listing: {
+    titleSeparator: '|',
+    maxTitleLength: 140,
+    tagsPerListing: 13,
+    tagAlternates: 5,
+    maxTagLength: 20,
+    forbiddenTitleWords: ['frame', 'framed', 'frames'],
+    aiDisclosurePhrases: ['ai generated', 'ai-generated'],
+    deliveryDetailPhrases: ['ships in', 'business days'],
+  },
+  midjourney: { version: '--v 7', style: '--style raw', stylizeMin: 50, stylizeMax: 150 },
+};
+
+// URL-dispatch fetch mock (same convention as JobMockupReview.test.jsx's makeFetchMock):
+// JobListingReview now fetches GET /api/config/shop-conventions on mount alongside
+// whatever a given test cares about, so matching by call order alone (plain
+// mockResolvedValueOnce) is no longer reliable here.
+function makeFetchMock(map) {
+  return vi.fn((url, opts) => {
+    const entry = map.find(([matcher]) => (typeof matcher === 'string' ? url === matcher : matcher.test(url)));
+    if (entry) return Promise.resolve(entry[1](url, opts));
+    return Promise.resolve({ ok: true, json: async () => ({}) });
+  });
+}
+
+// Default: real shop conventions, so tests that don't care about the live-feedback
+// behavior itself still get sane, realistic limits instead of the component's internal
+// fallback.
+const DEFAULT_CONVENTIONS = [
+  ['/api/config/shop-conventions', () => ({ ok: true, json: async () => SHOP_CONVENTIONS_RESPONSE })],
+];
+
 beforeEach(() => {
-  global.fetch = vi.fn();
+  global.fetch = makeFetchMock(DEFAULT_CONVENTIONS);
 });
 
 describe('JobListingReview', () => {
@@ -30,7 +63,10 @@ describe('JobListingReview', () => {
   });
 
   it('loads and renders listing cards on click', async () => {
-    fetch.mockResolvedValueOnce({ ok: true, json: async () => [LISTING] });
+    global.fetch = makeFetchMock([
+      ...DEFAULT_CONVENTIONS,
+      ['/api/jobs/42/listings', () => ({ ok: true, json: async () => [LISTING] })],
+    ]);
     const user = userEvent.setup();
     render(<JobListingReview jobId="42" />);
 
@@ -44,7 +80,10 @@ describe('JobListingReview', () => {
   });
 
   it('shows an error message when loading fails', async () => {
-    fetch.mockResolvedValueOnce({ ok: false, json: async () => ({}) });
+    global.fetch = makeFetchMock([
+      ...DEFAULT_CONVENTIONS,
+      ['/api/jobs/42/listings', () => ({ ok: false, json: async () => ({}) })],
+    ]);
     const user = userEvent.setup();
     render(<JobListingReview jobId="42" />);
 
@@ -54,7 +93,14 @@ describe('JobListingReview', () => {
   });
 
   it('edits a field and saves via PATCH, reflecting the cleaned server response', async () => {
-    fetch.mockResolvedValueOnce({ ok: true, json: async () => [LISTING] });
+    global.fetch = makeFetchMock([
+      ...DEFAULT_CONVENTIONS,
+      ['/api/jobs/42/listings', () => ({ ok: true, json: async () => [LISTING] })],
+      [/\/api\/jobs\/42\/listings\/1/, () => ({
+        ok: true,
+        json: async () => ({ ...LISTING, title: 'Edited Title', warnings: ['Title trimmed to fit convention'] }),
+      })],
+    ]);
     const user = userEvent.setup();
     render(<JobListingReview jobId="42" />);
     await user.click(screen.getByText('Load listings'));
@@ -64,10 +110,6 @@ describe('JobListingReview', () => {
     await user.clear(titleInput);
     await user.type(titleInput, 'Edited Title');
 
-    fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ ...LISTING, title: 'Edited Title', warnings: ['Title trimmed to fit convention'] }),
-    });
     await user.click(screen.getByText('Save'));
 
     await waitFor(() => {
@@ -80,7 +122,10 @@ describe('JobListingReview', () => {
   });
 
   it('copies title/description/tags to the clipboard', async () => {
-    fetch.mockResolvedValueOnce({ ok: true, json: async () => [LISTING] });
+    global.fetch = makeFetchMock([
+      ...DEFAULT_CONVENTIONS,
+      ['/api/jobs/42/listings', () => ({ ok: true, json: async () => [LISTING] })],
+    ]);
     const user = userEvent.setup();
     render(<JobListingReview jobId="42" />);
     await user.click(screen.getByText('Load listings'));
@@ -92,5 +137,93 @@ describe('JobListingReview', () => {
       'Original Title\n\nOriginal description\n\nTags: wall art, boho'
     );
     expect(await screen.findByText('Copied!')).toBeInTheDocument();
+  });
+});
+
+describe('JobListingReview — live shop-conventions feedback', () => {
+  it('fetches shop conventions on mount and uses them (not a hardcoded copy) for the title/tag limits', async () => {
+    global.fetch = makeFetchMock([
+      ['/api/config/shop-conventions', () => ({
+        ok: true,
+        json: async () => ({
+          listing: { ...SHOP_CONVENTIONS_RESPONSE.listing, maxTitleLength: 50, tagsPerListing: 3, maxTagLength: 10 },
+          midjourney: SHOP_CONVENTIONS_RESPONSE.midjourney,
+        }),
+      })],
+      ['/api/jobs/42/listings', () => ({ ok: true, json: async () => [LISTING] })],
+    ]);
+    const user = userEvent.setup();
+    render(<JobListingReview jobId="42" />);
+    await user.click(screen.getByText('Load listings'));
+    await screen.findByDisplayValue('Original Title');
+
+    expect(screen.getByText('Title (max 50 chars)')).toBeInTheDocument();
+    expect(screen.getByText(/\/50/)).toBeInTheDocument();
+    expect(screen.getByText('Tags (comma-separated, max 3)')).toBeInTheDocument();
+    expect(screen.getByText(/2\/3 tags/)).toBeInTheDocument();
+  });
+
+  it('warns live when the title contains a forbidden word, before Save is clicked', async () => {
+    global.fetch = makeFetchMock([
+      ...DEFAULT_CONVENTIONS,
+      ['/api/jobs/42/listings', () => ({ ok: true, json: async () => [LISTING] })],
+    ]);
+    const user = userEvent.setup();
+    render(<JobListingReview jobId="42" />);
+    await user.click(screen.getByText('Load listings'));
+    const titleInput = await screen.findByDisplayValue('Original Title');
+
+    expect(screen.queryByText(/Contains forbidden word/)).not.toBeInTheDocument();
+
+    await user.clear(titleInput);
+    await user.type(titleInput, 'Framed wall art');
+
+    expect(await screen.findByText(/Contains forbidden word\(s\), will be removed on save: frame/)).toBeInTheDocument();
+  });
+
+  it('warns live when the description contains an AI-disclosure phrase', async () => {
+    global.fetch = makeFetchMock([
+      ...DEFAULT_CONVENTIONS,
+      ['/api/jobs/42/listings', () => ({ ok: true, json: async () => [LISTING] })],
+    ]);
+    const user = userEvent.setup();
+    render(<JobListingReview jobId="42" />);
+    await user.click(screen.getByText('Load listings'));
+    const descInput = await screen.findByDisplayValue('Original description');
+
+    await user.clear(descInput);
+    await user.type(descInput, 'This print is AI generated art');
+
+    expect(await screen.findByText(/Contains AI-disclosure phrase\(s\), will be removed on save: ai generated/)).toBeInTheDocument();
+  });
+
+  it('warns live when the description contains a delivery-detail phrase', async () => {
+    global.fetch = makeFetchMock([
+      ...DEFAULT_CONVENTIONS,
+      ['/api/jobs/42/listings', () => ({ ok: true, json: async () => [LISTING] })],
+    ]);
+    const user = userEvent.setup();
+    render(<JobListingReview jobId="42" />);
+    await user.click(screen.getByText('Load listings'));
+    const descInput = await screen.findByDisplayValue('Original description');
+
+    await user.clear(descInput);
+    await user.type(descInput, 'Ships in 3 business days');
+
+    expect(await screen.findByText(/Contains delivery-detail phrase\(s\), will be removed on save: ships in, business days/)).toBeInTheDocument();
+  });
+
+  it('falls back to sane default limits, with no phrase warnings, if the shop-conventions fetch fails', async () => {
+    global.fetch = makeFetchMock([
+      ['/api/config/shop-conventions', () => ({ ok: false, json: async () => ({}) })],
+      ['/api/jobs/42/listings', () => ({ ok: true, json: async () => [{ ...LISTING, title: 'Framed wall art' }] })],
+    ]);
+    const user = userEvent.setup();
+    render(<JobListingReview jobId="42" />);
+    await user.click(screen.getByText('Load listings'));
+    await screen.findByDisplayValue('Framed wall art');
+
+    expect(screen.getByText('Title (max 140 chars)')).toBeInTheDocument();
+    expect(screen.queryByText(/Contains forbidden word/)).not.toBeInTheDocument();
   });
 });
