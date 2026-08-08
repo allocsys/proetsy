@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAsyncTask } from './hooks/useAsyncTask.js';
 
 function tagsToText(tags) {
   return Array.isArray(tags) ? tags.join(', ') : '';
@@ -32,8 +33,7 @@ function ListingCard({ listing, onSaved }) {
   const [tagsText, setTagsText] = useState(tagsToText(listing.tags));
   const [tagAltText, setTagAltText] = useState(tagsToText(listing.tag_alternates));
   const [warnings, setWarnings] = useState(listing.warnings || []);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
+  const { pending: saving, error, setError, run } = useAsyncTask();
   const [copied, setCopied] = useState(false);
 
   const parsedTags = textToTags(tagsText);
@@ -41,10 +41,8 @@ function ListingCard({ listing, onSaved }) {
   const tagsOverLimit = parsedTags.length > TAGS_PER_LISTING;
   const oversizedTagCount = parsedTags.filter((t) => t.length > MAX_TAG_LENGTH).length;
 
-  async function save() {
-    setSaving(true);
-    setError(null);
-    try {
+  function save() {
+    run(async () => {
       const res = await fetch(`/api/jobs/${listing.job_id}/listings/${listing.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -63,11 +61,7 @@ function ListingCard({ listing, onSaved }) {
       setTagAltText(tagsToText(data.tag_alternates));
       setWarnings(data.warnings || []);
       onSaved(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
+    });
   }
 
   async function copyForEtsy() {
@@ -168,23 +162,16 @@ function ListingCard({ listing, onSaved }) {
  */
 export default function JobListingReview({ jobId }) {
   const [listings, setListings] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const { pending: loading, error, run } = useAsyncTask();
 
-  async function loadListings() {
+  function loadListings() {
     if (!jobId) return;
-    setLoading(true);
-    setError(null);
-    try {
+    run(async () => {
       const res = await fetch(`/api/jobs/${jobId}/listings`);
       if (!res.ok) throw new Error('Failed to load listings');
       const data = await res.json();
       setListings(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    });
   }
 
   function handleSaved(updated) {

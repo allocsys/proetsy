@@ -1,16 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useAsyncTask } from './hooks/useAsyncTask.js';
 
 /**
  * One mockup's review card.
  */
 function MockupCard({ mockup, onVariantChange }) {
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
+  const { pending: saving, error, run } = useAsyncTask();
 
-  async function selectVariant(variant) {
-    setSaving(true);
-    setError(null);
-    try {
+  function selectVariant(variant) {
+    run(async () => {
       const res = await fetch(`/api/jobs/${mockup.job_id}/mockups/${mockup.id}/variant`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -19,11 +17,7 @@ function MockupCard({ mockup, onVariantChange }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to update variant');
       onVariantChange(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
+    });
   }
 
   return (
@@ -82,15 +76,21 @@ function MockupCard({ mockup, onVariantChange }) {
 
 /**
  * Manual category-selection gate for the curated flow.
+ *
+ * Deliberately left off useAsyncTask: `loaded` here means "has the initial
+ * categories/templates fetch ever succeeded," not "is a fetch currently in flight" --
+ * on failure it's meant to stay false forever (the component renders nothing rather
+ * than a stuck error state) rather than flip back to not-pending like a normal
+ * request would. That's different enough from useAsyncTask's pending/error shape
+ * that forcing it through the hook would risk changing this existing behavior.
  */
 function MockupCategorySelector({ jobId, onGenerated }) {
   const [categories, setCategories] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [checked, setChecked] = useState({});
-  const [running, setRunning] = useState(false);
   const [status, setStatus] = useState('');
-  const [error, setError] = useState(null);
+  const { pending: running, error, run } = useAsyncTask();
 
   useEffect(() => {
     setLoaded(false);
@@ -103,7 +103,7 @@ function MockupCategorySelector({ jobId, onGenerated }) {
         setTemplates(tpls);
         setLoaded(true);
       })
-      .catch((err) => setError(err.message));
+      .catch(() => {});
   }, [jobId]);
 
   function toggleCategory(category) {
@@ -116,12 +116,10 @@ function MockupCategorySelector({ jobId, onGenerated }) {
     return templates.filter((t) => t.category && checkedCategories.has(t.category)).map((t) => t.size_key);
   }, [checked, templates]);
 
-  async function handleGenerate() {
+  function handleGenerate() {
     if (!jobId || !resolvedSizeKeys.length) return;
-    setRunning(true);
     setStatus('Generating mockups…');
-    setError(null);
-    try {
+    run(async () => {
       const res = await fetch(`/api/jobs/${jobId}/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -131,12 +129,9 @@ function MockupCategorySelector({ jobId, onGenerated }) {
       if (!res.ok) throw new Error(data.error || 'Failed to generate mockups');
       setStatus(`Generated mockups for ${resolvedSizeKeys.length} template${resolvedSizeKeys.length === 1 ? '' : 's'}.`);
       onGenerated?.();
-    } catch (err) {
-      setError(err.message);
+    }).catch(() => {
       setStatus('');
-    } finally {
-      setRunning(false);
-    }
+    });
   }
 
   if (!loaded) return null;
@@ -176,22 +171,15 @@ function MockupCategorySelector({ jobId, onGenerated }) {
  */
 export default function JobMockupReview({ jobId }) {
   const [mockups, setMockups] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const { pending: loading, error, run } = useAsyncTask();
 
-  async function loadMockups() {
+  function loadMockups() {
     if (!jobId) return;
-    setLoading(true);
-    setError(null);
-    try {
+    run(async () => {
       const res = await fetch(`/api/jobs/${jobId}/mockups`);
       if (!res.ok) throw new Error('Failed to load mockups');
       setMockups(await res.json());
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    });
   }
 
   function handleVariantChange() {
