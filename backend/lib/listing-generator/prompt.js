@@ -1,9 +1,11 @@
-import { SHOP_CONVENTIONS, LISTING_VARIATIONS } from '../../config/shop-conventions.js';
+import { LISTING_VARIATIONS } from '../../config/shop-conventions.js';
+import { getShopConventions } from '../../config/index.js';
 
 // Builds the prompt sent to the LLM provider layer for Module 2. Shop conventions are
 // spelled out explicitly here; validate.js re-enforces them after the fact as a backstop
 // in case the model drifts from the instructions.
 export function buildListingPrompt({ imageAnalysis, manualNotes, trend, tagCandidates, availableSizes }) {
+  const SHOP_CONVENTIONS = getShopConventions().listing;
   const subjectBlock = imageAnalysis
     ? `Image analysis (from Module 1):\n${JSON.stringify(imageAnalysis, null, 2)}`
     : `Module 1 (Image Analyzer) was skipped. Manual notes from the user:\n${manualNotes || '(none provided)'}`;
