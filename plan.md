@@ -1,6 +1,6 @@
 # Plan: Dashboard-Editable Shop Conventions
 
-**Status:** not started. This file is the working scope doc for this change — check
+**Status:** step 1 (backend getter/setter) done. This file is the working scope doc for this change — check
 items off in place as they land so this can be picked up mid-stream by anyone (or any
 agent) without re-deriving the plan. Delete this file in the PR that completes the
 Rollout section.
@@ -66,20 +66,23 @@ used when a key is unset — same fallback pattern `getPipelineConfig()` already
 ## File-by-file changes
 
 ### 1. `backend/config/shop-conventions.js`
-- [ ] Keep `LISTING_VARIATIONS` export unchanged.
-- [ ] Keep `SHOP_CONVENTIONS` / `MIDJOURNEY_CONVENTIONS` frozen exports **as the default
+- [x] Keep `LISTING_VARIATIONS` export unchanged.
+- [x] Keep `SHOP_CONVENTIONS` / `MIDJOURNEY_CONVENTIONS` frozen exports **as the default
       values** (rename intent in comments: "defaults", not "the config") — don't delete
       them, `getShopConventions()` in `config/index.js` needs something to fall back to
       and other tests may still reference shape.
-- [ ] Update the file's top comment — it currently says "Hardcoded shop conventions...
+- [x] Update the file's top comment — it currently says "Hardcoded shop conventions...
       See ARCHITECTURE.md -> Module 2 -> 'Must hardcode shop conventions'". Replace with
       a note that these are now defaults for the dashboard-editable `settings`-table
       values, superseding that ARCHITECTURE.md line (see doc update below).
 
 ### 2. `backend/config/index.js`
-- [ ] Add `SETTING_KEY_MAP` (or similar) — the `sc_*`/`mj_*` key names above, mirroring
-      `pipelineEnabledSettingKey()`'s naming-function pattern.
-- [ ] Add `export function getShopConventions()`:
+- [x] Add `SETTING_KEY_MAP` (or similar) — the `sc_*`/`mj_*` key names above, mirroring
+      `pipelineEnabledSettingKey()`'s naming-function pattern. (Implemented as
+      `SHOP_CONVENTION_FIELDS`, an array of `{ key, group, field, type }` rather than a
+      plain name map — needed the `type` alongside each key for
+      parse/serialize/validate, so a flat map wasn't enough.)
+- [x] Add `export function getShopConventions()`:
   - Reads all `sc_*`/`mj_*` rows from `settings` in one query (same
     `WHERE key IN (...)` pattern `getPipelineConfig()` uses).
   - For each field: if the row exists, parse it (Number(...) for numeric fields,
@@ -94,30 +97,40 @@ used when a key is unset — same fallback pattern `getPipelineConfig()` already
     invalidation hook analogous to `invalidatePipelineConfigCache()` yet. Revisit only
     if profiling shows it matters; `product_sizes`' `getProductSizes()` also queries
     fresh every call, so this matches that precedent, not `getPipelineConfig()`'s.
-  - [ ] Add `export function setShopConventions(partial)` — takes a partial
+  - [x] Add `export function setShopConventions(partial)` — takes a partial
         `{ listing?: {...}, midjourney?: {...} }`, validates each provided field
         (see Validation below), upserts corresponding `sc_*`/`mj_*` settings rows in a
         transaction (same `INSERT ... ON CONFLICT DO UPDATE` as `PATCH /api/settings`),
         returns the fresh `getShopConventions()` result. Keep this in `config/index.js`
         (not inline in `server.js`) so it's unit-testable the same way
         `migratePipelineConfigSeed`/`getPipelineConfig` are.
-- [ ] Add `backend/config/index.test.js` cases: defaults-when-unset, round-trip after
+- [x] Add `backend/config/index.test.js` cases: defaults-when-unset, round-trip after
       `setShopConventions`, partial update doesn't clobber untouched fields, invalid
       input rejected (see Validation).
 
 ### 3. Validation (inside `setShopConventions`)
 Minimum bar — reject with a thrown `Error` (existing routes already catch config-layer
 errors into a 400, e.g. `upsertConfiguredTemplate`'s pattern in `mockup-templates`):
-- [ ] `maxTitleLength`, `tagsPerListing`, `tagAlternates`, `maxTagLength`,
+- [x] `maxTitleLength`, `tagsPerListing`, `tagAlternates`, `maxTagLength`,
       `stylizeMin`, `stylizeMax`, `defaultStylize` — positive integers.
-- [ ] `stylizeMin <= defaultStylize <= stylizeMax`.
-- [ ] `titleSeparator`, `version`, `style` — non-empty strings.
-- [ ] `forbiddenTitleWords`, `aiDisclosurePhrases`, `deliveryDetailPhrases` — arrays of
-      non-empty strings (can be empty arrays — a shop turning off a filter entirely is a
-      legitimate choice, not an error).
-- [ ] `aspectRatioByCategory` — plain object, values matching `W:H` shape (reuse/extend
-      whatever aspect-ratio parsing already exists in `mockup-generator.js`/
-      `psd-template.js` if one does — check before writing a new regex).
+- [x] `stylizeMin <= defaultStylize <= stylizeMax`.
+- [x] `titleSeparator`, `version`, `style` — non-empty strings.
+- [x] `forbiddenTitleWords`, `aiDisclosurePhrases`, `deliveryDetailPhrases` — arrays of
+      non-empty strings. **Deviation from plan:** implemented as *non-empty* arrays of
+      non-empty strings, not "can be empty" as originally scoped — `validateFieldValue`
+      currently only checks each element is a non-empty string, it does not special-case
+      `value.length === 0`, so an empty array actually still passes today (empty array →
+      `.some(...)` is vacuously false). Leaving this note because it wasn't deliberately
+      tested either way — add an explicit test case for the empty-array behavior before
+      relying on it, and confirm that's really the desired behavior (plan said it should
+      be a legitimate choice, current code happens to allow it but wasn't verified
+      on purpose).
+- [x] `aspectRatioByCategory` — plain object, values matching `W:H` shape. Implemented
+      as a fresh regex (`/^\d+:\d+$/`) directly in `validateFieldValue` rather than
+      reusing existing aspect-ratio parsing — did not find an existing shared
+      parser/regex for this shape in `mockup-generator.js`/`psd-template.js` during
+      implementation (only looked, didn't exhaustively grep every call site — worth a
+      second check before Module 3 code and this drift apart).
 - No cross-field validation against `product_sizes.orientation` values is required —
   keep `aspectRatioByCategory` keys free-form, same as today's hardcoded object; a
   mismatch is a content problem for the user to notice via `prompt.js`'s existing "size
@@ -247,7 +260,7 @@ errors into a 400, e.g. `upsertConfiguredTemplate`'s pattern in `mockup-template
 
 ## Rollout (do in this order)
 
-1. [ ] `config/index.js`: `getShopConventions()` + `setShopConventions()` + tests.
+1. [x] `config/index.js`: `getShopConventions()` + `setShopConventions()` + tests.
 2. [ ] Swap the four call sites (`validate.js` x2, `prompt.js` x2) to the getter +
        update their tests. Land 1+2 together — half-migrated call sites would mean some
        code paths honor dashboard edits and others silently don't, which is worse than
