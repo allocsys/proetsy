@@ -145,4 +145,25 @@ describe('POST /api/tags/backfill-categories', () => {
     expect(res.status).toBe(200);
     expect(res.body.updated).toBe(0);
   });
+
+  it('dry_run=true reports the proposed matches without writing them', async () => {
+    await request(app).post('/api/tags/bulk').send({ tags: 'boho throw pillow', category: 'boho' });
+    await request(app).post('/api/tags/bulk').send({ tags: 'boho wall hanging' });
+
+    const preview = await request(app).post('/api/tags/backfill-categories?dry_run=true').send({});
+    expect(preview.status).toBe(200);
+    expect(preview.body.dryRun).toBe(true);
+    expect(preview.body.updated).toBe(0);
+    expect(preview.body.updates.some((u) => u.tagText === 'boho wall hanging' && u.category === 'boho')).toBe(true);
+
+    // Preview must not have actually written anything — the tag is still uncategorized.
+    const stillUncategorized = preview.body.tags.find((t) => t.tag_text === 'boho wall hanging');
+    expect(stillUncategorized.category).toBeFalsy();
+
+    // Committing afterward applies the same match the preview showed.
+    const applied = await request(app).post('/api/tags/backfill-categories').send({});
+    expect(applied.status).toBe(200);
+    const backfilled = applied.body.tags.find((t) => t.tag_text === 'boho wall hanging');
+    expect(backfilled.category).toBe('boho');
+  });
 });
