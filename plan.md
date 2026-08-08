@@ -195,30 +195,25 @@ errors into a 400, e.g. `upsertConfiguredTemplate`'s pattern in `mockup-template
       branch).
 
 ### 9. Frontend — `frontend/src/App.jsx`
-- [ ] `shopConventions` state (line ~94) already exists and is fetched read-only
-      (`GET /api/config/shop-conventions`) presumably for display in the Settings panel
-      — confirm exactly where/how it's rendered (grep the render tree, wasn't fully
-      traced in this scoping pass) before deciding whether the edit UI belongs inline in
-      `App.jsx` or as a new extracted component (`ShopConventions.jsx`, matching the
-      `MockupTemplates.jsx` extraction precedent — likely the better call given
-      `App.jsx`'s existing size, but confirm by checking current line count/structure).
-- [ ] Editable form covering every `listing`/`midjourney` field above. Array fields
-      (`forbiddenTitleWords`, `aiDisclosurePhrases`, `deliveryDetailPhrases`) as
-      textarea-one-per-line inputs, converted to/from JSON arrays at the request
-      boundary — same UX pattern `POST /api/tags/bulk` already uses for newline-
-      separated input server-side; do the split/join client-side here instead since this
-      is a single object PATCH, not a bulk-insert endpoint.
-- [ ] Save button → `PATCH /api/config/shop-conventions`, re-fetch/update local state
-      from the response (same pattern as `MockupTemplates.jsx`'s Save handler — reuse
-      `useAsyncTask` hook from `frontend/src/hooks/useAsyncTask.js` if the existing
-      settings-save flows use it; check before introducing a second pattern).
-- [ ] Surface validation errors (400 body's `error` string) inline near the field,
-      not just a toast — same reasoning as everywhere else editable in this dashboard:
-      "fail loud, not silent" (ARCHITECTURE.md -> First-Run Setup).
-- [ ] `frontend/src/App.test.jsx` — add coverage for the new editable form (render,
-      edit, save, error path). Check whether a dedicated `ShopConventions.test.jsx` is
-      warranted if it gets extracted per the point above (matches
-      `MockupTemplates.test.jsx` being separate from `App.test.jsx`).
+- [x] Extracted a new `frontend/src/ShopConventions.jsx` component (matching the
+      `MockupTemplates.jsx` extraction precedent), replacing the old read-only
+      `shopConventions` state/summary box in `App.jsx`. The component owns its own
+      fetch of `GET /api/config/shop-conventions` rather than receiving it as a prop.
+- [x] Editable form covering every `listing`/`midjourney` field. Array fields
+      (`forbiddenTitleWords`, `aiDisclosurePhrases`, `deliveryDetailPhrases`) render as
+      one-line-per-item textareas, split/joined to/from JSON arrays client-side at the
+      request boundary. `aspectRatioByCategory` renders as addable/removable
+      category/ratio row pairs.
+- [x] Save button → `PATCH /api/config/shop-conventions`, sending the full `listing`/
+      `midjourney` objects; local state updates from the response on success.
+- [x] Validation errors (400 body's `error` string) surface inline in a dismissible
+      banner within the form, not just a toast.
+- [x] `frontend/src/ShopConventions.test.jsx` added (dedicated file, matching the
+      `MockupTemplates.test.jsx` split precedent): initial render from fetched values,
+      successful edit-and-save, and the 400 error-display path.
+- [x] `frontend/src/App.test.jsx` — the one existing shop-conventions assertion
+      (previously checking read-only text nodes) updated to `getByDisplayValue` since
+      values now live in form inputs; renamed to reflect the editable form.
 
 ### 10. `ARCHITECTURE.md`
 - [ ] Module 6 -> Settings panel bullet currently reads "...shop conventions
