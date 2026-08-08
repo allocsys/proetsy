@@ -49,20 +49,29 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
   }, []);
 
   useEffect(() => {
-    const interval = setInterval(async () => {
+    // Module 7 -> "Auto-import via watched folder" (step 7): a live push connection
+    // instead of polling GET /api/taste-filter/pending on a timer. The backend's
+    // chokidar watcher (watcher.js) already reacts to a new file the instant it lands;
+    // this closes the last remaining gap, where the dashboard used to wait for the next
+    // poll tick to notice. The stream sends one `data:` event per candidate -- whatever
+    // was already pending when the connection opened, then one more per newly-detected
+    // file for as long as the connection stays open -- so the merge/dedupe logic below
+    // is unchanged from the old poll handler, just triggered by a push instead of a
+    // timer. EventSource reconnects automatically on a transient network drop, so
+    // there's no manual retry loop to write here.
+    const source = new EventSource('/api/taste-filter/pending/stream');
+    source.onmessage = (event) => {
+      let candidate;
       try {
-        const res = await fetch('/api/taste-filter/pending');
-        if (!res.ok) return;
-        const data = await res.json();
-        const fresh = (data.candidates || []).filter((c) => !seenPathsRef.current.has(c.imagePath));
-        if (!fresh.length) return;
-        fresh.forEach((c) => seenPathsRef.current.add(c.imagePath));
-        setCandidates((prev) => [...fresh, ...prev]);
+        candidate = JSON.parse(event.data);
       } catch {
-        // Ignore transient polling errors; next interval tick will retry.
+        return;
       }
-    }, PENDING_POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
+      if (!candidate || !candidate.imagePath || seenPathsRef.current.has(candidate.imagePath)) return;
+      seenPathsRef.current.add(candidate.imagePath);
+      setCandidates((prev) => [candidate, ...prev]);
+    };
+    return () => source.close();
   }, []);
 
   async function handleImport(fileList) {
