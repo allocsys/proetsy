@@ -216,32 +216,27 @@ errors into a 400, e.g. `upsertConfiguredTemplate`'s pattern in `mockup-template
       values now live in form inputs; renamed to reflect the editable form.
 
 ### 10. `ARCHITECTURE.md`
-- [ ] Module 6 -> Settings panel bullet currently reads "...shop conventions
-      (read-only — intentionally hardcoded)". Update to "shop conventions
-      (dashboard-editable, see `getShopConventions`/`setShopConventions` in
-      `config/index.js`)" — mirror the existing product-sizes bullet's phrasing in the
-      same list.
-- [ ] Module 2's "Must hardcode shop conventions" heading/bullet list — reframe as
-      "Default shop conventions (dashboard-editable, see below)" rather than deleting
-      the list; the values themselves are still accurate as *defaults*.
-- [ ] "Open Risks — Reviewed, Accepted As-Is" section doesn't mention this specifically
-      but double check nothing else there assumes conventions are immutable (e.g. any
-      note about prompt-injection safety of frozen text) before making them
-      user-editable — if something does, it needs its own line item added here, not
-      silently invalidated.
-- [ ] Database Schema section, `settings` row description already says "(default price,
-      delivery text, shop conventions, watcher config)" — shop conventions is already
-      anticipated there, no change needed, just confirms this doc already expected this
-      migration path.
+- [x] Module 6 -> Settings panel bullet updated from "...shop conventions
+      (read-only — intentionally hardcoded)" to "shop conventions (dashboard-editable,
+      see `getShopConventions`/`setShopConventions` in `config/index.js`)", mirroring
+      the existing product-sizes bullet's phrasing in the same list.
+- [x] Module 2's "Must hardcode shop conventions" heading reframed as "Default shop
+      conventions (dashboard-editable, see `getShopConventions`/`setShopConventions` in
+      `config/index.js`)" — the bullet list of values underneath is unchanged, still
+      accurate as *defaults*.
+- [x] Checked "Open Risks — Reviewed, Accepted As-Is" — nothing there assumes
+      conventions are immutable (its two entries are about AI-disclosure content policy
+      and multi-key Gemini ToS risk, unrelated), so no new line item needed.
+- [x] Database Schema section, `settings` row description already said "(default price,
+      delivery text, shop conventions, watcher config)" — confirmed accurate as-is, no
+      change needed.
 
 ### 11. Backfill / migration
-- [ ] No DB schema migration needed — `settings` is already a generic key/value table
-      (`CREATE TABLE IF NOT EXISTS settings` already exists per `db/schema.sql`, confirm
-      exact DDL before writing code but no new migration file expected).
-- [ ] No seed migration needed either (unlike `migratePipelineConfigSeed()`) — the
-      fallback-to-defaults behavior inside `getShopConventions()` makes an explicit
-      one-time seed unnecessary; an unset key always resolves to today's hardcoded
-      value until the user explicitly changes it via the dashboard.
+- [x] Confirmed: no DB schema migration was needed — `settings` stayed a generic
+      key/value table throughout steps 1-3, no new migration file added.
+- [x] Confirmed: no seed migration was needed either — `getShopConventions()`'s
+      fallback-to-defaults behavior made an explicit one-time seed unnecessary, exactly
+      as anticipated here.
 
 ## Rollout (do in this order)
 
