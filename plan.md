@@ -27,10 +27,12 @@ The "Review a Job" view is a bare number input + "Load job" button — no picker
 
 **What shipped:** Jobs now refresh whenever the Review view is opened. A "Pick a recent job" dropdown (up to 25 most-recently-updated jobs, sorted by `updated_at`) sits next to the manual Job ID field. When no job is loaded, the empty state now lists the 10 most recent jobs as a clickable table instead of just telling the user to type an ID.
 
-## 4. Irreversible AI action with only a confirm() dialog
+## 4. Irreversible AI action with only a confirm() dialog — ✅ Done (`5d18052`, `0fe6c37`, `f6f63b4`, `9841bb3`)
 "Suggest categories for uncategorized tags" (`backfillTagCategories`) writes AI-guessed categories immediately with no preview. The confirm dialog itself admits this: *"Suggestions are written immediately and can't be previewed first."*
 
 **Fix direction:** Show a preview/diff of suggested categories before committing, or make the write itself easily reversible (e.g. one-click revert of the last backfill run).
+
+**What shipped:** Backend now supports `POST /api/tags/backfill-categories?dry_run=true`, which computes the exact same tag→category matches without writing anything (matching logic is deterministic, so preview and apply always agree — covered by a new test). The button now says "Suggest categories…", fetches a preview first, and shows the full list of proposed changes with explicit Apply / Cancel buttons — the native `confirm()` dialog is gone.
 
 ## 5. Inconsistent delete UX
 Tags, trends, and API keys all delete via native `window.confirm()` popups — jarring against an otherwise custom-styled dashboard, and inconsistent with item 4 above, which also confirms but can't be undone even after confirming.
