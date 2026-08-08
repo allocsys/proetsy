@@ -572,24 +572,67 @@ describe('App', () => {
     });
   });
 
-  it('deletes an API key after confirmation, and does nothing if the confirm is cancelled', async () => {
+  // plan.md step 5: native window.confirm() popups replaced with a shared,
+  // styled in-app modal for all destructive delete actions.
+  it('deletes an API key after confirming in the in-app modal, and does nothing if cancelled', async () => {
     mockFetchByUrl({ '/api/settings/api-keys': [API_KEY_ROW] });
     const user = userEvent.setup();
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     render(<App />);
     await screen.findByText('ok');
 
     await openSettings(user);
     await user.click(await screen.findByText('Delete'));
 
-    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('gemini'));
+    let dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText(/Delete gemini key "primary"/)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByText('Cancel'));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalledWith('/api/settings/api-keys/1', expect.objectContaining({ method: 'DELETE' }));
 
-    confirmSpy.mockReturnValue(true);
     await user.click(screen.getByText('Delete'));
+    dialog = await screen.findByRole('alertdialog');
+    await user.click(within(dialog).getByText('Delete'));
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith('/api/settings/api-keys/1', expect.objectContaining({ method: 'DELETE' }));
+    });
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  });
+
+  it('deletes a tag after confirming in the in-app modal', async () => {
+    mockFetchByUrl({ '/api/tags': [{ id: 1, tag_text: 'boho decor', category: 'boho' }] });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('ok');
+
+    await openSettings(user);
+    await user.click(await screen.findByLabelText('Delete tag boho decor'));
+
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText(/Delete tag "boho decor"/)).toBeInTheDocument();
+    await user.click(within(dialog).getByText('Delete'));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith('/api/tags/1', expect.objectContaining({ method: 'DELETE' }));
+    });
+  });
+
+  it('deletes a trend after confirming in the in-app modal', async () => {
+    mockFetchByUrl({ '/api/trends': [{ id: 9, term: 'cottagecore', category: null }] });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('ok');
+
+    await openSettings(user);
+    await user.click(await screen.findByLabelText('Delete trend cottagecore'));
+
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText(/Delete trend "cottagecore"/)).toBeInTheDocument();
+    await user.click(within(dialog).getByText('Delete'));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith('/api/trends/9', expect.objectContaining({ method: 'DELETE' }));
     });
   });
 
