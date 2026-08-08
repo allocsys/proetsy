@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 
-const PENDING_POLL_INTERVAL_MS = 5000;
-
 const LABEL_CLASS = {
   'likely-keep': 'success',
   'likely-discard': 'danger',
