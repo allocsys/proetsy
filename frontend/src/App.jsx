@@ -651,8 +651,8 @@ function App() {
                   {tags.length ? (
                     <ul className="settings-compact-list">
                       {tags.map((t) => (
-                        <li key={t.id || t.term}>
-                          {t.term}{t.category ? ` (${t.category})` : ''}
+                        <li key={t.id || t.tag_text}>
+                          {t.tag_text}{t.category ? ` (${t.category})` : ''}
                         </li>
                       ))}
                     </ul>
