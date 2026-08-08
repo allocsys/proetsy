@@ -108,6 +108,16 @@ function openSettings(user) {
   return user.click(screen.getByRole('button', { name: 'Settings' }));
 }
 
+// plan.md step 7: Settings is now split into sub-tabs (Tags & Trends / Shop &
+// Pipeline / API Keys / Automation & Diagnostics), defaulting to Tags & Trends.
+// Opens Settings and, if a non-default tab is needed, switches to it.
+async function openSettingsTab(user, tabLabel) {
+  await openSettings(user);
+  if (tabLabel) {
+    await user.click(await screen.findByRole('button', { name: tabLabel }));
+  }
+}
+
 beforeEach(() => {
   vi.restoreAllMocks();
 });
@@ -429,10 +439,27 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await openSettings(user);
+    await openSettingsTab(user, 'Shop & Pipeline');
 
     expect(await screen.findByText('|')).toBeInTheDocument();
     expect(screen.getByText(/Tags per listing: 13/)).toBeInTheDocument();
+  });
+
+  it('defaults the Settings panel to the Tags & Trends tab, hiding other tabs\' content until selected (plan.md step 7)', async () => {
+    mockFetchByUrl();
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('ok');
+
+    await openSettings(user);
+
+    expect(await screen.findByText('Bulk tools')).toBeInTheDocument();
+    expect(screen.queryByText('Securely stored API keys for Gemini & Claude providers. Key values are masked after saving.')).not.toBeInTheDocument();
+    expect(screen.queryByText(/saved default.*used for every future upload/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'API Keys' }));
+    expect(await screen.findByText(/Securely stored API keys/)).toBeInTheDocument();
+    expect(screen.queryByText('Bulk tools')).not.toBeInTheDocument();
   });
 
   it('shows the watched-folder auto-import status in the settings panel (Module 7 -> step 7)', async () => {
@@ -443,7 +470,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await openSettings(user);
+    await openSettingsTab(user, 'Automation & Diagnostics');
 
     expect(await screen.findByText(/Watching \/home\/you\/midjourney/)).toBeInTheDocument();
     expect(screen.getByText(/2 pending/)).toBeInTheDocument();
@@ -457,7 +484,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await openSettings(user);
+    await openSettingsTab(user, 'Automation & Diagnostics');
     await user.click(await screen.findByLabelText('Auto-import from folder'));
 
     await waitFor(() => {
@@ -485,7 +512,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await openSettings(user);
+    await openSettingsTab(user, 'API Keys');
 
     expect(await screen.findByText('primary')).toBeInTheDocument();
     expect(screen.getByText('********...abcd')).toBeInTheDocument();
@@ -498,7 +525,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await openSettings(user);
+    await openSettingsTab(user, 'API Keys');
 
     expect(await screen.findByText(/No dashboard-managed keys yet/)).toBeInTheDocument();
   });
@@ -514,7 +541,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await openSettings(user);
+    await openSettingsTab(user, 'API Keys');
     await user.type(await screen.findByPlaceholderText('Paste API key'), 'AIzaSyD-fake-key-1234567890');
     await user.type(screen.getByPlaceholderText('e.g. backup key'), 'backup');
     await user.click(screen.getByText('Add key'));
@@ -559,7 +586,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await openSettings(user);
+    await openSettingsTab(user, 'API Keys');
     await user.type(await screen.findByPlaceholderText('Paste API key'), 'short');
     await user.click(screen.getByText('Add key'));
 
@@ -572,7 +599,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await openSettings(user);
+    await openSettingsTab(user, 'API Keys');
     await user.click(await screen.findByText('Disable'));
 
     await waitFor(() => {
@@ -591,7 +618,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await openSettings(user);
+    await openSettingsTab(user, 'API Keys');
     await user.click(await screen.findByText('Delete'));
 
     let dialog = await screen.findByRole('alertdialog');
@@ -653,7 +680,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await openSettings(user);
+    await openSettingsTab(user, 'Shop & Pipeline');
 
     expect(await screen.findByText('Pipeline Modules')).toBeInTheDocument();
     const checkboxes = screen.getAllByRole('checkbox', { name: /listing_generator/ });
@@ -670,7 +697,7 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('ok');
 
-    await openSettings(user);
+    await openSettingsTab(user, 'Shop & Pipeline');
 
     const settingsPanelCheckbox = document
       .querySelector('.settings-checkbox-row input[type="checkbox"]');
