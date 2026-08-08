@@ -455,7 +455,7 @@ describe('App', () => {
 
     expect(await screen.findByText('Bulk tools')).toBeInTheDocument();
     expect(screen.queryByText('Securely stored API keys for Gemini & Claude providers. Key values are masked after saving.')).not.toBeInTheDocument();
-    expect(screen.queryByText(/saved default.*used for every future upload/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Pipeline Modules')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'API Keys' }));
     expect(await screen.findByText(/Securely stored API keys/)).toBeInTheDocument();
