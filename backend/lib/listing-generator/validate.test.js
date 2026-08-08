@@ -1,11 +1,31 @@
-import { describe, it, expect } from 'vitest';
-import { enforceConventions } from './validate.js';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { SHOP_CONVENTIONS } from '../../config/shop-conventions.js';
 
-// See ARCHITECTURE.md -> Module 2 -> "Must hardcode shop conventions". enforceConventions
-// is the belt-and-braces backstop applied both at generation time and (as of the PATCH
-// route added alongside these tests) on manual edits — these tests exercise it directly,
-// independent of the LLM call.
+// enforceConventions now reads the shop's *current* conventions via
+// config/index.js's getShopConventions() (dashboard-editable, backed by the `settings`
+// DB table — see plan.md), not the static SHOP_CONVENTIONS import directly. DB_PATH must
+// be set BEFORE validate.js (which transitively imports db/init.js via config/index.js)
+// is first imported — same env-var-before-import pattern as config/index.test.js. The
+// static SHOP_CONVENTIONS import above is still used here, but only to build expected
+// values in assertions — it's the fallback default getShopConventions() returns when
+// nothing's been set in the `settings` table, which is exactly this test file's state
+// (nothing ever writes to `settings` here), so the two stay equal throughout this file.
+let enforceConventions;
+let tmpRoot;
+
+beforeAll(async () => {
+  tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'proetsy-validate-test-'));
+  process.env.DB_PATH = path.join(tmpRoot, 'test.db');
+
+  ({ enforceConventions } = await import('./validate.js'));
+});
+
+afterAll(() => {
+  fs.rmSync(tmpRoot, { recursive: true, force: true });
+});
 
 function baseVariation(overrides = {}) {
   return {
