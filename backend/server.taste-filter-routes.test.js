@@ -300,14 +300,10 @@ describe('GET /api/taste-filter/pending + /watch-status (Module 7 -> "Auto-impor
       });
 
       fs.writeFileSync(path.join(watchFolder, 'already-pending.png'), 'fake-png-bytes');
+      // Same inline poll-loop style as the GET /pending test above -- waitUntil's
+      // predicate is synchronous, and getting a candidate here requires an awaited HTTP
+      // call, so it's polled directly rather than through that helper.
       let firstCandidate;
-      await waitUntil(() => {
-        // Deliberately not awaited inside the predicate -- this reuses the pattern from
-        // the poll-based test above via a synchronous flag instead, see below.
-        return !!firstCandidate;
-      }, 1); // placeholder, replaced by the explicit poll loop immediately below
-
-      // The line above can't actually await inside a sync predicate, so poll directly:
       const pollStart = Date.now();
       while (Date.now() - pollStart < 10000 && !firstCandidate) {
         const pendingRes = await request(app).get('/api/taste-filter/pending');
