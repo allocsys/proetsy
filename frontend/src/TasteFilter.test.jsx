@@ -25,32 +25,18 @@ const CANDIDATE = {
 // not just the tests that exercise it directly.
 let sourceInstances;
 
-// TasteFilter's mount-time effect fetches these two URLs unconditionally, before any
-// interaction the tests below actually care about -- neither response needs to be
-// realistic, since centroids/prompts only feed datalist suggestions no test asserts on.
-// Handled here, *outside* the recorded spy below, so these mount-time calls don't shift
-// the call-index assertions (fetch.mock.calls[0], calls[2][1], toHaveBeenLastCalledWith,
-// etc.) that every other test relies on -- fetch.mock.calls stays exactly the calls each
-// test already expects, in the same order as before.
-const MOUNT_TIME_URLS = {
-  '/api/taste-filter/centroids': () => Promise.resolve({ ok: true, json: async () => [] }),
-  '/api/prompts': () => Promise.resolve({ ok: true, json: async () => [] }),
-};
-
 beforeEach(() => {
-  const recordedFetch = vi.fn();
-  global.fetch = (url, ...rest) => {
-    if (MOUNT_TIME_URLS[url]) return MOUNT_TIME_URLS[url]();
-    return recordedFetch(url, ...rest);
-  };
-  // Tests call `fetch.mockResolvedValueOnce(...)`, `fetch.mock.calls`, etc. directly on
-  // the global -- forward those onto the underlying spy so existing test code is unchanged.
-  Object.setPrototypeOf(global.fetch, Object.getPrototypeOf(recordedFetch));
-  Object.assign(global.fetch, recordedFetch);
-  global.fetch.mock = recordedFetch.mock;
-  global.fetch.mockResolvedValueOnce = recordedFetch.mockResolvedValueOnce.bind(recordedFetch);
-  global.fetch.mockResolvedValue = recordedFetch.mockResolvedValue.bind(recordedFetch);
-  global.fetch.mockImplementationOnce = recordedFetch.mockImplementationOnce.bind(recordedFetch);
+  global.fetch = vi.fn();
+  // TasteFilter's mount-time effect fires these two GETs first, unconditionally, before
+  // any interaction a test below cares about -- neither response needs to be realistic,
+  // since centroids/prompts only feed datalist suggestions no test asserts on. Queuing
+  // them here (ahead of whatever a test queues next) keeps `fetch` a plain, fully-featured
+  // vi.fn() -- every matcher (toHaveBeenCalledWith, toHaveBeenLastCalledWith, etc.) keeps
+  // working unmodified -- at the cost of shifting fetch.mock.calls by a constant +2 for
+  // any test that indexes into it directly; those few call sites account for the offset
+  // explicitly (see MOUNT_TIME_CALLS below).
+  fetch.mockResolvedValueOnce({ ok: true, json: async () => [] }); // /api/taste-filter/centroids
+  fetch.mockResolvedValueOnce({ ok: true, json: async () => [] }); // /api/prompts
 
   sourceInstances = [];
   global.EventSource = class {
@@ -73,6 +59,10 @@ afterEach(() => {
 function makeFile(name = 'candidate.png') {
   return new File(['fake-image-bytes'], name, { type: 'image/png' });
 }
+
+// Every test's fetch.mock.calls[0] and [1] are the mount-time centroids/prompts calls
+// pre-queued in beforeEach above; a test's own first real call is at this index.
+const MOUNT_TIME_CALLS = 2;
 
 describe('TasteFilter', () => {
   it('renders the empty dropzone state with no candidates', () => {
@@ -107,7 +97,7 @@ describe('TasteFilter', () => {
     const input = document.querySelector('input[type="file"]');
     await user.upload(input, makeFile());
 
-    const [, options] = fetch.mock.calls[0];
+    const [, options] = fetch.mock.calls[MOUNT_TIME_CALLS];
     const body = options.body;
     expect(body.get('category')).toBe('square-canvas');
     expect(body.get('prompt_id')).toBe('17');
@@ -182,16 +172,16 @@ describe('TasteFilter', () => {
 
     await user.click(screen.getByText('Keep & send to pipeline'));
 
-    const calledUrls = fetch.mock.calls.slice(1).map(([url]) => url);
+    const calledUrls = fetch.mock.calls.slice(MOUNT_TIME_CALLS + 1).map(([url]) => url);
     expect(calledUrls).toEqual(['/api/taste-filter/label', '/api/taste-filter/promote', '/api/jobs']);
 
-    expect(fetch.mock.calls[2][1]).toEqual(
+    expect(fetch.mock.calls[MOUNT_TIME_CALLS + 2][1]).toEqual(
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ image_path: CANDIDATE.imagePath }),
       })
     );
-    expect(fetch.mock.calls[3][1]).toEqual(
+    expect(fetch.mock.calls[MOUNT_TIME_CALLS + 3][1]).toEqual(
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ artwork_id: 42, pipeline_overrides: overrides }),
