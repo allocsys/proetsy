@@ -291,21 +291,40 @@ textarea:focus-visible {
 }
 
 .sidebar-toggle-btn {
-  background: transparent;
+  background: var(--studio-raised);
   border: var(--border-light);
   color: var(--studio-ink-soft);
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   padding: 0;
-  border-radius: var(--radius-sm);
-  font-size: 11px;
-  line-height: 1;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .sidebar-toggle-btn:hover {
   color: var(--studio-ink);
-  background-color: rgba(255, 255, 255, 0.04);
+  background-color: var(--studio-overlay);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.sidebar-toggle-btn:active {
+  background-color: var(--studio-sunken);
+}
+
+.sidebar-toggle-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.sidebar.collapsed .sidebar-toggle-btn {
+  width: 32px;
+  height: 32px;
 }
 
 .sidebar.collapsed {
@@ -350,6 +369,7 @@ textarea:focus-visible {
 .sidebar-nav-item {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: var(--space-3);
   width: 100%;
   text-align: left;
