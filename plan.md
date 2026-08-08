@@ -155,7 +155,7 @@ errors into a 400, e.g. `upsertConfiguredTemplate`'s pattern in `mockup-template
       accordingly. Verified: 11/11 and 12/12 tests pass.
 
 ### 7. `backend/lib/llm/fixture.test.js`
-- [ ] This test currently imports `SHOP_CONVENTIONS` directly from
+- [x] This test currently imports `SHOP_CONVENTIONS` directly from
       `shop-conventions.js` with a comment noting it wants to catch drift ("a future
       SHOP_CONVENTIONS/MIDJOURNEY_CONVENTIONS change that quietly..."). Decide during
       implementation whether this should move to `getShopConventions()` (to test the
