@@ -318,7 +318,17 @@ describe('App', () => {
         '/api/jobs/bulk',
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ artwork_ids: [5], pipeline_overrides: expect.any(Object), batch_id: null }),
+          // The literal value PIPELINE_CONFIG above deterministically produces via
+          // Object.fromEntries(cfg.pipeline.map((m) => [m.module, m.enabled])) in
+          // App.jsx. (Previously this used JSON.stringify({ ..., pipeline_overrides:
+          // expect.any(Object), ... }) -- that doesn't wildcard anything once it's
+          // inside a JSON.stringify'd string; it silently serializes the matcher's
+          // own internal properties instead and never matched the real request.)
+          body: JSON.stringify({
+            artwork_ids: [5],
+            pipeline_overrides: { image_analyzer: true, listing_generator: true, mockup_composer: true },
+            batch_id: null,
+          }),
         })
       );
     });
