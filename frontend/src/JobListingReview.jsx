@@ -11,6 +11,17 @@ function textToTags(text) {
     .filter(Boolean);
 }
 
+// Mirrors backend/config/shop-conventions.js's SHOP_CONVENTIONS. Kept as local
+// constants (not fetched) since these are baked-in, non-editable conventions -- see
+// the read-only "Shop conventions" panel in Settings (App.jsx) which shows the same
+// values from GET /api/config/shop-conventions. Used here only for live inline
+// character/tag-count feedback before Save; the backend's enforceConventions()
+// remains the actual source of truth and re-applies these rules on every PATCH
+// regardless of what this shows.
+const MAX_TITLE_LENGTH = 140;
+const TAGS_PER_LISTING = 13;
+const MAX_TAG_LENGTH = 20;
+
 /**
  * One listing variation's review/edit card — polished to match the dark unified
  * design system, spacing scale, and visual hierarchy.
@@ -24,6 +35,11 @@ function ListingCard({ listing, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
+
+  const parsedTags = textToTags(tagsText);
+  const titleOverLimit = title.length > MAX_TITLE_LENGTH;
+  const tagsOverLimit = parsedTags.length > TAGS_PER_LISTING;
+  const oversizedTagCount = parsedTags.filter((t) => t.length > MAX_TAG_LENGTH).length;
 
   async function save() {
     setSaving(true);
@@ -82,6 +98,9 @@ function ListingCard({ listing, onSaved }) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
+        <span className={`input-helper-text${titleOverLimit ? ' text-danger' : ''}`}>
+          {title.length}/{MAX_TITLE_LENGTH}{titleOverLimit ? ' — over limit, will be truncated on save' : ''}
+        </span>
       </div>
 
       <div className="settings-field mb-3">
@@ -106,6 +125,9 @@ function ListingCard({ listing, onSaved }) {
           value={tagsText}
           onChange={(e) => setTagsText(e.target.value)}
         />
+        <span className={`input-helper-text${tagsOverLimit || oversizedTagCount ? ' text-danger' : ''}`}>
+          {parsedTags.length}/{TAGS_PER_LISTING} tags{oversizedTagCount ? `, ${oversizedTagCount} over ${MAX_TAG_LENGTH} chars` : ''}{tagsOverLimit ? ' — extra tags will be dropped on save' : ''}
+        </span>
       </div>
 
       <div className="settings-field mb-4">
