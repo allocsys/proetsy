@@ -8,6 +8,8 @@ function copyToClipboard(text) {
   }
 }
 
+const COPIED_FEEDBACK_MS = 1500;
+
 export default function PromptHelper() {
   const [trends, setTrends] = useState([]);
   const [selectedTrendId, setSelectedTrendId] = useState('');
@@ -21,6 +23,7 @@ export default function PromptHelper() {
   const [addingTrend, setAddingTrend] = useState(false);
   const [csvMessage, setCsvMessage] = useState('');
   const [error, setError] = useState(null);
+  const [copiedId, setCopiedId] = useState(null);
 
   async function loadTrends() {
     setLoadingTrends(true);
@@ -86,6 +89,14 @@ export default function PromptHelper() {
     } catch (err) {
       setCsvMessage(`Import failed: ${err.message}`);
     }
+  }
+
+  function handleCopy(id, text) {
+    copyToClipboard(text);
+    setCopiedId(id);
+    setTimeout(() => {
+      setCopiedId((current) => (current === id ? null : current));
+    }, COPIED_FEEDBACK_MS);
   }
 
   async function generate() {
@@ -198,7 +209,9 @@ export default function PromptHelper() {
             {generated.map((p) => (
               <div key={p.id} className="surface p-4" style={{ padding: '1rem', borderRadius: 'var(--radius-md)' }}>
                 <code className="prompt-code-block block mb-2">{p.prompt_text}</code>
-                <button className="btn-secondary btn-sm" onClick={() => copyToClipboard(p.prompt_text)}>Copy</button>
+                <button className="btn-secondary btn-sm" onClick={() => handleCopy(`generated-${p.id}`, p.prompt_text)}>
+                  {copiedId === `generated-${p.id}` ? 'Copied!' : 'Copy'}
+                </button>
                 {p.warnings.length > 0 && (
                   <ul className="prompt-warnings-list mt-2">
                     {p.warnings.map((w, i) => <li key={i}>{w}</li>)}
@@ -217,7 +230,9 @@ export default function PromptHelper() {
             {history.map((p) => (
               <li key={p.id} className="prompt-history-item flex-row items-center justify-between surface" style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <code className="mono-sm" style={{ wordBreak: 'break-all', marginRight: '1rem' }}>{p.prompt_text}</code> 
-                <button className="btn-ghost btn-sm" onClick={() => copyToClipboard(p.prompt_text)}>Copy</button>
+                <button className="btn-ghost btn-sm" onClick={() => handleCopy(`history-${p.id}`, p.prompt_text)}>
+                  {copiedId === `history-${p.id}` ? 'Copied!' : 'Copy'}
+                </button>
               </li>
             ))}
           </ul>
