@@ -130,9 +130,10 @@ export default function JobArtworkAnalysisReview({ jobId }) {
       {job && (
         <div className="manual-notes-section">
           <div className="settings-field">
-            <label className="settings-field-label">Manual notes fallback</label>
+            <label className="settings-field-label" htmlFor="job-manual-notes">Manual notes fallback</label>
             <span className="input-helper-text">Used by listing generator when AI analysis is skipped or fails.</span>
             <textarea
+              id="job-manual-notes"
               className="listing-textarea input"
               value={manualNotes}
               onChange={(e) => setManualNotes(e.target.value)}
