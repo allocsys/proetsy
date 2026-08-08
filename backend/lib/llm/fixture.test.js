@@ -1,8 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { generateText, generateVision, generateImage } from './fixture.js';
 import { LISTING_VARIATIONS, SHOP_CONVENTIONS } from '../../config/shop-conventions.js';
-import { enforceConventions } from '../listing-generator/validate.js';
-import { enforceMidjourneyConventions } from '../prompt-helper/validate.js';
 
 // fixture.js (LLM_PROVIDER=fixture) is currently only exercised two ways: mocked-out
 // entirely in llm/index.test.js (which never touches this file's own logic), and for
@@ -11,8 +12,35 @@ import { enforceMidjourneyConventions } from '../prompt-helper/validate.js';
 // test failure pointing at this file). These tests fill that gap at the unit level --
 // importantly, several of them run the fixture's real output through the SAME
 // downstream validators (enforceConventions, enforceMidjourneyConventions) Module 2/4
-// actually use, so a future SHOP_CONVENTIONS/MIDJOURNEY_CONVENTIONS change that quietly
-// breaks the fixture's own compliance fails here, not only in a slower E2E run.
+// actually use, so a future defaults change that quietly breaks the fixture's own
+// compliance fails here, not only in a slower E2E run.
+//
+// generateText/generateVision/generateImage above are plain, DB-free imports (fixture.js
+// only needs the static LISTING_VARIATIONS export). enforceConventions/
+// enforceMidjourneyConventions are different: they now read the shop's *current*
+// conventions via config/index.js's getShopConventions() (dashboard-editable, DB-backed
+// -- see plan.md), so DB_PATH must be set BEFORE those two modules are first imported --
+// same env-var-before-import pattern as config/index.test.js. Deliberately still
+// comparing the fixture's output against the shipped SHOP_CONVENTIONS *defaults* above
+// (imported statically, no DB needed for that), not a dashboard-customized value --
+// fixture.js is meant to be deterministic/config-independent (used by the Playwright E2E
+// suite per ARCHITECTURE.md), and this suite never writes to `settings`, so the
+// defaults hold throughout regardless.
+let enforceConventions;
+let enforceMidjourneyConventions;
+let tmpRoot;
+
+beforeAll(async () => {
+  tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'proetsy-fixture-test-'));
+  process.env.DB_PATH = path.join(tmpRoot, 'test.db');
+
+  ({ enforceConventions } = await import('../listing-generator/validate.js'));
+  ({ enforceMidjourneyConventions } = await import('../prompt-helper/validate.js'));
+});
+
+afterAll(() => {
+  fs.rmSync(tmpRoot, { recursive: true, force: true });
+});
 
 describe('generateText — listing-generator shape (prompt contains "variations")', () => {
   const listingPrompt = 'Return JSON with a "variations" array, one per angle...';
