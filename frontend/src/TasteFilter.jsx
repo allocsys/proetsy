@@ -22,6 +22,8 @@ function ScoreBadge({ label, score, confident }) {
 function TasteFilter({ overrides, refreshJobs } = {}) {
   const [category, setCategory] = useState('');
   const [promptId, setPromptId] = useState('');
+  const [categoryOptions, setCategoryOptions] = useState([]);
+  const [promptOptions, setPromptOptions] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [status, setStatus] = useState('');
   const [autoSortedExpanded, setAutoSortedExpanded] = useState(false);
@@ -29,6 +31,24 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef(null);
   const seenPathsRef = useRef(new Set());
+
+  useEffect(() => {
+    // Populates the Category and Prompt ID datalists so previously-used values are
+    // selectable instead of needing to be retyped exactly. Categories come from taste
+    // centroids (every category a batch has actually been scored against, minus the
+    // null/global row); prompt IDs come from the full Module 4 prompt history.
+    fetch('/api/taste-filter/centroids')
+      .then((r) => r.json())
+      .then((rows) => {
+        const cats = Array.from(new Set(rows.map((r) => r.category).filter((c) => c && c !== 'global'))).sort();
+        setCategoryOptions(cats);
+      })
+      .catch(() => {});
+    fetch('/api/prompts')
+      .then((r) => r.json())
+      .then((prompts) => setPromptOptions(Array.isArray(prompts) ? prompts : []))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -64,6 +84,11 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
       data.candidates.forEach((c) => seenPathsRef.current.add(c.imagePath));
       setCandidates((prev) => [...data.candidates, ...prev]);
       setStatus(`Scored ${data.candidates.length} image${data.candidates.length > 1 ? 's' : ''}.`);
+      // Makes a just-used new category immediately selectable for the next batch in this
+      // same session, without waiting for a fresh /api/taste-filter/centroids fetch.
+      if (category && !categoryOptions.includes(category)) {
+        setCategoryOptions((prev) => [...prev, category].sort());
+      }
     } catch (err) {
       setStatus(`Import failed: ${err.message}`);
     }
@@ -184,10 +209,16 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
           <input
             id="taste-category-input"
             className="input"
+            list="taste-category-options"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
             placeholder="e.g. square-canvas"
           />
+          <datalist id="taste-category-options">
+            {categoryOptions.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
           <span className="input-helper-text">Curation name (optional)</span>
         </div>
         <div className="taste-input-field" style={{ flex: '1', minWidth: '160px' }}>
@@ -195,10 +226,16 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
           <input
             id="taste-prompt-id-input"
             className="input"
+            list="taste-prompt-id-options"
             value={promptId}
             onChange={(e) => setPromptId(e.target.value)}
             placeholder="links to Module 4"
           />
+          <datalist id="taste-prompt-id-options">
+            {promptOptions.map((p) => (
+              <option key={p.id} value={p.id} label={p.prompt_text ? p.prompt_text.slice(0, 60) : undefined} />
+            ))}
+          </datalist>
           <span className="input-helper-text">Module link (optional)</span>
         </div>
         <button className="btn-primary recompute-btn" onClick={handleRecompute} type="button">
