@@ -359,16 +359,14 @@ function App() {
       if (error) throw new Error(error);
 
       setUploadStatus(`Creating ${artworks.length} job${artworks.length > 1 ? 's' : ''}…`);
-      const jobIds = [];
-      for (const artwork of artworks) {
-        const jobRes = await fetch('/api/jobs', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ artwork_id: artwork.id, pipeline_overrides: overrides, batch_id: batchId }),
-        });
-        const job = await jobRes.json();
-        jobIds.push(job.id);
-      }
+      const jobsRes = await fetch('/api/jobs/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ artwork_ids: artworks.map((a) => a.id), pipeline_overrides: overrides, batch_id: batchId }),
+      });
+      const jobsData = await jobsRes.json();
+      if (jobsData.error) throw new Error(jobsData.error);
+      const jobIds = jobsData.jobs.map((job) => job.id);
       refreshJobs();
 
       setUploadStatus(`Running pipeline for ${jobIds.length} job${jobIds.length > 1 ? 's' : ''} on the server…`);
