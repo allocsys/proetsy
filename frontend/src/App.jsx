@@ -641,6 +641,7 @@ function App() {
 
                 <div className="settings-subsection">
                   <h4 className="settings-sub-heading">Tag library</h4>
+                  <label htmlFor="settings-tags-textarea" className="settings-field-label" style={{ display: 'block', marginBottom: '0.25rem' }}>Add tags (one per line)</label>
                   <textarea
                     id="settings-tags-textarea"
                     rows={5}
@@ -668,7 +669,7 @@ function App() {
                     </div>
                     <button className="btn-primary" onClick={saveTags} disabled={!tagsText.trim()}>Save tags</button>
                     {tagsSavedMessage && (
-                      <span className="text-muted mono-sm" style={{ color: tagsSavedMessage.ok ? 'var(--state-success)' : 'var(--state-danger)' }}>
+                      <span className={`mono-sm ${tagsSavedMessage.ok ? 'text-success' : 'text-danger'}`}>
                         {tagsSavedMessage.text}
                       </span>
                     )}
@@ -704,7 +705,7 @@ function App() {
                       <input type="file" accept=".csv,text/csv" onChange={(e) => importTagsCsv(e.target.files?.[0])} />
                     </label>
                     {tagsCsvMessage && (
-                      <span className="text-muted mono-sm" style={{ color: tagsCsvMessage.ok ? 'var(--state-success)' : 'var(--state-danger)' }}>
+                      <span className={`mono-sm ${tagsCsvMessage.ok ? 'text-success' : 'text-danger'}`}>
                         {tagsCsvMessage.text}
                       </span>
                     )}
@@ -712,7 +713,7 @@ function App() {
                       Suggest categories for uncategorized tags
                     </button>
                     {tagsBackfillMessage && (
-                      <span className="text-muted mono-sm" style={{ color: tagsBackfillMessage.ok ? 'var(--state-success)' : 'var(--state-danger)' }}>
+                      <span className={`mono-sm ${tagsBackfillMessage.ok ? 'text-success' : 'text-danger'}`}>
                         {tagsBackfillMessage.text}
                       </span>
                     )}
