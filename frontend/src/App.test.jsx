@@ -281,13 +281,14 @@ describe('App', () => {
     expect(await screen.findByTestId('stub-prompt-helper')).toBeInTheDocument();
   });
 
-  it('uploads a file, creates a job, runs the batch, and shows single-job status', async () => {
+  it('uploads a file, creates a job via the bulk endpoint, runs the batch, and shows single-job status (plan.md step 6)', async () => {
     mockFetchByUrl({
       '/api/artworks/upload': { artworks: [{ id: 5, file_path: '/data/uploads/fox.png' }] },
-      '/api/jobs': (url, options) => {
-        if (options?.method === 'POST') return { id: 42, overall_status: 'pending' };
-        return [];
+      '/api/jobs/bulk': (url, options) => {
+        if (options?.method === 'POST') return { jobs: [{ id: 42, overall_status: 'pending' }] };
+        return {};
       },
+      '/api/jobs': [],
       '/api/jobs/run-batch': {},
     });
     const user = userEvent.setup();
@@ -300,6 +301,16 @@ describe('App', () => {
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith('/api/artworks/upload', expect.objectContaining({ method: 'POST' }));
+    });
+    // Single bulk request for all artworks in this upload -- no per-file POST /api/jobs.
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/jobs/bulk',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ artwork_ids: [5], pipeline_overrides: expect.any(Object), batch_id: null }),
+        })
+      );
     });
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
