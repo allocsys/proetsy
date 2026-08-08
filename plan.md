@@ -48,7 +48,9 @@ Tags, trends, and API keys all delete via native `window.confirm()` popups — j
 
 **What shipped:** Backend gained `createJobsBulk` (backend/lib/jobs.js) and `POST /api/jobs/bulk` (backend/server.js), which create every job for a batch in one DB transaction, all-or-nothing across the array, with the same per-module seeding rules (required modules always pending, overrides apply per-run only) as the existing single-job path. `handleFiles` in frontend/src/App.jsx now calls this once per upload with `artwork_ids: artworks.map(a => a.id)` instead of looping `POST /api/jobs` per file. App.test.jsx updated to assert the single bulk request.
 
-## 7. Everything dumped into one Settings mega-page
+## 7. Everything dumped into one Settings mega-page — ✅ Done
 Tags, trends, shop conventions, API keys (sensitive), automation/watch-folder config, and rate-limit diagnostics are all one long scroll with no sub-navigation. Sensitive key management sits directly next to trivial fields like default price.
 
 **Fix direction:** Split into sub-tabs (e.g. Tags & Trends / API Keys / Automation / Diagnostics) or at minimum visually separate sensitive sections with stronger boundaries.
+
+**What shipped:** Settings now has a tab strip (reusing the Job Workspace's `.workspace-tabs`/`.workspace-tab-btn` styling) with four tabs: **Tags & Trends** (default), **Shop & Pipeline** (shop defaults/conventions + the Pipeline Modules saved-default toggles), **API Keys** (its own dedicated tab, out of the main scroll entirely), and **Automation & Diagnostics** (watch-folder, taste-filter auto-sort, LLM rate-limit status). Each `settings-section-card` is gated behind `settingsTab` state so only one concern renders at a time. App.test.jsx updated to switch tabs before asserting on non-default-tab content, plus a new test confirming the default tab and that other tabs' content is hidden until selected.
