@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useAsyncTask } from './hooks/useAsyncTask.js';
 
 const CATEGORIES = ['portrait', 'landscape', 'square'];
 
@@ -19,11 +20,15 @@ export default function PromptHelper() {
   const [generated, setGenerated] = useState([]);
   const [history, setHistory] = useState([]);
   const [loadingTrends, setLoadingTrends] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [addingTrend, setAddingTrend] = useState(false);
   const [csvMessage, setCsvMessage] = useState('');
-  const [error, setError] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
+  // addTrend and generate already shared one loading+error pair before this hook existed
+  // (loadTrends/loadHistory intentionally fail silently with no error state, and the CSV
+  // import has its own message-based feedback instead -- neither matches this pending/
+  // error shape, so both are left as local state below).
+  const addTrendTask = useAsyncTask();
+  const generateTask = useAsyncTask();
+  const error = addTrendTask.error || generateTask.error;
 
   async function loadTrends() {
     setLoadingTrends(true);
@@ -50,11 +55,9 @@ export default function PromptHelper() {
     loadHistory(category);
   }, [category]);
 
-  async function addTrend() {
+  function addTrend() {
     if (!newTrendTerm.trim()) return;
-    setAddingTrend(true);
-    setError(null);
-    try {
+    addTrendTask.run(async () => {
       const res = await fetch('/api/trends', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -66,11 +69,7 @@ export default function PromptHelper() {
       setNewTrendCategory('');
       await loadTrends();
       setSelectedTrendId(String(data.id));
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setAddingTrend(false);
-    }
+    });
   }
 
   async function importTrendsCsv(file) {
@@ -99,10 +98,8 @@ export default function PromptHelper() {
     }, COPIED_FEEDBACK_MS);
   }
 
-  async function generate() {
-    setGenerating(true);
-    setError(null);
-    try {
+  function generate() {
+    generateTask.run(async () => {
       const res = await fetch('/api/prompts/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -115,11 +112,7 @@ export default function PromptHelper() {
       if (!res.ok) throw new Error(data.error || 'Prompt generation failed');
       setGenerated(data.prompts);
       await loadHistory(category);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setGenerating(false);
-    }
+    });
   }
 
   return (
@@ -157,8 +150,8 @@ export default function PromptHelper() {
               ))}
             </select>
           </div>
-          <button className="btn-primary" onClick={generate} disabled={generating}>
-            {generating ? 'Generating…' : 'Generate prompts'}
+          <button className="btn-primary" onClick={generate} disabled={generateTask.pending}>
+            {generateTask.pending ? 'Generating…' : 'Generate prompts'}
           </button>
         </div>
       </div>
@@ -186,8 +179,8 @@ export default function PromptHelper() {
               onChange={(e) => setNewTrendCategory(e.target.value)}
             />
           </div>
-          <button className="btn-secondary" onClick={addTrend} disabled={addingTrend || !newTrendTerm.trim()}>
-            {addingTrend ? 'Adding…' : 'Add trend'}
+          <button className="btn-secondary" onClick={addTrend} disabled={addTrendTask.pending || !newTrendTerm.trim()}>
+            {addTrendTask.pending ? 'Adding…' : 'Add trend'}
           </button>
         </div>
 
