@@ -12,6 +12,7 @@ import path from 'node:path';
 let getDb;
 let syncWatcherFromSettings;
 let getPendingCandidates;
+let onPendingCandidate;
 let removePendingCandidate;
 let getWatcherStatus;
 let _resetForTests;
@@ -39,6 +40,7 @@ beforeAll(async () => {
   ({
     syncWatcherFromSettings,
     getPendingCandidates,
+    onPendingCandidate,
     removePendingCandidate,
     getWatcherStatus,
     _resetForTests,
@@ -205,5 +207,62 @@ describe('syncWatcherFromSettings — enabled', () => {
     writeSetting(SETTING_FOLDER, secondFolder);
     syncWatcherFromSettings(candidatesDir);
     expect(getWatcherStatus().folder).toBe(secondFolder);
+  });
+});
+
+// Backs GET /api/taste-filter/pending/stream in server.js -- a live-push channel on top
+// of the existing GET /api/taste-filter/pending poll route, so a subscriber (one per SSE
+// connection) finds out about a newly-detected candidate the moment handleNewFile scores
+// it, instead of only through the next poll.
+describe('onPendingCandidate — live-push subscription used by the SSE route', () => {
+  it('notifies a subscriber the moment a new candidate is detected and scored', async () => {
+    writeSetting(SETTING_ENABLED, 'true');
+    writeSetting(SETTING_FOLDER, watchFolder);
+    syncWatcherFromSettings(candidatesDir);
+
+    const received = [];
+    const unsubscribe = onPendingCandidate((c) => received.push(c));
+
+    fs.writeFileSync(path.join(watchFolder, 'pushed.png'), 'fake-png-bytes');
+    await waitForPendingCount(1);
+
+    expect(received).toHaveLength(1);
+    expect(received[0].imagePath).toBe(getPendingCandidates()[0].imagePath);
+    unsubscribe();
+  });
+
+  it('stops delivering candidates once unsubscribed', async () => {
+    writeSetting(SETTING_ENABLED, 'true');
+    writeSetting(SETTING_FOLDER, watchFolder);
+    syncWatcherFromSettings(candidatesDir);
+
+    const received = [];
+    const unsubscribe = onPendingCandidate((c) => received.push(c));
+    unsubscribe();
+
+    fs.writeFileSync(path.join(watchFolder, 'unsubscribed.png'), 'fake-png-bytes');
+    await waitForPendingCount(1);
+
+    expect(received).toHaveLength(0);
+  });
+
+  it('supports multiple independent subscribers, e.g. two concurrent SSE connections', async () => {
+    writeSetting(SETTING_ENABLED, 'true');
+    writeSetting(SETTING_FOLDER, watchFolder);
+    syncWatcherFromSettings(candidatesDir);
+
+    const receivedA = [];
+    const receivedB = [];
+    const unsubscribeA = onPendingCandidate((c) => receivedA.push(c));
+    const unsubscribeB = onPendingCandidate((c) => receivedB.push(c));
+
+    fs.writeFileSync(path.join(watchFolder, 'fan-out.png'), 'fake-png-bytes');
+    await waitForPendingCount(1);
+
+    expect(receivedA).toHaveLength(1);
+    expect(receivedB).toHaveLength(1);
+    expect(receivedA[0].imagePath).toBe(receivedB[0].imagePath);
+    unsubscribeA();
+    unsubscribeB();
   });
 });
