@@ -54,7 +54,7 @@ Generates 3 listing variations (`backend/lib/listing-generator/`), enforces shop
 
 **Input:** image analysis (or manual notes) + selected trend (manual) + tag library
 **Output:** 3 listing variations (fine art/decor, aesthetic/trend, gift angle), each with title, description, tags
-**Must hardcode shop conventions:**
+**Default shop conventions (dashboard-editable, see `getShopConventions`/`setShopConventions` in `config/index.js`):**
 - Title separator: `|`
 - Max title length: 140 characters
 - Tags per listing: 13 (+5 alternatives), max tag length 20 characters
@@ -115,7 +115,7 @@ React frontend (`frontend/src/App.jsx`) that:
 - Runs the pipeline server-side (`backend/lib/pipeline-runner.js`, `POST /api/jobs/:id/run` / `POST /api/jobs/run-batch`) — the run isn't tied to the browser tab staying open.
 - Shows a **pipeline config panel**: per-run module toggles seeded from `pipeline.config.json`'s defaults; the required module (Module 2) is shown checked and disabled. Overrides apply to that run only.
 - Job history log, grouped into collapsible "bulk batch" rows (jobs sharing a client-generated `batch_id`) with per-status badge breakdowns.
-- Settings panel: tag-library paste/CSV import, default price/delivery text, trend-list management, shop conventions (read-only — intentionally hardcoded), product-sizes/mockup templates (dashboard-editable — see Module 3's `MockupTemplates.jsx`).
+- Settings panel: tag-library paste/CSV import, default price/delivery text, trend-list management, shop conventions (dashboard-editable, see `getShopConventions`/`setShopConventions` in `config/index.js`), product-sizes/mockup templates (dashboard-editable — see Module 3's `MockupTemplates.jsx`).
 - Review/edit any generated field before publishing (`JobListingReview.jsx`, `JobMockupReview.jsx`, `JobArtworkAnalysisReview.jsx`), each with Copy-for-Etsy / export.
 - Persistent setup-status banner (`GET /api/setup-status`) — see First-Run Setup below.
 

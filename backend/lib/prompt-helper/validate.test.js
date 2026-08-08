@@ -1,5 +1,30 @@
-import { describe, it, expect } from 'vitest';
-import { enforceMidjourneyConventions } from './validate.js';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+// enforceMidjourneyConventions now reads the shop's *current* Midjourney conventions via
+// config/index.js's getShopConventions().midjourney (dashboard-editable, backed by the
+// `settings` DB table — see plan.md). DB_PATH must be set BEFORE validate.js (which
+// transitively imports db/init.js via config/index.js) is first imported — same
+// env-var-before-import pattern as config/index.test.js. This file's expectations use
+// the shipped default values directly (--v 7, --style raw, stylize 50-150 default 100,
+// aspect ratios) rather than importing MIDJOURNEY_CONVENTIONS, matching how they were
+// already written before this change — nothing here ever writes to `settings`, so those
+// defaults hold throughout.
+let enforceMidjourneyConventions;
+let tmpRoot;
+
+beforeAll(async () => {
+  tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'proetsy-prompt-helper-validate-test-'));
+  process.env.DB_PATH = path.join(tmpRoot, 'test.db');
+
+  ({ enforceMidjourneyConventions } = await import('./validate.js'));
+});
+
+afterAll(() => {
+  fs.rmSync(tmpRoot, { recursive: true, force: true });
+});
 
 describe('enforceMidjourneyConventions', () => {
   it('leaves an already-compliant prompt unchanged, with no warnings', () => {

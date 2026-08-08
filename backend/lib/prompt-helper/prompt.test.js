@@ -1,5 +1,28 @@
-import { describe, it, expect } from 'vitest';
-import { buildPromptHelperPrompt, PROMPT_COUNT } from './prompt.js';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+// buildPromptHelperPrompt now reads the shop's *current* Midjourney conventions via
+// config/index.js's getShopConventions().midjourney (dashboard-editable, backed by the
+// `settings` DB table — see plan.md). DB_PATH must be set BEFORE prompt.js (which
+// transitively imports db/init.js via config/index.js) is first imported — same
+// env-var-before-import pattern as config/index.test.js. PROMPT_COUNT is a plain export
+// (no DB dependency), so it's fine to still import it up front.
+let buildPromptHelperPrompt;
+let PROMPT_COUNT;
+let tmpRoot;
+
+beforeAll(async () => {
+  tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'proetsy-prompt-helper-prompt-test-'));
+  process.env.DB_PATH = path.join(tmpRoot, 'test.db');
+
+  ({ buildPromptHelperPrompt, PROMPT_COUNT } = await import('./prompt.js'));
+});
+
+afterAll(() => {
+  fs.rmSync(tmpRoot, { recursive: true, force: true });
+});
 
 const TREND = { term: 'cottagecore botanical', category: 'home decor' };
 

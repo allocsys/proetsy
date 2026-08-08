@@ -158,6 +158,7 @@ describe('suggestCategoriesForUncategorizedTags (plan.md Rollout step 3)', () =>
     const result = suggestCategoriesForUncategorizedTags();
 
     expect(result).toEqual({
+      dryRun: false,
       checked: 1,
       updated: 1,
       updates: [{ tagText: 'botanical wall art', category: 'botanical' }],
@@ -181,7 +182,7 @@ describe('suggestCategoriesForUncategorizedTags (plan.md Rollout step 3)', () =>
 
     const result = suggestCategoriesForUncategorizedTags();
 
-    expect(result).toEqual({ checked: 1, updated: 0, updates: [] });
+    expect(result).toEqual({ dryRun: false, checked: 1, updated: 0, updates: [] });
     const row = db.prepare('SELECT * FROM tags WHERE tag_text = ?').get('cityscape at night');
     expect(row.category).toBeNull();
   });
@@ -201,7 +202,7 @@ describe('suggestCategoriesForUncategorizedTags (plan.md Rollout step 3)', () =>
 
     const result = suggestCategoriesForUncategorizedTags();
 
-    expect(result).toEqual({ checked: 0, updated: 0, updates: [] });
+    expect(result).toEqual({ dryRun: false, checked: 0, updated: 0, updates: [] });
     const row = db.prepare('SELECT * FROM tags WHERE tag_text = ?').get('boho botanical mashup');
     expect(row.category).toBe('boho');
   });
@@ -231,7 +232,7 @@ describe('suggestCategoriesForUncategorizedTags (plan.md Rollout step 3)', () =>
   });
 
   it('returns all-zero results when the library has no uncategorized tags or is empty', () => {
-    expect(suggestCategoriesForUncategorizedTags()).toEqual({ checked: 0, updated: 0, updates: [] });
+    expect(suggestCategoriesForUncategorizedTags()).toEqual({ dryRun: false, checked: 0, updated: 0, updates: [] });
 
     const db = getDb();
     db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)').run(
@@ -239,7 +240,7 @@ describe('suggestCategoriesForUncategorizedTags (plan.md Rollout step 3)', () =>
       'style',
       'manual'
     );
-    expect(suggestCategoriesForUncategorizedTags()).toEqual({ checked: 0, updated: 0, updates: [] });
+    expect(suggestCategoriesForUncategorizedTags()).toEqual({ dryRun: false, checked: 0, updated: 0, updates: [] });
   });
 });
 

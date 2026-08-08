@@ -1,4 +1,4 @@
-import { MIDJOURNEY_CONVENTIONS } from '../../config/shop-conventions.js';
+import { getShopConventions } from '../../config/index.js';
 
 // Number of ready-to-paste prompt variations requested per generation call. Mirrors
 // Module 2's fixed-3-variations precedent for consistency, but isn't itself a hardcoded
@@ -20,6 +20,7 @@ export const PROMPT_COUNT = 3;
  * @returns {string}
  */
 export function buildPromptHelperPrompt({ trend, category, styleHints = [] }) {
+  const MIDJOURNEY_CONVENTIONS = getShopConventions().midjourney;
   const aspectRatio = MIDJOURNEY_CONVENTIONS.aspectRatioByCategory[category] || null;
 
   const trendLine = trend

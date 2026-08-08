@@ -1,4 +1,4 @@
-import { SHOP_CONVENTIONS } from '../../config/shop-conventions.js';
+import { getShopConventions } from '../../config/index.js';
 
 function stripForbiddenPhrases(text, phrases) {
   if (!text) return { text, hits: [] };
@@ -15,11 +15,15 @@ function stripForbiddenPhrases(text, phrases) {
   return { text: cleaned, hits };
 }
 
-// Enforces the hardcoded shop conventions on one generated variation. The prompt already
+// Enforces the shop's current conventions (dashboard-editable, see
+// config/index.js's getShopConventions()) on one generated variation. The prompt already
 // asks the model for these — this is the belt-and-braces backstop so a convention
-// violation never reaches the dashboard even if the model drifts. Returns the cleaned
-// variation plus a `warnings` list surfaced to the reviewer, never silently dropped.
+// violation never reaches the dashboard even if the model drifts. Reads conventions
+// fresh on every call (no caching), so a dashboard edit takes effect on the very next
+// generation/manual-edit without a restart. Returns the cleaned variation plus a
+// `warnings` list surfaced to the reviewer, never silently dropped.
 export function enforceConventions(variation) {
+  const SHOP_CONVENTIONS = getShopConventions().listing;
   const warnings = [];
 
   let title = variation.title || '';

@@ -318,7 +318,17 @@ describe('App', () => {
         '/api/jobs/bulk',
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ artwork_ids: [5], pipeline_overrides: expect.any(Object), batch_id: null }),
+          // The literal value PIPELINE_CONFIG above deterministically produces via
+          // Object.fromEntries(cfg.pipeline.map((m) => [m.module, m.enabled])) in
+          // App.jsx. (Previously this used JSON.stringify({ ..., pipeline_overrides:
+          // expect.any(Object), ... }) -- that doesn't wildcard anything once it's
+          // inside a JSON.stringify'd string; it silently serializes the matcher's
+          // own internal properties instead and never matched the real request.)
+          body: JSON.stringify({
+            artwork_ids: [5],
+            pipeline_overrides: { image_analyzer: true, listing_generator: true, mockup_composer: true },
+            batch_id: null,
+          }),
         })
       );
     });
@@ -433,7 +443,7 @@ describe('App', () => {
     });
   });
 
-  it('shows shop conventions read-only in the settings panel', async () => {
+  it('shows the editable shop conventions form, pre-populated, in the settings panel (plan.md step 4)', async () => {
     mockFetchByUrl();
     const user = userEvent.setup();
     render(<App />);
@@ -441,8 +451,8 @@ describe('App', () => {
 
     await openSettingsTab(user, 'Shop & Pipeline');
 
-    expect(await screen.findByText('|')).toBeInTheDocument();
-    expect(screen.getByText(/Tags per listing: 13/)).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('|')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('13')).toBeInTheDocument();
   });
 
   it('defaults the Settings panel to the Tags & Trends tab, hiding other tabs\' content until selected (plan.md step 7)', async () => {
