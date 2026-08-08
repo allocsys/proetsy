@@ -433,7 +433,7 @@ describe('App', () => {
     });
   });
 
-  it('shows shop conventions read-only in the settings panel', async () => {
+  it('shows the editable shop conventions form, pre-populated, in the settings panel (plan.md step 4)', async () => {
     mockFetchByUrl();
     const user = userEvent.setup();
     render(<App />);
@@ -441,8 +441,8 @@ describe('App', () => {
 
     await openSettingsTab(user, 'Shop & Pipeline');
 
-    expect(await screen.findByText('|')).toBeInTheDocument();
-    expect(screen.getByText(/Tags per listing: 13/)).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('|')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('13')).toBeInTheDocument();
   });
 
   it('defaults the Settings panel to the Tags & Trends tab, hiding other tabs\' content until selected (plan.md step 7)', async () => {
