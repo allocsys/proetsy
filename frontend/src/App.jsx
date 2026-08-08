@@ -1349,8 +1349,29 @@ function App() {
               <div className="paper-card card" style={{ marginBottom: '1rem' }}>
                 <h2 style={{ marginTop: 0, marginBottom: '1rem' }}>Job Workspace</h2>
                 <div className="settings-field-row" style={{ alignItems: 'flex-start' }}>
+                  <div className="settings-field" style={{ flex: 1, minWidth: '220px' }}>
+                    <label htmlFor="review-job-picker" className="settings-field-label">Pick a recent job</label>
+                    <select
+                      id="review-job-picker"
+                      value=""
+                      onChange={(e) => {
+                        if (!e.target.value) return;
+                        setJobIdInput(e.target.value);
+                        setActiveJobId(e.target.value);
+                        setReviewTab('analysis');
+                      }}
+                      disabled={!recentJobsSorted.length}
+                    >
+                      <option value="">{recentJobsSorted.length ? 'Select a job…' : 'No jobs yet'}</option>
+                      {recentJobsSorted.slice(0, 25).map((j) => (
+                        <option key={j.id} value={j.id}>
+                          #{j.id} — {j.artwork_file_path?.split('/').pop() || 'untitled'} ({j.overall_status || 'pending'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <div className="settings-field">
-                    <span className="settings-field-label">Job ID (optional)</span>
+                    <span className="settings-field-label">Or enter a Job ID directly</span>
                     <input
                       type="number"
                       placeholder="Job ID"
@@ -1358,7 +1379,6 @@ function App() {
                       onChange={(e) => setJobIdInput(e.target.value)}
                       style={{ maxWidth: '160px' }}
                     />
-                    <span className="input-helper-text">Enter an active or completed job ID to inspect pipeline output.</span>
                   </div>
                   <button className="btn-primary" onClick={() => { setActiveJobId(jobIdInput); setReviewTab('analysis'); }} disabled={!jobIdInput} style={{ height: '34px', marginTop: '1.25rem' }}>
                     Load job
@@ -1431,9 +1451,39 @@ function App() {
                     </div>
                   </div>
                 </div>
+              ) : recentJobsSorted.length ? (
+                <div className="paper-card card">
+                  <p className="text-muted mono-sm" style={{ marginTop: 0 }}>Or pick a recent job:</p>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Job</th>
+                          <th>Artwork</th>
+                          <th>Status</th>
+                          <th>Updated</th>
+                          <th />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {recentJobsSorted.slice(0, 10).map((job) => (
+                          <tr key={job.id}>
+                            <td className="mono">#{job.id}</td>
+                            <td style={{ wordBreak: 'break-all' }}>{job.artwork_file_path?.split('/').pop()}</td>
+                            <td><StatusBadge status={job.overall_status} /></td>
+                            <td className="text-muted mono mono-sm">{job.updated_at}</td>
+                            <td>
+                              <button className="btn-secondary btn-sm" onClick={() => openJob(job.id)}>Review</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               ) : (
                 <div className="paper-card card">
-                  <p className="empty-state">Enter a job ID above, or open one from Listing History to start reviewing.</p>
+                  <p className="empty-state">No jobs yet — drop some artwork on the Upload view to get started.</p>
                 </div>
               )}
             </section>
