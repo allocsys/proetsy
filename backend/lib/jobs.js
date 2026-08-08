@@ -35,6 +35,45 @@ export function createJob(artworkId, overrides = {}, batchId = null) {
   return run();
 }
 
+// plan.md step 6: bulk-upload previously fired one POST /api/jobs per artwork,
+// sequentially awaited from the dashboard (N round-trips for N files). This creates
+// every job for a batch in a single call and a single DB transaction, so the dashboard
+// can make one request instead of N. Same per-module seeding rules as createJob
+// (required modules always pending, overrides apply per-run only) -- kept atomic across
+// the whole array: if any artwork_id doesn't exist, nothing in the batch is created
+// (mirrors createJob's own all-or-nothing behavior for one job).
+// Returns the array of new job ids, in the same order as `artworkIds`.
+export function createJobsBulk(artworkIds, overrides = {}, batchId = null) {
+  if (!Array.isArray(artworkIds) || !artworkIds.length) {
+    throw new Error('artworkIds must be a non-empty array');
+  }
+
+  const db = getDb();
+  const getArtwork = db.prepare('SELECT id FROM artworks WHERE id = ?');
+  const insertJob = db.prepare("INSERT INTO jobs (artwork_id, overall_status, batch_id) VALUES (?, 'pending', ?)");
+  const insertModule = db.prepare('INSERT INTO job_modules (job_id, module_name, status) VALUES (?, ?, ?)');
+  const { pipeline } = getPipelineConfig();
+
+  const run = db.transaction((ids) => {
+    const jobIds = [];
+    for (const artworkId of ids) {
+      const artwork = getArtwork.get(artworkId);
+      if (!artwork) throw new Error(`Artwork ${artworkId} not found`);
+
+      const { lastInsertRowid: jobId } = insertJob.run(artworkId, batchId || null);
+      for (const { module, enabled, required } of pipeline) {
+        const override = overrides[module];
+        const effectiveEnabled = required ? true : override !== undefined ? Boolean(override) : enabled;
+        insertModule.run(jobId, module, effectiveEnabled ? 'pending' : 'skipped');
+      }
+      jobIds.push(jobId);
+    }
+    return jobIds;
+  });
+
+  return run(artworkIds);
+}
+
 export function getJobWithModules(jobId) {
   const db = getDb();
   // Joins artworks for artwork_file_path -- same alias GET /api/jobs' list query uses
