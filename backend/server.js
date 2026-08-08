@@ -428,7 +428,12 @@ app.post('/api/tags/csv', (req, res) => {
 // entirely derived from the current state of the tags table (see
 // suggestCategoriesForUncategorizedTags).
 app.post('/api/tags/backfill-categories', (req, res) => {
-  const result = suggestCategoriesForUncategorizedTags();
+  // ?dry_run=true (or body { dry_run: true }) computes and returns the proposed
+  // tag -> category matches without writing them, so the dashboard can show a preview
+  // before the user commits (see user-list.js's suggestCategoriesForUncategorizedTags
+  // dryRun option). Omitted/false behaves exactly as before -- writes immediately.
+  const dryRun = req.query.dry_run === 'true' || req.body?.dry_run === true;
+  const result = suggestCategoriesForUncategorizedTags({ dryRun });
   const db = getDb();
   res.status(200).json({ ...result, tags: db.prepare('SELECT * FROM tags ORDER BY tag_text').all() });
 });
