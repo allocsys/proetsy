@@ -4,6 +4,7 @@ import JobArtworkAnalysisReview from './JobArtworkAnalysisReview.jsx';
 import JobListingReview from './JobListingReview.jsx';
 import JobMockupReview from './JobMockupReview.jsx';
 import MockupTemplates from './MockupTemplates.jsx';
+import ShopConventions from './ShopConventions.jsx';
 import PromptHelper from './PromptHelper.jsx';
 import TasteFilter from './TasteFilter.jsx';
 import UpdaterStatus from './UpdaterStatus.jsx';
@@ -91,7 +92,6 @@ function App() {
   const [setupStatus, setSetupStatus] = useState(null);
   const [pipelineDefault, setPipelineDefault] = useState(null);
   const [overrides, setOverrides] = useState({});
-  const [shopConventions, setShopConventions] = useState(null);
   const [settings, setSettings] = useState({});
   const [trends, setTrends] = useState([]);
   const [newTrendTerm, setNewTrendTerm] = useState('');
@@ -291,7 +291,6 @@ function App() {
       })
       .catch(reportFetchError('pipelineConfig (initial load)'));
 
-    fetch('/api/config/shop-conventions').then((r) => r.json()).then(setShopConventions).catch(reportFetchError('shopConventions'));
     fetch('/api/settings').then((r) => r.json()).then(setSettings).catch(reportFetchError('settings'));
     refreshSetupStatus();
     refreshJobs();
@@ -978,28 +977,7 @@ function App() {
                   </div>
                 </div>
 
-                <div className="settings-subsection">
-                  <div className="settings-readonly-box">
-                    <div className="settings-readonly-header">
-                      <h4 className="settings-readonly-title">Shop conventions</h4>
-                      <span className="read-only-badge">Read-only</span>
-                    </div>
-                    <p className="text-muted mono-sm" style={{ marginTop: 0, marginBottom: '0.5rem' }}>
-                      Fixed pipeline conventions, not editable here — change them in <code className="mono">shop-conventions.js</code>.
-                    </p>
-                    {shopConventions ? (
-                      <ul className="settings-compact-list">
-                        <li>Title separator: <code>{shopConventions.listing.titleSeparator}</code></li>
-                        <li>Max title length: {shopConventions.listing.maxTitleLength}</li>
-                        <li>Tags per listing: {shopConventions.listing.tagsPerListing} (+{shopConventions.listing.tagAlternates} alternates, max {shopConventions.listing.maxTagLength} chars)</li>
-                        <li>Forbidden title words: {shopConventions.listing.forbiddenTitleWords.join(', ')}</li>
-                        <li>Midjourney: {shopConventions.midjourney.version}, {shopConventions.midjourney.style}, stylize {shopConventions.midjourney.stylizeMin}–{shopConventions.midjourney.stylizeMax}</li>
-                      </ul>
-                    ) : (
-                      <p className="empty-state" style={{ margin: 0 }}>Loading…</p>
-                    )}
-                  </div>
-                </div>
+                <ShopConventions />
 
               </div>
               )}
