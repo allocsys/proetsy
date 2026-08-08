@@ -1,4 +1,4 @@
-import { MIDJOURNEY_CONVENTIONS } from '../../config/shop-conventions.js';
+import { getShopConventions } from '../../config/index.js';
 
 const STYLIZE_RE = /--s(?:tylize)?\s+(\d+)/i;
 const AR_RE = /--ar\s+\d+:\d+/i;
@@ -20,6 +20,7 @@ const STYLE_RAW_RE = /--style\s+raw/i;
  * @returns {{ text: string, warnings: string[] }}
  */
 export function enforceMidjourneyConventions(promptText, category) {
+  const MIDJOURNEY_CONVENTIONS = getShopConventions().midjourney;
   const warnings = [];
   let text = (promptText || '').trim();
 
