@@ -1181,6 +1181,16 @@ input:focus, select:focus, textarea:focus {
   color: var(--studio-ink-soft);
   font-size: 12.5px;
   line-height: 1.6;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.settings-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
 .settings-readonly-box {
@@ -1224,7 +1234,7 @@ input:focus, select:focus, textarea:focus {
 
 .settings-dashboard-grid {
   display: grid;
-  grid-template-columns: 1.1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
   gap: var(--space-5);
   align-items: start;
 }
