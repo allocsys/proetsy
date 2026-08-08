@@ -13,7 +13,7 @@ import {
   invalidatePipelineConfigCache,
 } from './config/index.js';
 import { SHOP_CONVENTIONS, MIDJOURNEY_CONVENTIONS } from './config/shop-conventions.js';
-import { createJob, getJobWithModules, setManualNotes, setModuleStatus } from './lib/jobs.js';
+import { createJob, createJobsBulk, getJobWithModules, setManualNotes, setModuleStatus } from './lib/jobs.js';
 import { analyzeArtworkForJob } from './lib/image-analyzer/index.js';
 import { generateListingsForJob } from './lib/listing-generator/index.js';
 import { enforceConventions } from './lib/listing-generator/validate.js';
@@ -485,6 +485,23 @@ app.post('/api/jobs', (req, res) => {
   try {
     const jobId = createJob(artwork_id, pipeline_overrides || {}, batch_id || null);
     res.status(201).json(getJobWithModules(jobId));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// plan.md step 6: single bulk-create endpoint so the dashboard's multi-file upload can
+// make one request instead of one POST /api/jobs per file. All-or-nothing across the
+// array (see createJobsBulk) -- a bad artwork_id 400s without creating any of the other
+// jobs in the batch.
+app.post('/api/jobs/bulk', (req, res) => {
+  const { artwork_ids, pipeline_overrides, batch_id } = req.body || {};
+  if (!Array.isArray(artwork_ids) || !artwork_ids.length) {
+    return res.status(400).json({ error: 'artwork_ids is required and must be a non-empty array' });
+  }
+  try {
+    const jobIds = createJobsBulk(artwork_ids, pipeline_overrides || {}, batch_id || null);
+    res.status(201).json({ jobs: jobIds.map((jobId) => getJobWithModules(jobId)) });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
