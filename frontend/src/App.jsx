@@ -611,7 +611,7 @@ function App() {
 
           {activeView === 'settings' && (
             <div>
-              <h2 style={{ marginTop: 0, marginBottom: '1.5rem' }}>Shop Settings & Tag Library</h2>
+              <h2 style={{ marginTop: 0, marginBottom: '1.5rem' }}>Shop Settings & Tags</h2>
 
               <div className="settings-dashboard-grid">
 
@@ -646,6 +646,19 @@ function App() {
                     <button className="btn-primary" onClick={saveTags} disabled={!tagsText.trim()}>Save tags</button>
                     {tagsSavedMessage && <span className="text-muted mono-sm">{tagsSavedMessage}</span>}
                   </div>
+
+                  <h4 className="settings-sub-heading" style={{ marginTop: '1rem' }}>Current tags</h4>
+                  {tags.length ? (
+                    <ul className="settings-compact-list">
+                      {tags.map((t) => (
+                        <li key={t.id || t.tag_text}>
+                          {t.tag_text}{t.category ? ` (${t.category})` : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="empty-state">No tags added yet.</p>
+                  )}
                 </div>
 
                 <div className="settings-subsection">
@@ -706,6 +719,9 @@ function App() {
                     <div className="settings-field">
                       <span className="settings-field-label">Default price</span>
                       <input
+                        type="number"
+                        step="0.01"
+                        min="0"
                         value={settings.default_price || ''}
                         onChange={(e) => setSettings((s) => ({ ...s, default_price: e.target.value }))}
                         onBlur={(e) => saveSettings({ default_price: e.target.value })}
@@ -746,7 +762,7 @@ function App() {
 
               </div>
 
-              <div className="settings-section-card card settings-card-keys">
+              <div className="settings-section-card card settings-card-keys settings-full-width-card">
                 <h3 className="settings-section-title">API Keys</h3>
 
                 <div className="settings-subsection">
@@ -754,40 +770,42 @@ function App() {
                     Securely stored API keys for Gemini & Claude providers. Key values are masked after saving.
                   </p>
                   {apiKeys.length ? (
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>Provider</th>
-                          <th>Label</th>
-                          <th>Key</th>
-                          <th>Status</th>
-                          <th />
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {apiKeys.map((key) => (
-                          <tr key={key.id}>
-                            <td className="mono">{key.provider}</td>
-                            <td>{key.label || <span className="text-muted">—</span>}</td>
-                            <td className="mono mono-sm">{key.maskedKey}</td>
-                            <td>
-                              <span className={`status-pill ${key.enabled ? 'success' : 'pending'}`}>
-                                <span className="status-dot" aria-hidden="true" />
-                                {key.enabled ? 'Enabled' : 'Disabled'}
-                              </span>
-                            </td>
-                            <td>
-                              <div className="flex-row" style={{ gap: '0.5rem' }}>
-                                <button className="btn-secondary btn-sm" onClick={() => toggleApiKeyEnabled(key)}>
-                                  {key.enabled ? 'Disable' : 'Enable'}
-                                </button>
-                                <button className="btn-secondary btn-sm" onClick={() => deleteApiKey(key)}>Delete</button>
-                              </div>
-                            </td>
+                    <div className="data-table-wrapper">
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>Provider</th>
+                            <th>Label</th>
+                            <th>Key</th>
+                            <th>Status</th>
+                            <th />
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {apiKeys.map((key) => (
+                            <tr key={key.id}>
+                              <td className="mono">{key.provider}</td>
+                              <td>{key.label || <span className="text-muted">—</span>}</td>
+                              <td className="mono mono-sm">{key.maskedKey}</td>
+                              <td>
+                                <span className={`status-pill ${key.enabled ? 'success' : 'pending'}`}>
+                                  <span className="status-dot" aria-hidden="true" />
+                                  {key.enabled ? 'Enabled' : 'Disabled'}
+                                </span>
+                              </td>
+                              <td>
+                                <div className="flex-row" style={{ gap: '0.5rem' }}>
+                                  <button className="btn-secondary btn-sm" onClick={() => toggleApiKeyEnabled(key)}>
+                                    {key.enabled ? 'Disable' : 'Enable'}
+                                  </button>
+                                  <button className="btn-secondary btn-sm" onClick={() => deleteApiKey(key)}>Delete</button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   ) : (
                     <p className="empty-state">No dashboard-managed keys yet — add one below to enable Gemini/Claude calls.</p>
                   )}
@@ -851,7 +869,7 @@ function App() {
                 </div>
               </div>
 
-              <div className="settings-section-card card settings-card-automation">
+              <div className="settings-section-card card settings-card-automation settings-full-width-card">
                 <h3 className="settings-section-title">Automation & Diagnostics</h3>
 
                 <div className="settings-subsection">
@@ -912,9 +930,14 @@ function App() {
                     />
                     Auto-compute taste threshold
                   </label>
-                  <div className="settings-field" style={{ maxWidth: '200px' }}>
-                    <span className="settings-field-label">Auto threshold (score cutoff)</span>
+                  <div className="settings-field" style={{ maxWidth: '200px', opacity: settings.taste_filter_auto_enabled === 'true' ? 1 : 0.6 }}>
+                    <span className="settings-field-label">Auto threshold (score cutoff){settings.taste_filter_auto_enabled === 'true' ? '' : ' (inactive — enable auto-compute above)'}</span>
                     <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="1"
+                      disabled={settings.taste_filter_auto_enabled !== 'true'}
                       value={settings.taste_filter_auto_threshold ?? ''}
                       onChange={(e) => setSettings((s) => ({ ...s, taste_filter_auto_threshold: e.target.value }))}
                       onBlur={(e) => saveSettings({ taste_filter_auto_threshold: e.target.value })}
@@ -930,33 +953,35 @@ function App() {
                       <span className="read-only-badge">Read-only</span>
                     </div>
                     {rateLimits.length ? (
-                      <table className="data-table" style={{ marginBottom: 0 }}>
-                        <thead>
-                          <tr>
-                            <th>Key #</th>
-                            <th>Model</th>
-                            <th>Status</th>
-                            <th>Consecutive hits</th>
-                            <th>Limited until</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {rateLimits.map((r) => (
-                            <tr key={`${r.keyIndex}-${r.model}`}>
-                              <td className="mono">{r.keyIndex}</td>
-                              <td className="mono">{r.model}</td>
-                              <td>
-                                <span className={`status-pill ${r.currentlyLimited ? 'danger' : 'success'}`}>
-                                  <span className="status-dot" aria-hidden="true" />
-                                  {r.currentlyLimited ? 'Cooling down' : 'OK'}
-                                </span>
-                              </td>
-                              <td>{r.consecutiveHits}</td>
-                              <td className="text-muted mono mono-sm">{r.currentlyLimited ? r.limitedUntil : '—'}</td>
+                      <div className="data-table-wrapper">
+                        <table className="data-table" style={{ marginBottom: 0 }}>
+                          <thead>
+                            <tr>
+                              <th>Key #</th>
+                              <th>Model</th>
+                              <th>Status</th>
+                              <th>Consecutive hits</th>
+                              <th>Limited until</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {rateLimits.map((r) => (
+                              <tr key={`${r.keyIndex}-${r.model}`}>
+                                <td className="mono">{r.keyIndex}</td>
+                                <td className="mono">{r.model}</td>
+                                <td>
+                                  <span className={`status-pill ${r.currentlyLimited ? 'danger' : 'success'}`}>
+                                    <span className="status-dot" aria-hidden="true" />
+                                    {r.currentlyLimited ? 'Cooling down' : 'OK'}
+                                  </span>
+                                </td>
+                                <td>{r.consecutiveHits}</td>
+                                <td className="text-muted mono mono-sm">{r.currentlyLimited ? r.limitedUntil : '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     ) : (
                       <p className="empty-state" style={{ margin: 0 }}>No key/model pair has hit a rate limit yet.</p>
                     )}
