@@ -930,13 +930,14 @@ function App() {
                     />
                     Auto-compute taste threshold
                   </label>
-                  <div className="settings-field" style={{ maxWidth: '200px' }}>
-                    <span className="settings-field-label">Auto threshold (score cutoff)</span>
+                  <div className="settings-field" style={{ maxWidth: '200px', opacity: settings.taste_filter_auto_enabled === 'true' ? 1 : 0.6 }}>
+                    <span className="settings-field-label">Auto threshold (score cutoff){settings.taste_filter_auto_enabled === 'true' ? '' : ' (inactive — enable auto-compute above)'}</span>
                     <input
                       type="number"
                       step="0.01"
                       min="0"
                       max="1"
+                      disabled={settings.taste_filter_auto_enabled !== 'true'}
                       value={settings.taste_filter_auto_threshold ?? ''}
                       onChange={(e) => setSettings((s) => ({ ...s, taste_filter_auto_threshold: e.target.value }))}
                       onBlur={(e) => saveSettings({ taste_filter_auto_threshold: e.target.value })}
