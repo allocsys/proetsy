@@ -955,7 +955,7 @@ function App() {
 
                 <div className="settings-subsection" style={{ marginBottom: 0 }}>
                   <p className="text-muted mono-sm" style={{ marginTop: 0, marginBottom: '0.75rem' }}>
-                    Configure default enabled pipeline steps for new artwork uploads. These are saved and used for every future upload — for a one-time change on a single upload instead, use the Pipeline toggles on the Upload page.
+                    This is the <strong>saved default</strong> used for every future upload. For a one-time change on a single upload instead, use the Pipeline toggles on the Upload page — those apply only to that run and don't affect this default.
                   </p>
                   <div className="flex-row flex-wrap" style={{ gap: '1.5rem' }}>
                     {pipelineDefault?.pipeline?.map((m) => (
@@ -1160,21 +1160,38 @@ function App() {
                 </summary>
                 <div className="upload-lane">
                   <h3>Pipeline</h3>
-                  <p className="text-muted" style={{ marginTop: 0 }}>Defaults come from <code>pipeline.config.json</code>; toggles here apply only to artwork uploaded next.</p>
-                  <div className="flex-row flex-wrap" style={{ gap: '1.5rem', marginBottom: '1.5rem' }}>
-                    {pipelineDefault?.pipeline?.map((m) => (
-                      <label key={m.module} style={{ opacity: m.required ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: m.required ? 'not-allowed' : 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={!!overrides[m.module]}
-                          disabled={m.required}
-                          onChange={() => toggleModule(m.module, m.required)}
-                        />
-                        <span>{m.module}</span>
-                        {m.required ? <span className="text-muted mono-sm">(required)</span> : null}
-                      </label>
-                    ))}
+                  <p className="text-muted" style={{ marginTop: 0 }}>
+                    These toggles apply <strong>only to artwork uploaded next</strong> — they don't change your saved default.
+                    To change what every future upload starts with, go to <strong>Settings → Pipeline Modules</strong>.
+                  </p>
+                  <div className="flex-row flex-wrap" style={{ gap: '1.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                    {pipelineDefault?.pipeline?.map((m) => {
+                      const isModified = !m.required && !!overrides[m.module] !== !!m.enabled;
+                      return (
+                        <label key={m.module} style={{ opacity: m.required ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: m.required ? 'not-allowed' : 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={!!overrides[m.module]}
+                            disabled={m.required}
+                            onChange={() => toggleModule(m.module, m.required)}
+                          />
+                          <span>{m.module}</span>
+                          {m.required ? <span className="text-muted mono-sm">(required)</span> : null}
+                          {isModified ? <span className="text-muted mono-sm" title="Different from your saved default, for this upload only"> (changed for this upload)</span> : null}
+                        </label>
+                      );
+                    })}
                   </div>
+                  {pipelineDefault?.pipeline?.some((m) => !m.required && !!overrides[m.module] !== !!m.enabled) && (
+                    <button
+                      type="button"
+                      className="btn-secondary btn-xs"
+                      style={{ marginBottom: '1rem' }}
+                      onClick={() => setOverrides(Object.fromEntries(pipelineDefault.pipeline.map((m) => [m.module, m.enabled])))}
+                    >
+                      Reset to saved default
+                    </button>
+                  )}
 
                   <div
                     className={`dropzone ${dragActive ? 'active' : ''}`}
