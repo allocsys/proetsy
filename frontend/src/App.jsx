@@ -104,7 +104,14 @@ function App() {
   const [jobIdInput, setJobIdInput] = useState('');
   const [activeJobId, setActiveJobId] = useState(null);
   const [activeView, setActiveView] = useState('upload');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      const stored = localStorage.getItem('proetsy_sidebar_collapsed');
+      return stored === null ? false : stored === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [fetchError, setFetchError] = useState(null);
   const [reviewTab, setReviewTab] = useState('analysis');
   const [activeJobInfo, setActiveJobInfo] = useState(null);
@@ -575,7 +582,15 @@ function App() {
           <div className="sidebar-toggle-row">
             <button
               className="sidebar-toggle-btn"
-              onClick={() => setSidebarCollapsed((c) => !c)}
+              onClick={() => setSidebarCollapsed((c) => {
+                const next = !c;
+                try {
+                  localStorage.setItem('proetsy_sidebar_collapsed', String(next));
+                } catch {
+                  // ignore storage errors (e.g. private browsing)
+                }
+                return next;
+              })}
               aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
