@@ -109,6 +109,13 @@ function App() {
   const [reviewTab, setReviewTab] = useState('analysis');
   const [activeJobInfo, setActiveJobInfo] = useState(null);
   const [showHowItWorks, setShowHowItWorks] = useState(false);
+  const [previousView, setPreviousView] = useState('upload');
+  const [tagsLoading, setTagsLoading] = useState(true);
+  const [trendsLoading, setTrendsLoading] = useState(true);
+  const [apiKeysLoading, setApiKeysLoading] = useState(true);
+  const [rateLimitsLoading, setRateLimitsLoading] = useState(true);
+  const [rateLimitsUpdatedAt, setRateLimitsUpdatedAt] = useState(null);
+  const [savedFlashes, setSavedFlashes] = useState({});
 
   useEffect(() => {
     if (!activeJobId) {
@@ -141,7 +148,21 @@ function App() {
     return (err) => setFetchError({ source, message: err.message });
   }
 
+  function flashSaved(field) {
+    setSavedFlashes((prev) => ({ ...prev, [field]: true }));
+    setTimeout(() => {
+      setSavedFlashes((prev) => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    }, 2000);
+  }
+
   function goTo(view) {
+    if (view === 'settings' && activeView !== 'settings') {
+      setPreviousView(activeView);
+    }
     setActiveView(view);
     if (view === 'settings') {
       refreshRateLimits();
@@ -174,15 +195,15 @@ function App() {
   function refreshTrends() {
     fetch('/api/trends')
       .then((r) => r.json())
-      .then(setTrends)
-      .catch(reportFetchError('refreshTrends'));
+      .then((data) => { setTrends(data); setTrendsLoading(false); })
+      .catch((err) => { setTrendsLoading(false); reportFetchError('refreshTrends')(err); });
   }
 
   function refreshTags() {
     fetch('/api/tags')
       .then((r) => r.json())
-      .then(setTags)
-      .catch(reportFetchError('refreshTags'));
+      .then((data) => { setTags(data); setTagsLoading(false); })
+      .catch((err) => { setTagsLoading(false); reportFetchError('refreshTags')(err); });
   }
 
   function refreshWatchStatus() {
@@ -195,15 +216,15 @@ function App() {
   function refreshRateLimits() {
     fetch('/api/llm/rate-limits')
       .then((r) => r.json())
-      .then(setRateLimits)
-      .catch(reportFetchError('refreshRateLimits'));
+      .then((data) => { setRateLimits(data); setRateLimitsLoading(false); setRateLimitsUpdatedAt(new Date()); })
+      .catch((err) => { setRateLimitsLoading(false); reportFetchError('refreshRateLimits')(err); });
   }
 
   function refreshApiKeys() {
     fetch('/api/settings/api-keys')
       .then((r) => r.json())
-      .then(setApiKeys)
-      .catch(reportFetchError('refreshApiKeys'));
+      .then((data) => { setApiKeys(data); setApiKeysLoading(false); })
+      .catch((err) => { setApiKeysLoading(false); reportFetchError('refreshApiKeys')(err); });
   }
 
   function refreshPipelineConfig() {
@@ -241,6 +262,11 @@ function App() {
   const tagCategories = useMemo(
     () => Array.from(new Set(tags.map((t) => t.category).filter(Boolean))).sort(),
     [tags]
+  );
+
+  const trendCategories = useMemo(
+    () => Array.from(new Set(trends.map((t) => t.category).filter(Boolean))).sort(),
+    [trends]
   );
 
   const [expandedBatches, setExpandedBatches] = useState({});
@@ -348,12 +374,14 @@ function App() {
     refreshTags();
   }
 
-  async function deleteTag(id) {
+  async function deleteTag(id, tagText) {
+    if (!window.confirm(`Delete tag "${tagText}"? This can't be undone.`)) return;
     await fetch(`/api/tags/${id}`, { method: 'DELETE' });
     refreshTags();
   }
 
-  async function deleteTrend(id) {
+  async function deleteTrend(id, term) {
+    if (!window.confirm(`Delete trend "${term}"? This can't be undone.`)) return;
     await fetch(`/api/trends/${id}`, { method: 'DELETE' });
     refreshTrends();
   }
@@ -381,6 +409,10 @@ function App() {
   }
 
   async function backfillTagCategories() {
+    const uncategorizedCount = tags.filter((t) => !t.category).length;
+    if (!window.confirm(`This uses AI to guess and save a category for ${uncategorizedCount} uncategorized tag(s). Suggestions are written immediately and can't be previewed first. Continue?`)) {
+      return;
+    }
     setTagsBackfillRunning(true);
     setTagsBackfillMessage({ text: 'Checking uncategorized tags…', ok: true });
     try {
@@ -408,7 +440,12 @@ function App() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
     });
-    setSettings(await res.json());
+    const data = await res.json();
+    setSettings(data);
+    if (res.ok) {
+      Object.keys(updates).forEach(flashSaved);
+    }
+    return data;
   }
 
   async function saveWatchSetting(updates) {
@@ -510,7 +547,7 @@ function App() {
             </button>
           </div>
           <UpdaterStatus />
-          <button className="btn-secondary" onClick={() => goTo(activeView === 'settings' ? 'upload' : 'settings')}>
+          <button className="btn-secondary" onClick={() => goTo(activeView === 'settings' ? previousView : 'settings')}>
             <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ width: '14px', height: '14px' }}>
               <circle cx="12" cy="12" r="3" />
               <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
@@ -676,14 +713,16 @@ function App() {
                   </div>
 
                   <h4 className="settings-sub-heading" style={{ marginTop: '1rem' }}>Current tags</h4>
-                  {tags.length ? (
+                  {tagsLoading ? (
+                    <p className="empty-state">Loading…</p>
+                  ) : tags.length ? (
                     <ul className="settings-compact-list">
                       {tags.map((t) => (
                         <li key={t.id || t.tag_text} className="settings-list-item">
                           <span>{t.tag_text}{t.category ? ` (${t.category})` : ''}</span>
                           <button
                             className="btn-secondary btn-xs"
-                            onClick={() => deleteTag(t.id)}
+                            onClick={() => deleteTag(t.id, t.tag_text)}
                             title="Delete tag"
                             aria-label={`Delete tag ${t.tag_text}`}
                           >
@@ -722,14 +761,16 @@ function App() {
 
                 <div className="settings-subsection" style={{ marginBottom: 0 }}>
                   <h4 className="settings-sub-heading">Trend list</h4>
-                  {trends.length ? (
+                  {trendsLoading ? (
+                    <p className="empty-state">Loading…</p>
+                  ) : trends.length ? (
                     <ul className="settings-compact-list">
                       {trends.map((t) => (
                         <li key={t.id} className="settings-list-item">
                           <span>{t.term}{t.category ? ` (${t.category})` : ''}</span>
                           <button
                             className="btn-secondary btn-xs"
-                            onClick={() => deleteTrend(t.id)}
+                            onClick={() => deleteTrend(t.id, t.term)}
                             title="Delete trend"
                             aria-label={`Delete trend ${t.term}`}
                           >
@@ -755,10 +796,16 @@ function App() {
                       <label htmlFor="settings-trend-category" className="settings-field-label">Category (optional)</label>
                       <input
                         id="settings-trend-category"
+                        list="trend-category-options"
                         value={newTrendCategory}
                         onChange={(e) => setNewTrendCategory(e.target.value)}
                         placeholder="Category (optional)"
                       />
+                      <datalist id="trend-category-options">
+                        {trendCategories.map((c) => (
+                          <option key={c} value={c} />
+                        ))}
+                      </datalist>
                     </div>
                     <button className="btn-primary btn-sm" onClick={addTrendFromSettings} disabled={!newTrendTerm.trim()}>Add trend</button>
                   </div>
@@ -771,7 +818,7 @@ function App() {
                 <div className="settings-subsection">
                   <div className="settings-field-row">
                     <div className="settings-field">
-                      <label htmlFor="settings-default-price" className="settings-field-label">Default price</label>
+                      <label htmlFor="settings-default-price" className="settings-field-label">Default price{savedFlashes.default_price ? <span className="field-saved-hint">Saved</span> : null}</label>
                       <input
                         id="settings-default-price"
                         type="number"
@@ -784,7 +831,7 @@ function App() {
                       />
                     </div>
                     <div className="settings-field" style={{ flex: 1, minWidth: '240px' }}>
-                      <label htmlFor="settings-delivery-text" className="settings-field-label">Delivery text</label>
+                      <label htmlFor="settings-delivery-text" className="settings-field-label">Delivery text{savedFlashes.delivery_text ? <span className="field-saved-hint">Saved</span> : null}</label>
                       <input
                         id="settings-delivery-text"
                         value={settings.delivery_text || ''}
@@ -802,6 +849,9 @@ function App() {
                       <h4 className="settings-readonly-title">Shop conventions</h4>
                       <span className="read-only-badge">Read-only</span>
                     </div>
+                    <p className="text-muted mono-sm" style={{ marginTop: 0, marginBottom: '0.5rem' }}>
+                      Fixed pipeline conventions, not editable here — change them in <code className="mono">shop-conventions.js</code>.
+                    </p>
                     {shopConventions ? (
                       <ul className="settings-compact-list">
                         <li>Title separator: <code>{shopConventions.listing.titleSeparator}</code></li>
@@ -825,7 +875,9 @@ function App() {
                   <p className="text-muted mono-sm" style={{ marginTop: 0, marginBottom: '0.5rem' }}>
                     Securely stored API keys for Gemini & Claude providers. Key values are masked after saving.
                   </p>
-                  {apiKeys.length ? (
+                  {apiKeysLoading ? (
+                    <p className="empty-state">Loading…</p>
+                  ) : apiKeys.length ? (
                     <div className="data-table-wrapper">
                       <table className="data-table">
                         <thead>
@@ -904,7 +956,7 @@ function App() {
 
                 <div className="settings-subsection" style={{ marginBottom: 0 }}>
                   <p className="text-muted mono-sm" style={{ marginTop: 0, marginBottom: '0.75rem' }}>
-                    Configure default enabled pipeline steps for new artwork uploads.
+                    Configure default enabled pipeline steps for new artwork uploads. These are saved and used for every future upload — for a one-time change on a single upload instead, use the Pipeline toggles on the Upload page.
                   </p>
                   <div className="flex-row flex-wrap" style={{ gap: '1.5rem' }}>
                     {pipelineDefault?.pipeline?.map((m) => (
@@ -946,7 +998,7 @@ function App() {
                   </label>
                   <div className="settings-field-row">
                     <div className="settings-field" style={{ flex: 1, minWidth: '260px' }}>
-                      <label htmlFor="settings-watched-folder" className="settings-field-label">Watched folder path</label>
+                      <label htmlFor="settings-watched-folder" className="settings-field-label">Watched folder path{savedFlashes.taste_filter_watch_folder ? <span className="field-saved-hint">Saved</span> : null}</label>
                       <input
                         id="settings-watched-folder"
                         value={settings.taste_filter_watch_folder || ''}
@@ -956,7 +1008,7 @@ function App() {
                       />
                     </div>
                     <div className="settings-field">
-                      <label htmlFor="settings-watch-category" className="settings-field-label">Category (optional)</label>
+                      <label htmlFor="settings-watch-category" className="settings-field-label">Category (optional){savedFlashes.taste_filter_watch_category ? <span className="field-saved-hint">Saved</span> : null}</label>
                       <input
                         id="settings-watch-category"
                         value={settings.taste_filter_watch_category || ''}
@@ -991,7 +1043,7 @@ function App() {
                     Auto-compute taste threshold
                   </label>
                   <div className="settings-field" style={{ maxWidth: '200px', opacity: settings.taste_filter_auto_enabled === 'true' ? 1 : 0.6 }}>
-                    <label htmlFor="settings-auto-threshold" className="settings-field-label">Auto threshold (score cutoff){settings.taste_filter_auto_enabled === 'true' ? '' : ' (inactive — enable auto-compute above)'}</label>
+                    <label htmlFor="settings-auto-threshold" className="settings-field-label">Auto threshold (score cutoff){settings.taste_filter_auto_enabled === 'true' ? '' : ' (inactive — enable auto-compute above)'}{savedFlashes.taste_filter_auto_threshold ? <span className="field-saved-hint">Saved</span> : null}</label>
                     <input
                       id="settings-auto-threshold"
                       type="number"
@@ -1011,9 +1063,17 @@ function App() {
                   <div className="settings-readonly-box">
                     <div className="settings-readonly-header">
                       <h4 className="settings-readonly-title">LLM rate-limit status</h4>
-                      <span className="read-only-badge">Read-only</span>
+                      <div className="flex-row" style={{ gap: '0.5rem' }}>
+                        {rateLimitsUpdatedAt && (
+                          <span className="text-muted mono-sm">Updated {rateLimitsUpdatedAt.toLocaleTimeString()}</span>
+                        )}
+                        <button className="btn-secondary btn-xs" onClick={refreshRateLimits} title="Refresh rate-limit status" aria-label="Refresh rate-limit status">⟳</button>
+                        <span className="read-only-badge">Read-only</span>
+                      </div>
                     </div>
-                    {rateLimits.length ? (
+                    {rateLimitsLoading ? (
+                      <p className="empty-state" style={{ margin: 0 }}>Loading…</p>
+                    ) : rateLimits.length ? (
                       <div className="data-table-wrapper">
                         <table className="data-table" style={{ marginBottom: 0 }}>
                           <thead>
