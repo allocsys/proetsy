@@ -20,10 +20,12 @@ Both render the same checkbox list off `pipelineDefault.pipeline`, but nothing i
 
 **What shipped:** Sidebar now defaults to expanded on first visit. Once a user collapses or expands it, the choice is saved to `localStorage` (`proetsy_sidebar_collapsed`) and restored on future visits.
 
-## 3. Job Review requires manually typing a job ID
+## 3. Job Review requires manually typing a job ID — ✅ Done (`974a662`, `5c31997`)
 The "Review a Job" view is a bare number input + "Load job" button — no picker, no autocomplete. Listing History already has a clickable table of jobs, but if a user lands on Review first they're stuck guessing/typing IDs.
 
 **Fix direction:** Add a dropdown/search sourced from `/api/jobs`, or default Review to showing recent jobs when no ID is loaded.
+
+**What shipped:** Jobs now refresh whenever the Review view is opened. A "Pick a recent job" dropdown (up to 25 most-recently-updated jobs, sorted by `updated_at`) sits next to the manual Job ID field. When no job is loaded, the empty state now lists the 10 most recent jobs as a clickable table instead of just telling the user to type an ID.
 
 ## 4. Irreversible AI action with only a confirm() dialog
 "Suggest categories for uncategorized tags" (`backfillTagCategories`) writes AI-guessed categories immediately with no preview. The confirm dialog itself admits this: *"Suggestions are written immediately and can't be previewed first."*
