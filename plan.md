@@ -250,8 +250,8 @@ errors into a 400, e.g. `upsertConfiguredTemplate`'s pattern in `mockup-template
        drift from a separate in-flight change, not touched by this branch).
 3. [x] `server.js` GET/PATCH routes + `server.config-routes.test.js` cases. Done.
 4. [x] Frontend editable form + tests. Done.
-5. [ ] `ARCHITECTURE.md` updates.
-6. [ ] Delete this `plan.md` in the same PR that lands step 5.
+5. [x] `ARCHITECTURE.md` updates. Done.
+6. [x] Delete this `plan.md` in the same PR that lands step 5. (This commit.)
 
 ## Open questions (resolve during implementation, not blocking the start of step 1)
 
