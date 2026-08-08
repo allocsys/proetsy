@@ -91,6 +91,8 @@ function App() {
   const [tagsCsvMessage, setTagsCsvMessage] = useState(null); // { text, ok }
   const [tagsBackfillMessage, setTagsBackfillMessage] = useState(null); // { text, ok }
   const [tagsBackfillRunning, setTagsBackfillRunning] = useState(false);
+  const [tagsBackfillPreview, setTagsBackfillPreview] = useState(null); // { checked, updates } | null
+  const [tagsBackfillPreviewLoading, setTagsBackfillPreviewLoading] = useState(false);
   const [watchStatus, setWatchStatus] = useState(null);
   const [rateLimits, setRateLimits] = useState([]);
   const [apiKeys, setApiKeys] = useState([]);
@@ -423,13 +425,33 @@ function App() {
     refreshTags();
   }
 
-  async function backfillTagCategories() {
-    const uncategorizedCount = tags.filter((t) => !t.category).length;
-    if (!window.confirm(`This uses AI to guess and save a category for ${uncategorizedCount} uncategorized tag(s). Suggestions are written immediately and can't be previewed first. Continue?`)) {
-      return;
+  // Step 1: fetch the proposed matches without writing anything (backend dry_run=true),
+  // so the user can see exactly what would change before committing to it.
+  async function previewBackfillTagCategories() {
+    setTagsBackfillPreviewLoading(true);
+    setTagsBackfillMessage(null);
+    try {
+      const res = await fetch('/api/tags/backfill-categories?dry_run=true', { method: 'POST' });
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(`No response from backend (status ${res.status}). Is the backend server running?`);
+      }
+      if (!res.ok) throw new Error(data.error || 'Preview failed');
+      setTagsBackfillPreview({ checked: data.checked, updates: data.updates });
+    } catch (err) {
+      setTagsBackfillMessage({ text: `Preview failed: ${err.message}`, ok: false });
     }
+    setTagsBackfillPreviewLoading(false);
+  }
+
+  // Step 2: user reviewed the preview and chose to apply it — commits the exact same
+  // matches that were just shown (the matching logic is deterministic, see
+  // user-list.js's suggestCategoriesForUncategorizedTags).
+  async function applyBackfillTagCategories() {
     setTagsBackfillRunning(true);
-    setTagsBackfillMessage({ text: 'Checking uncategorized tags…', ok: true });
+    setTagsBackfillMessage({ text: 'Applying…', ok: true });
     try {
       const res = await fetch('/api/tags/backfill-categories', { method: 'POST' });
       let data;
@@ -446,6 +468,7 @@ function App() {
       setTagsBackfillMessage({ text: `Backfill failed: ${err.message}`, ok: false });
     }
     setTagsBackfillRunning(false);
+    setTagsBackfillPreview(null);
     refreshTags();
   }
 
@@ -771,8 +794,8 @@ function App() {
                         {tagsCsvMessage.text}
                       </span>
                     )}
-                    <button className="btn-secondary btn-sm" onClick={backfillTagCategories} disabled={tagsBackfillRunning}>
-                      Suggest categories for uncategorized tags
+                    <button className="btn-secondary btn-sm" onClick={previewBackfillTagCategories} disabled={tagsBackfillPreviewLoading || tagsBackfillRunning}>
+                      {tagsBackfillPreviewLoading ? 'Checking…' : 'Suggest categories for uncategorized tags'}
                     </button>
                     {tagsBackfillMessage && (
                       <span className={`mono-sm ${tagsBackfillMessage.ok ? 'text-success' : 'text-danger'}`}>
@@ -780,6 +803,45 @@ function App() {
                       </span>
                     )}
                   </div>
+
+                  {tagsBackfillPreview && (
+                    <div className="settings-readonly-box" style={{ marginTop: '0.75rem' }}>
+                      <div className="settings-readonly-header">
+                        <h4 className="settings-readonly-title">Preview — nothing saved yet</h4>
+                      </div>
+                      {tagsBackfillPreview.updates.length ? (
+                        <>
+                          <p className="text-muted mono-sm" style={{ marginTop: 0 }}>
+                            {tagsBackfillPreview.updates.length} of {tagsBackfillPreview.checked} uncategorized tag(s) would be updated:
+                          </p>
+                          <ul className="settings-compact-list" style={{ maxHeight: '220px', overflowY: 'auto' }}>
+                            {tagsBackfillPreview.updates.map((u) => (
+                              <li key={u.tagText} className="settings-list-item">
+                                <span>{u.tagText} → <strong>{u.category}</strong></span>
+                              </li>
+                            ))}
+                          </ul>
+                          <div className="flex-row" style={{ gap: '0.5rem', marginTop: '0.5rem' }}>
+                            <button className="btn-primary btn-sm" onClick={applyBackfillTagCategories} disabled={tagsBackfillRunning}>
+                              Apply {tagsBackfillPreview.updates.length} change{tagsBackfillPreview.updates.length > 1 ? 's' : ''}
+                            </button>
+                            <button className="btn-secondary btn-sm" onClick={() => setTagsBackfillPreview(null)} disabled={tagsBackfillRunning}>
+                              Cancel
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="empty-state" style={{ margin: 0 }}>
+                            No matches found among {tagsBackfillPreview.checked} uncategorized tag(s) — nothing to apply.
+                          </p>
+                          <button className="btn-secondary btn-sm" style={{ marginTop: '0.5rem' }} onClick={() => setTagsBackfillPreview(null)}>
+                            Close
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="settings-subsection" style={{ marginBottom: 0 }}>
