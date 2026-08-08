@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import StatusPill from './components/StatusPill.jsx';
 
 function UpdaterStatus() {
   const [phase, setPhase] = useState('idle');
@@ -65,7 +66,7 @@ function UpdaterStatus() {
   if (phase === 'available') {
     return (
       <div className="flex-row flex-wrap" style={{ gap: '0.5rem' }}>
-        <span className="status-pill pending">Update {version ? `v${version}` : ''} available</span>
+        <StatusPill variant="pending">Update {version ? `v${version}` : ''} available</StatusPill>
         <button className="btn-primary btn-sm" onClick={handleDownload}>Download update</button>
       </div>
     );
@@ -78,7 +79,7 @@ function UpdaterStatus() {
   if (phase === 'downloaded') {
     return (
       <div className="flex-row flex-wrap" style={{ gap: '0.5rem' }}>
-        <span className="status-pill success">Update {version ? `v${version}` : ''} ready</span>
+        <StatusPill variant="success">Update {version ? `v${version}` : ''} ready</StatusPill>
         <button className="btn-primary btn-sm" onClick={handleInstall}>Restart & install</button>
       </div>
     );
@@ -87,7 +88,7 @@ function UpdaterStatus() {
   if (phase === 'not-available') {
     return (
       <div className="flex-row flex-wrap" style={{ gap: '0.5rem' }}>
-        <span className="status-pill success">Up to date</span>
+        <StatusPill variant="success">Up to date</StatusPill>
         <button className="btn-ghost btn-sm" onClick={handleCheck}>Check again</button>
       </div>
     );
