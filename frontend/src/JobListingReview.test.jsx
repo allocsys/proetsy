@@ -93,4 +93,29 @@ describe('JobListingReview', () => {
     );
     expect(await screen.findByText('Copied!')).toBeInTheDocument();
   });
+
+  it('copies individual fields (Title, Description, Tags, Alternate tags) to clipboard', async () => {
+    fetch.mockResolvedValueOnce({ ok: true, json: async () => [LISTING] });
+    const user = userEvent.setup();
+    render(<JobListingReview jobId="42" />);
+    await user.click(screen.getByText('Load listings'));
+    await screen.findByDisplayValue('Original Title');
+
+    // Copy Title
+    await user.click(screen.getByRole('button', { name: 'Copy Title to clipboard' }));
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Original Title');
+    expect(await screen.findByText('✓ Copied')).toBeInTheDocument();
+
+    // Copy Description
+    await user.click(screen.getByRole('button', { name: 'Copy Description to clipboard' }));
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Original description');
+
+    // Copy Tags
+    await user.click(screen.getByRole('button', { name: 'Copy Tags to clipboard' }));
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('wall art, boho');
+
+    // Copy Alternate Tags
+    await user.click(screen.getByRole('button', { name: 'Copy Alternate Tags to clipboard' }));
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('minimalist');
+  });
 });

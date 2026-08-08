@@ -24,6 +24,17 @@ function ListingCard({ listing, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [copiedField, setCopiedField] = useState(null);
+
+  async function handleCopyField(text, fieldName) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(fieldName);
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch {
+      setError('Clipboard copy failed — copy manually.');
+    }
+  }
 
   async function save() {
     setSaving(true);
@@ -73,9 +84,21 @@ function ListingCard({ listing, onSaved }) {
       </div>
 
       <div className="settings-field mb-3">
-        <label className="settings-field-label" htmlFor={`listing-title-${listing.id}`}>
-          Title (max 140 chars)
-        </label>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 'var(--space-1)' }}>
+          <label className="settings-field-label" htmlFor={`listing-title-${listing.id}`}>
+            Title (max 140 chars)
+          </label>
+          <button
+            type="button"
+            className="btn-secondary btn-xs"
+            onClick={() => handleCopyField(title, 'title')}
+            title="Copy Title to clipboard"
+            aria-label="Copy Title to clipboard"
+            style={{ padding: '2px 8px', height: 'auto', minHeight: '18px' }}
+          >
+            {copiedField === 'title' ? '✓ Copied' : 'Copy'}
+          </button>
+        </div>
         <input
           id={`listing-title-${listing.id}`}
           className="input"
@@ -85,9 +108,21 @@ function ListingCard({ listing, onSaved }) {
       </div>
 
       <div className="settings-field mb-3">
-        <label className="settings-field-label" htmlFor={`listing-desc-${listing.id}`}>
-          Description
-        </label>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 'var(--space-1)' }}>
+          <label className="settings-field-label" htmlFor={`listing-desc-${listing.id}`}>
+            Description
+          </label>
+          <button
+            type="button"
+            className="btn-secondary btn-xs"
+            onClick={() => handleCopyField(description, 'desc')}
+            title="Copy Description to clipboard"
+            aria-label="Copy Description to clipboard"
+            style={{ padding: '2px 8px', height: 'auto', minHeight: '18px' }}
+          >
+            {copiedField === 'desc' ? '✓ Copied' : 'Copy'}
+          </button>
+        </div>
         <textarea
           id={`listing-desc-${listing.id}`}
           className="listing-textarea input"
@@ -97,9 +132,21 @@ function ListingCard({ listing, onSaved }) {
       </div>
 
       <div className="settings-field mb-3">
-        <label className="settings-field-label" htmlFor={`listing-tags-${listing.id}`}>
-          Tags (comma-separated, max 13)
-        </label>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 'var(--space-1)' }}>
+          <label className="settings-field-label" htmlFor={`listing-tags-${listing.id}`}>
+            Tags (comma-separated, max 13)
+          </label>
+          <button
+            type="button"
+            className="btn-secondary btn-xs"
+            onClick={() => handleCopyField(tagsText, 'tags')}
+            title="Copy Tags to clipboard"
+            aria-label="Copy Tags to clipboard"
+            style={{ padding: '2px 8px', height: 'auto', minHeight: '18px' }}
+          >
+            {copiedField === 'tags' ? '✓ Copied' : 'Copy'}
+          </button>
+        </div>
         <input
           id={`listing-tags-${listing.id}`}
           className="input"
@@ -109,9 +156,21 @@ function ListingCard({ listing, onSaved }) {
       </div>
 
       <div className="settings-field mb-4">
-        <label className="settings-field-label" htmlFor={`listing-alt-tags-${listing.id}`}>
-          Alternate tags (comma-separated)
-        </label>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 'var(--space-1)' }}>
+          <label className="settings-field-label" htmlFor={`listing-alt-tags-${listing.id}`}>
+            Alternate tags (comma-separated)
+          </label>
+          <button
+            type="button"
+            className="btn-secondary btn-xs"
+            onClick={() => handleCopyField(tagAltText, 'altTags')}
+            title="Copy Alternate Tags to clipboard"
+            aria-label="Copy Alternate Tags to clipboard"
+            style={{ padding: '2px 8px', height: 'auto', minHeight: '18px' }}
+          >
+            {copiedField === 'altTags' ? '✓ Copied' : 'Copy'}
+          </button>
+        </div>
         <input
           id={`listing-alt-tags-${listing.id}`}
           className="input"
