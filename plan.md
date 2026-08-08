@@ -1,0 +1,42 @@
+# UX/Workflow Findings — Dashboard Review
+
+Findings from a review of `frontend/src/App.jsx` and `ARCHITECTURE.md`. These are front-end/UX friction points, not architecture problems — the backend design holds up fine.
+
+## 1. Pipeline toggles are duplicated and confusing
+There are two places to turn pipeline modules on/off:
+- Settings → "Pipeline Modules" (persisted default, `togglePersistedModule`)
+- Upload page → toggles inside the pipeline section (session-only override via `overrides` state)
+
+Both render the same checkbox list off `pipelineDefault.pipeline`, but nothing in the UI explains which one wins for a given run, or that one is a saved default and the other a one-time override. A user changing one could reasonably assume they changed the other.
+
+**Fix direction:** Either merge into a single control with an explicit "apply to this run only" vs "save as default" choice, or visually/textually separate the two so it's obvious they're different scopes.
+
+## 2. Sidebar defaults to collapsed
+`sidebarCollapsed` initializes to `true`, so a first-time user lands on icon-only nav with no labels until they find and click the collapse toggle.
+
+**Fix direction:** Default to expanded; persist the user's preference (e.g. localStorage) once they collapse it themselves.
+
+## 3. Job Review requires manually typing a job ID
+The "Review a Job" view is a bare number input + "Load job" button — no picker, no autocomplete. Listing History already has a clickable table of jobs, but if a user lands on Review first they're stuck guessing/typing IDs.
+
+**Fix direction:** Add a dropdown/search sourced from `/api/jobs`, or default Review to showing recent jobs when no ID is loaded.
+
+## 4. Irreversible AI action with only a confirm() dialog
+"Suggest categories for uncategorized tags" (`backfillTagCategories`) writes AI-guessed categories immediately with no preview. The confirm dialog itself admits this: *"Suggestions are written immediately and can't be previewed first."*
+
+**Fix direction:** Show a preview/diff of suggested categories before committing, or make the write itself easily reversible (e.g. one-click revert of the last backfill run).
+
+## 5. Inconsistent delete UX
+Tags, trends, and API keys all delete via native `window.confirm()` popups — jarring against an otherwise custom-styled dashboard, and inconsistent with item 4 above, which also confirms but can't be undone even after confirming.
+
+**Fix direction:** Standardize on in-app confirmation UI (styled modal or inline "confirm delete" state) instead of native browser dialogs, applied consistently across all destructive actions.
+
+## 6. Bulk upload is N sequential round-trips
+`handleFiles` loops `for (const artwork of artworks)` and does one `POST /api/jobs` per file, awaited serially, instead of a single bulk-create endpoint.
+
+**Fix direction:** Add a `POST /api/jobs/bulk` endpoint accepting an array of artwork IDs, or at minimum fire the per-file requests concurrently (`Promise.all`) instead of sequentially.
+
+## 7. Everything dumped into one Settings mega-page
+Tags, trends, shop conventions, API keys (sensitive), automation/watch-folder config, and rate-limit diagnostics are all one long scroll with no sub-navigation. Sensitive key management sits directly next to trivial fields like default price.
+
+**Fix direction:** Split into sub-tabs (e.g. Tags & Trends / API Keys / Automation / Diagnostics) or at minimum visually separate sensitive sections with stronger boundaries.
