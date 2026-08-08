@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TasteFilter from './TasteFilter.jsx';
 
@@ -266,40 +266,84 @@ describe('TasteFilter — Step 2.9: collapsed Auto-sorted section for autoDecisi
   });
 });
 
-describe('TasteFilter — watched-folder auto-import polling (Module 7 -> "Auto-import via watched folder", step 7)', () => {
+describe('TasteFilter — watched-folder auto-import via SSE (Module 7 -> "Auto-import via watched folder", step 7)', () => {
+  // jsdom has no built-in EventSource -- a minimal stand-in that records every instance
+  // TasteFilter.jsx constructs and lets a test fire a synthetic message straight at the
+  // component's own onmessage handler, the same way the real backend stream would.
+  let sourceInstances;
+
   beforeEach(() => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+    sourceInstances = [];
+    global.EventSource = class {
+      constructor(url) {
+        this.url = url;
+        this.onmessage = null;
+        this.closed = false;
+        sourceInstances.push(this);
+      }
+      close() {
+        this.closed = true;
+      }
+    };
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    delete global.EventSource;
   });
 
-  it('does not poll before the interval elapses', () => {
+  it('opens a stream connection to /api/taste-filter/pending/stream on mount', () => {
     render(<TasteFilter />);
-    expect(fetch).not.toHaveBeenCalled();
+    expect(sourceInstances).toHaveLength(1);
+    expect(sourceInstances[0].url).toBe('/api/taste-filter/pending/stream');
   });
 
-  it('merges a watcher-detected candidate into the grid once the poll interval elapses', async () => {
+  it('merges a watcher-pushed candidate into the grid when a message event arrives', async () => {
     const watched = { ...CANDIDATE, imagePath: '/data/taste-filter/from-watcher.png', imageUrl: '/taste-filter-files/from-watcher.png' };
-    fetch.mockResolvedValue({ ok: true, json: async () => ({ candidates: [watched] }) });
-
     render(<TasteFilter />);
-    await vi.advanceTimersByTimeAsync(5000);
+    const [source] = sourceInstances;
 
-    expect(fetch).toHaveBeenCalledWith('/api/taste-filter/pending');
+    act(() => {
+      source.onmessage({ data: JSON.stringify(watched) });
+    });
+
     expect(await screen.findByText('Keep')).toBeInTheDocument();
   });
 
-  it('does not re-add a candidate already merged in from an earlier poll', async () => {
+  it('does not re-add a candidate already merged in from an earlier event', async () => {
     const watched = { ...CANDIDATE, imagePath: '/data/taste-filter/from-watcher.png', imageUrl: '/taste-filter-files/from-watcher.png' };
-    fetch.mockResolvedValue({ ok: true, json: async () => ({ candidates: [watched] }) });
-
     render(<TasteFilter />);
-    await vi.advanceTimersByTimeAsync(5000);
+    const [source] = sourceInstances;
+
+    act(() => {
+      source.onmessage({ data: JSON.stringify(watched) });
+    });
     await screen.findByText('Keep');
-    await vi.advanceTimersByTimeAsync(5000);
+
+    act(() => {
+      source.onmessage({ data: JSON.stringify(watched) });
+    });
 
     expect(screen.getAllByText('Keep')).toHaveLength(1);
+  });
+
+  it('ignores a malformed message instead of throwing', async () => {
+    render(<TasteFilter />);
+    const [source] = sourceInstances;
+
+    expect(() => {
+      act(() => {
+        source.onmessage({ data: 'not json' });
+      });
+    }).not.toThrow();
+    expect(screen.queryByText('Keep')).not.toBeInTheDocument();
+  });
+
+  it('closes the stream connection on unmount', () => {
+    const { unmount } = render(<TasteFilter />);
+    const [source] = sourceInstances;
+
+    unmount();
+
+    expect(source.closed).toBe(true);
   });
 });
