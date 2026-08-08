@@ -25,18 +25,32 @@ const CANDIDATE = {
 // not just the tests that exercise it directly.
 let sourceInstances;
 
-function defaultFetchMock(url) {
-  // TasteFilter's mount-time effect fetches these unconditionally, before any
-  // interaction the tests below actually care about. Neither response needs to be
-  // realistic -- centroids/prompts only feed datalist suggestions no test asserts on --
-  // it just needs to resolve instead of leaving `fetch(...)` return undefined.
-  if (url === '/api/taste-filter/centroids') return Promise.resolve({ ok: true, json: async () => [] });
-  if (url === '/api/prompts') return Promise.resolve({ ok: true, json: async () => [] });
-  return Promise.resolve({ ok: true, json: async () => ({}) });
-}
+// TasteFilter's mount-time effect fetches these two URLs unconditionally, before any
+// interaction the tests below actually care about -- neither response needs to be
+// realistic, since centroids/prompts only feed datalist suggestions no test asserts on.
+// Handled here, *outside* the recorded spy below, so these mount-time calls don't shift
+// the call-index assertions (fetch.mock.calls[0], calls[2][1], toHaveBeenLastCalledWith,
+// etc.) that every other test relies on -- fetch.mock.calls stays exactly the calls each
+// test already expects, in the same order as before.
+const MOUNT_TIME_URLS = {
+  '/api/taste-filter/centroids': () => Promise.resolve({ ok: true, json: async () => [] }),
+  '/api/prompts': () => Promise.resolve({ ok: true, json: async () => [] }),
+};
 
 beforeEach(() => {
-  global.fetch = vi.fn(defaultFetchMock);
+  const recordedFetch = vi.fn();
+  global.fetch = (url, ...rest) => {
+    if (MOUNT_TIME_URLS[url]) return MOUNT_TIME_URLS[url]();
+    return recordedFetch(url, ...rest);
+  };
+  // Tests call `fetch.mockResolvedValueOnce(...)`, `fetch.mock.calls`, etc. directly on
+  // the global -- forward those onto the underlying spy so existing test code is unchanged.
+  Object.setPrototypeOf(global.fetch, Object.getPrototypeOf(recordedFetch));
+  Object.assign(global.fetch, recordedFetch);
+  global.fetch.mock = recordedFetch.mock;
+  global.fetch.mockResolvedValueOnce = recordedFetch.mockResolvedValueOnce.bind(recordedFetch);
+  global.fetch.mockResolvedValue = recordedFetch.mockResolvedValue.bind(recordedFetch);
+  global.fetch.mockImplementationOnce = recordedFetch.mockImplementationOnce.bind(recordedFetch);
 
   sourceInstances = [];
   global.EventSource = class {
