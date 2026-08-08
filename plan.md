@@ -116,15 +116,11 @@ errors into a 400, e.g. `upsertConfiguredTemplate`'s pattern in `mockup-template
 - [x] `stylizeMin <= defaultStylize <= stylizeMax`.
 - [x] `titleSeparator`, `version`, `style` — non-empty strings.
 - [x] `forbiddenTitleWords`, `aiDisclosurePhrases`, `deliveryDetailPhrases` — arrays of
-      non-empty strings. **Deviation from plan:** implemented as *non-empty* arrays of
-      non-empty strings, not "can be empty" as originally scoped — `validateFieldValue`
-      currently only checks each element is a non-empty string, it does not special-case
-      `value.length === 0`, so an empty array actually still passes today (empty array →
-      `.some(...)` is vacuously false). Leaving this note because it wasn't deliberately
-      tested either way — add an explicit test case for the empty-array behavior before
-      relying on it, and confirm that's really the desired behavior (plan said it should
-      be a legitimate choice, current code happens to allow it but wasn't verified
-      on purpose).
+      non-empty strings; empty arrays pass (matches plan — `.some(...)` over an empty
+      array is vacuously false, so turning a filter off entirely is allowed). Not yet
+      covered by an explicit test case (`index.test.js` only tests the reject paths and
+      a happy-path with non-empty arrays) — worth adding one before relying on it
+      further, but the behavior matches spec.
 - [x] `aspectRatioByCategory` — plain object, values matching `W:H` shape. Implemented
       as a fresh regex (`/^\d+:\d+$/`) directly in `validateFieldValue` rather than
       reusing existing aspect-ratio parsing — did not find an existing shared
