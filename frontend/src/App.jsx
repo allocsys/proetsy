@@ -1072,7 +1072,7 @@ function App() {
 
                 <div className="settings-subsection" style={{ marginBottom: 0 }}>
                   <p className="text-muted mono-sm" style={{ marginTop: 0, marginBottom: '0.75rem' }}>
-                    This is the <strong>saved default</strong> used for every future upload. For a one-time change on a single upload instead, use the Pipeline toggles on the Upload page — those apply only to that run and don't affect this default.
+                    This is the <strong>saved default</strong> used for every future upload. For a one-time change on a single upload instead, use the Pipeline toggles on the Upload page — those apply only to that run and don&apos;t affect this default.
                   </p>
                   <div className="flex-row flex-wrap" style={{ gap: '1.5rem' }}>
                     {pipelineDefault?.pipeline?.map((m) => (
@@ -1281,7 +1281,7 @@ function App() {
                 <div className="upload-lane">
                   <h3>Pipeline</h3>
                   <p className="text-muted" style={{ marginTop: 0 }}>
-                    These toggles apply <strong>only to artwork uploaded next</strong> — they don't change your saved default.
+                    These toggles apply <strong>only to artwork uploaded next</strong> — they don&apos;t change your saved default.
                     To change what every future upload starts with, go to <strong>Settings → Pipeline Modules</strong>.
                   </p>
                   <div className="flex-row flex-wrap" style={{ gap: '1.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
