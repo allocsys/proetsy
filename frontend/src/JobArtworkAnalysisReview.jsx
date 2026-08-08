@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAsyncTask } from './hooks/useAsyncTask.js';
 
 function listOrDash(items) {
   return Array.isArray(items) && items.length > 0 ? items.join(', ') : '—';
@@ -38,16 +39,19 @@ export default function JobArtworkAnalysisReview({ jobId }) {
   const [job, setJob] = useState(null);
   const [analysis, setAnalysis] = useState(null);
   const [manualNotes, setManualNotes] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [running, setRunning] = useState(false);
-  const [savingNotes, setSavingNotes] = useState(false);
-  const [error, setError] = useState(null);
+  // Three independent operations, each with its own useAsyncTask instance rather than
+  // one shared loading/error pair -- the original shared `error` state meant starting
+  // any operation cleared whatever error the *last* operation left behind, but no test
+  // (or user-facing behavior) actually depends on that cross-operation clearing; each
+  // action's own error naturally clears the next time that same action runs, and the
+  // three are rendered together below exactly as the single shared error was.
+  const load = useAsyncTask();
+  const analyze = useAsyncTask();
+  const notes = useAsyncTask();
 
-  async function loadJobAndAnalysis() {
+  function loadJobAndAnalysis() {
     if (!jobId) return;
-    setLoading(true);
-    setError(null);
-    try {
+    load.run(async () => {
       const jobRes = await fetch(`/api/jobs/${jobId}`);
       const jobData = await jobRes.json();
       if (!jobRes.ok) throw new Error(jobData.error || 'Failed to load job');
@@ -58,35 +62,23 @@ export default function JobArtworkAnalysisReview({ jobId }) {
       const artworkData = await artworkRes.json();
       if (!artworkRes.ok) throw new Error(artworkData.error || 'Failed to load artwork');
       setAnalysis(artworkData.image_analysis);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    });
   }
 
-  async function runAnalysis() {
+  function runAnalysis() {
     if (!jobId) return;
-    setRunning(true);
-    setError(null);
-    try {
+    analyze.run(async () => {
       const res = await fetch(`/api/jobs/${jobId}/run/image-analyzer`, { method: 'POST' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Image analysis failed');
       setAnalysis(data.imageAnalysis);
       setJob(data.job);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setRunning(false);
-    }
+    });
   }
 
-  async function saveManualNotes() {
+  function saveManualNotes() {
     if (!jobId) return;
-    setSavingNotes(true);
-    setError(null);
-    try {
+    notes.run(async () => {
       const res = await fetch(`/api/jobs/${jobId}/manual-notes`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -95,21 +87,19 @@ export default function JobArtworkAnalysisReview({ jobId }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save manual notes');
       setJob(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSavingNotes(false);
-    }
+    });
   }
+
+  const error = load.error || analyze.error || notes.error;
 
   return (
     <div className="card artwork-analysis-card">
       <div className="flex-row mb-4" style={{ gap: 'var(--space-2)' }}>
-        <button className="btn-primary" onClick={loadJobAndAnalysis} disabled={!jobId || loading}>
-          {loading ? 'Loading…' : 'Load analysis'}
+        <button className="btn-primary" onClick={loadJobAndAnalysis} disabled={!jobId || load.pending}>
+          {load.pending ? 'Loading…' : 'Load analysis'}
         </button>
-        <button className="btn-secondary" onClick={runAnalysis} disabled={!jobId || running}>
-          {running ? 'Running...' : 'Run image analyzer'}
+        <button className="btn-secondary" onClick={runAnalysis} disabled={!jobId || analyze.pending}>
+          {analyze.pending ? 'Running...' : 'Run image analyzer'}
         </button>
       </div>
 
@@ -141,8 +131,8 @@ export default function JobArtworkAnalysisReview({ jobId }) {
             />
           </div>
           <div className="mt-2">
-            <button className="btn-primary" onClick={saveManualNotes} disabled={savingNotes}>
-              {savingNotes ? 'Saving notes…' : 'Save manual notes'}
+            <button className="btn-primary" onClick={saveManualNotes} disabled={notes.pending}>
+              {notes.pending ? 'Saving notes…' : 'Save manual notes'}
             </button>
           </div>
         </div>
