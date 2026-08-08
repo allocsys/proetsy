@@ -2,7 +2,7 @@
 
 Findings from a review of `frontend/src/App.jsx` and `ARCHITECTURE.md`. These are front-end/UX friction points, not architecture problems — the backend design holds up fine.
 
-## 1. Pipeline toggles are duplicated and confusing
+## 1. Pipeline toggles are duplicated and confusing — ✅ Done (`276a3a5`)
 There are two places to turn pipeline modules on/off:
 - Settings → "Pipeline Modules" (persisted default, `togglePersistedModule`)
 - Upload page → toggles inside the pipeline section (session-only override via `overrides` state)
@@ -10,6 +10,8 @@ There are two places to turn pipeline modules on/off:
 Both render the same checkbox list off `pipelineDefault.pipeline`, but nothing in the UI explains which one wins for a given run, or that one is a saved default and the other a one-time override. A user changing one could reasonably assume they changed the other.
 
 **Fix direction:** Either merge into a single control with an explicit "apply to this run only" vs "save as default" choice, or visually/textually separate the two so it's obvious they're different scopes.
+
+**What shipped:** Upload-page copy now explicitly points to Settings → Pipeline Modules as the actual saved default (previously it wrongly pointed to `pipeline.config.json`). Each toggle that differs from the saved default is labeled "(changed for this upload)", and a "Reset to saved default" button appears whenever any override is active. Settings copy now leads with "This is the saved default" to make the asymmetry explicit.
 
 ## 2. Sidebar defaults to collapsed
 `sidebarCollapsed` initializes to `true`, so a first-time user lands on icon-only nav with no labels until they find and click the collapse toggle.
