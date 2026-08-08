@@ -1,6 +1,10 @@
-// Hardcoded shop conventions for Module 2 (Listing Generator). See ARCHITECTURE.md ->
-// Module 2 -> "Must hardcode shop conventions". These are baked into the LLM prompt AND
-// enforced again after generation (see lib/listing-generator/validate.js) as a backstop.
+// Default shop conventions for Module 2 (Listing Generator). Originally hardcoded/frozen
+// (see ARCHITECTURE.md -> Module 2 -> "Must hardcode shop conventions"); as of
+// plan.md -> "Dashboard-Editable Shop Conventions", these are now only the *defaults*
+// used by config/index.js's getShopConventions() when a shop hasn't overridden a field
+// via the dashboard (backed by the `settings` table). Read live values through
+// getShopConventions()/getShopConventions().listing -- never import SHOP_CONVENTIONS
+// directly outside of config/index.js's fallback logic and this file's own tests.
 
 export const LISTING_VARIATIONS = ['fine_art', 'aesthetic', 'gift'];
 
@@ -31,11 +35,11 @@ export const SHOP_CONVENTIONS = Object.freeze({
   ],
 });
 
-// Hardcoded Midjourney prompt conventions for Module 4 (Trend/Prompt Helper). See
+// Default Midjourney prompt conventions for Module 4 (Trend/Prompt Helper). See
 // ARCHITECTURE.md -> Module 4 -> "Output: ready-to-paste Midjourney prompts using shop
-// conventions (--v 7, --style raw, aspect ratio per category, --s 50–150)". Baked into
-// the LLM prompt AND enforced again after generation (see
-// lib/prompt-helper/validate.js) as a backstop, same pattern as SHOP_CONVENTIONS above.
+// conventions (--v 7, --style raw, aspect ratio per category, --s 50–150)". Same
+// defaults-only status as SHOP_CONVENTIONS above -- read live values through
+// getShopConventions().midjourney, not this export directly.
 export const MIDJOURNEY_CONVENTIONS = Object.freeze({
   version: '--v 7',
   style: '--style raw',
