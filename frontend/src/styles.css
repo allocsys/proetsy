@@ -1094,6 +1094,7 @@ input:focus, select:focus, textarea:focus {
 .text-muted { color: var(--studio-ink-soft); }
 .text-danger { color: var(--state-danger); }
 .text-pending { color: var(--state-pending); }
+.text-success { color: var(--state-success); }
 
 .settings-section-title {
   font-size: 15px;
@@ -1181,6 +1182,16 @@ input:focus, select:focus, textarea:focus {
   color: var(--studio-ink-soft);
   font-size: 12.5px;
   line-height: 1.6;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.settings-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
 .settings-readonly-box {
@@ -1223,10 +1234,9 @@ input:focus, select:focus, textarea:focus {
 }
 
 .settings-dashboard-grid {
-  display: grid;
-  grid-template-columns: 1.1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-5);
-  align-items: start;
 }
 
 .settings-full-width-card {

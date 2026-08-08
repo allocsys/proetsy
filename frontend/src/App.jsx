@@ -87,9 +87,9 @@ function App() {
   const [tags, setTags] = useState([]);
   const [tagsText, setTagsText] = useState('');
   const [tagsCategory, setTagsCategory] = useState('');
-  const [tagsSavedMessage, setTagsSavedMessage] = useState('');
-  const [tagsCsvMessage, setTagsCsvMessage] = useState('');
-  const [tagsBackfillMessage, setTagsBackfillMessage] = useState('');
+  const [tagsSavedMessage, setTagsSavedMessage] = useState(null); // { text, ok }
+  const [tagsCsvMessage, setTagsCsvMessage] = useState(null); // { text, ok }
+  const [tagsBackfillMessage, setTagsBackfillMessage] = useState(null); // { text, ok }
   const [tagsBackfillRunning, setTagsBackfillRunning] = useState(false);
   const [watchStatus, setWatchStatus] = useState(null);
   const [rateLimits, setRateLimits] = useState([]);
@@ -337,15 +337,30 @@ function App() {
       body: JSON.stringify({ tags: tagsText, category: tagsCategory.trim() || null }),
     });
     const data = await res.json();
-    setTagsSavedMessage(res.ok ? `Saved. ${data.inserted} new tag(s), ${data.total} total.` : data.error);
-    setTagsText('');
+    setTagsSavedMessage({
+      text: res.ok ? `Saved. ${data.inserted} new tag(s), ${data.total} total.` : (data.error || 'Failed to save tags'),
+      ok: res.ok
+    });
+    if (res.ok) {
+      setTagsText('');
+    }
     refreshSetupStatus();
     refreshTags();
   }
 
+  async function deleteTag(id) {
+    await fetch(`/api/tags/${id}`, { method: 'DELETE' });
+    refreshTags();
+  }
+
+  async function deleteTrend(id) {
+    await fetch(`/api/trends/${id}`, { method: 'DELETE' });
+    refreshTrends();
+  }
+
   async function importTagsCsv(file) {
     if (!file) return;
-    setTagsCsvMessage(`Importing ${file.name}…`);
+    setTagsCsvMessage({ text: `Importing ${file.name}…`, ok: true });
     try {
       const csv = await file.text();
       const res = await fetch('/api/tags/csv', {
@@ -354,9 +369,12 @@ function App() {
         body: JSON.stringify({ csv }),
       });
       const data = await res.json();
-      setTagsCsvMessage(res.ok ? `Imported ${data.inserted} new tag(s) from ${file.name}.` : data.error);
+      setTagsCsvMessage({
+        text: res.ok ? `Imported ${data.inserted} new tag(s) from ${file.name}.` : (data.error || 'Import failed'),
+        ok: res.ok
+      });
     } catch (err) {
-      setTagsCsvMessage(`Import failed: ${err.message}`);
+      setTagsCsvMessage({ text: `Import failed: ${err.message}`, ok: false });
     }
     refreshSetupStatus();
     refreshTags();
@@ -364,7 +382,7 @@ function App() {
 
   async function backfillTagCategories() {
     setTagsBackfillRunning(true);
-    setTagsBackfillMessage('Checking uncategorized tags…');
+    setTagsBackfillMessage({ text: 'Checking uncategorized tags…', ok: true });
     try {
       const res = await fetch('/api/tags/backfill-categories', { method: 'POST' });
       let data;
@@ -373,13 +391,12 @@ function App() {
       } catch {
         throw new Error(`No response from backend (status ${res.status}). Is the backend server running?`);
       }
-      setTagsBackfillMessage(
-        res.ok
-          ? `Backfilled ${data.updated} of ${data.checked} uncategorized tag(s).`
-          : data.error
-      );
+      setTagsBackfillMessage({
+        text: res.ok ? `Backfilled ${data.updated} of ${data.checked} uncategorized tag(s).` : (data.error || 'Backfill failed'),
+        ok: res.ok
+      });
     } catch (err) {
-      setTagsBackfillMessage(`Backfill failed: ${err.message}`);
+      setTagsBackfillMessage({ text: `Backfill failed: ${err.message}`, ok: false });
     }
     setTagsBackfillRunning(false);
     refreshTags();
@@ -494,7 +511,11 @@ function App() {
           </div>
           <UpdaterStatus />
           <button className="btn-secondary" onClick={() => goTo(activeView === 'settings' ? 'upload' : 'settings')}>
-            {activeView === 'settings' ? 'Close settings' : '⚙ Settings'}
+            <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ width: '14px', height: '14px' }}>
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
+            </svg>
+            {activeView === 'settings' ? 'Close settings' : 'Settings'}
           </button>
         </div>
       </header>
@@ -620,7 +641,9 @@ function App() {
 
                 <div className="settings-subsection">
                   <h4 className="settings-sub-heading">Tag library</h4>
+                  <label htmlFor="settings-tags-textarea" className="settings-field-label" style={{ display: 'block', marginBottom: '0.25rem' }}>Add tags (one per line)</label>
                   <textarea
+                    id="settings-tags-textarea"
                     rows={5}
                     className="mono input"
                     style={{ width: '100%', marginBottom: '0.75rem' }}
@@ -630,8 +653,9 @@ function App() {
                   />
                   <div className="settings-field-row">
                     <div className="settings-field">
-                      <span className="settings-field-label">Category (optional, applies to all)</span>
+                      <label htmlFor="settings-tags-category" className="settings-field-label">Category (optional, applies to all)</label>
                       <input
+                        id="settings-tags-category"
                         list="tag-category-options"
                         value={tagsCategory}
                         onChange={(e) => setTagsCategory(e.target.value)}
@@ -644,15 +668,27 @@ function App() {
                       </datalist>
                     </div>
                     <button className="btn-primary" onClick={saveTags} disabled={!tagsText.trim()}>Save tags</button>
-                    {tagsSavedMessage && <span className="text-muted mono-sm">{tagsSavedMessage}</span>}
+                    {tagsSavedMessage && (
+                      <span className={`mono-sm ${tagsSavedMessage.ok ? 'text-success' : 'text-danger'}`}>
+                        {tagsSavedMessage.text}
+                      </span>
+                    )}
                   </div>
 
                   <h4 className="settings-sub-heading" style={{ marginTop: '1rem' }}>Current tags</h4>
                   {tags.length ? (
                     <ul className="settings-compact-list">
                       {tags.map((t) => (
-                        <li key={t.id || t.tag_text}>
-                          {t.tag_text}{t.category ? ` (${t.category})` : ''}
+                        <li key={t.id || t.tag_text} className="settings-list-item">
+                          <span>{t.tag_text}{t.category ? ` (${t.category})` : ''}</span>
+                          <button
+                            className="btn-secondary btn-xs"
+                            onClick={() => deleteTag(t.id)}
+                            title="Delete tag"
+                            aria-label={`Delete tag ${t.tag_text}`}
+                          >
+                            ×
+                          </button>
                         </li>
                       ))}
                     </ul>
@@ -668,11 +704,19 @@ function App() {
                       Import CSV
                       <input type="file" accept=".csv,text/csv" onChange={(e) => importTagsCsv(e.target.files?.[0])} />
                     </label>
-                    {tagsCsvMessage && <span className="text-muted mono-sm">{tagsCsvMessage}</span>}
+                    {tagsCsvMessage && (
+                      <span className={`mono-sm ${tagsCsvMessage.ok ? 'text-success' : 'text-danger'}`}>
+                        {tagsCsvMessage.text}
+                      </span>
+                    )}
                     <button className="btn-secondary btn-sm" onClick={backfillTagCategories} disabled={tagsBackfillRunning}>
                       Suggest categories for uncategorized tags
                     </button>
-                    {tagsBackfillMessage && <span className="text-muted mono-sm">{tagsBackfillMessage}</span>}
+                    {tagsBackfillMessage && (
+                      <span className={`mono-sm ${tagsBackfillMessage.ok ? 'text-success' : 'text-danger'}`}>
+                        {tagsBackfillMessage.text}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -681,8 +725,16 @@ function App() {
                   {trends.length ? (
                     <ul className="settings-compact-list">
                       {trends.map((t) => (
-                        <li key={t.id}>
-                          {t.term}{t.category ? ` (${t.category})` : ''}
+                        <li key={t.id} className="settings-list-item">
+                          <span>{t.term}{t.category ? ` (${t.category})` : ''}</span>
+                          <button
+                            className="btn-secondary btn-xs"
+                            onClick={() => deleteTrend(t.id)}
+                            title="Delete trend"
+                            aria-label={`Delete trend ${t.term}`}
+                          >
+                            ×
+                          </button>
                         </li>
                       ))}
                     </ul>
@@ -691,22 +743,24 @@ function App() {
                   )}
                   <div className="flex-row flex-wrap mt-2">
                     <div className="settings-field" style={{ flex: 1, minWidth: '140px' }}>
-                      <span className="settings-field-label">Trend term</span>
+                      <label htmlFor="settings-trend-term" className="settings-field-label">Trend term</label>
                       <input
+                        id="settings-trend-term"
                         value={newTrendTerm}
                         onChange={(e) => setNewTrendTerm(e.target.value)}
                         placeholder="Trend term"
                       />
                     </div>
                     <div className="settings-field" style={{ flex: 1, minWidth: '140px' }}>
-                      <span className="settings-field-label">Category (optional)</span>
+                      <label htmlFor="settings-trend-category" className="settings-field-label">Category (optional)</label>
                       <input
+                        id="settings-trend-category"
                         value={newTrendCategory}
                         onChange={(e) => setNewTrendCategory(e.target.value)}
                         placeholder="Category (optional)"
                       />
                     </div>
-                    <button className="btn-secondary btn-sm" onClick={addTrendFromSettings} disabled={!newTrendTerm.trim()}>Add trend</button>
+                    <button className="btn-primary btn-sm" onClick={addTrendFromSettings} disabled={!newTrendTerm.trim()}>Add trend</button>
                   </div>
                 </div>
               </div>
@@ -717,8 +771,9 @@ function App() {
                 <div className="settings-subsection">
                   <div className="settings-field-row">
                     <div className="settings-field">
-                      <span className="settings-field-label">Default price</span>
+                      <label htmlFor="settings-default-price" className="settings-field-label">Default price</label>
                       <input
+                        id="settings-default-price"
                         type="number"
                         step="0.01"
                         min="0"
@@ -729,8 +784,9 @@ function App() {
                       />
                     </div>
                     <div className="settings-field" style={{ flex: 1, minWidth: '240px' }}>
-                      <span className="settings-field-label">Delivery text</span>
+                      <label htmlFor="settings-delivery-text" className="settings-field-label">Delivery text</label>
                       <input
+                        id="settings-delivery-text"
                         value={settings.delivery_text || ''}
                         onChange={(e) => setSettings((s) => ({ ...s, delivery_text: e.target.value }))}
                         onBlur={(e) => saveSettings({ delivery_text: e.target.value })}
@@ -812,15 +868,16 @@ function App() {
 
                   <div className="settings-field-row" style={{ marginTop: '1rem' }}>
                     <div className="settings-field">
-                      <span className="settings-field-label">Provider</span>
-                      <select value={newKeyProvider} onChange={(e) => setNewKeyProvider(e.target.value)}>
+                      <label htmlFor="settings-key-provider" className="settings-field-label">Provider</label>
+                      <select id="settings-key-provider" value={newKeyProvider} onChange={(e) => setNewKeyProvider(e.target.value)}>
                         <option value="gemini">Gemini</option>
                         <option value="claude">Claude</option>
                       </select>
                     </div>
                     <div className="settings-field" style={{ flex: 1, minWidth: '240px' }}>
-                      <span className="settings-field-label">Key value</span>
+                      <label htmlFor="settings-key-value" className="settings-field-label">Key value</label>
                       <input
+                        id="settings-key-value"
                         type="password"
                         value={newKeyValue}
                         onChange={(e) => setNewKeyValue(e.target.value)}
@@ -828,8 +885,9 @@ function App() {
                       />
                     </div>
                     <div className="settings-field">
-                      <span className="settings-field-label">Label (optional)</span>
+                      <label htmlFor="settings-key-label" className="settings-field-label">Label (optional)</label>
                       <input
+                        id="settings-key-label"
                         value={newKeyLabel}
                         onChange={(e) => setNewKeyLabel(e.target.value)}
                         placeholder="e.g. backup key"
@@ -841,7 +899,7 @@ function App() {
                 </div>
               </div>
 
-              <div className="settings-section-card card settings-card-modules">
+              <div className="settings-section-card card settings-card-modules settings-full-width-card">
                 <h3 className="settings-section-title">Pipeline Modules</h3>
 
                 <div className="settings-subsection" style={{ marginBottom: 0 }}>
@@ -888,8 +946,9 @@ function App() {
                   </label>
                   <div className="settings-field-row">
                     <div className="settings-field" style={{ flex: 1, minWidth: '260px' }}>
-                      <span className="settings-field-label">Watched folder path</span>
+                      <label htmlFor="settings-watched-folder" className="settings-field-label">Watched folder path</label>
                       <input
+                        id="settings-watched-folder"
                         value={settings.taste_filter_watch_folder || ''}
                         onChange={(e) => setSettings((s) => ({ ...s, taste_filter_watch_folder: e.target.value }))}
                         onBlur={(e) => saveWatchSetting({ taste_filter_watch_folder: e.target.value })}
@@ -897,8 +956,9 @@ function App() {
                       />
                     </div>
                     <div className="settings-field">
-                      <span className="settings-field-label">Category (optional)</span>
+                      <label htmlFor="settings-watch-category" className="settings-field-label">Category (optional)</label>
                       <input
+                        id="settings-watch-category"
                         value={settings.taste_filter_watch_category || ''}
                         onChange={(e) => setSettings((s) => ({ ...s, taste_filter_watch_category: e.target.value }))}
                         onBlur={(e) => saveWatchSetting({ taste_filter_watch_category: e.target.value })}
@@ -931,8 +991,9 @@ function App() {
                     Auto-compute taste threshold
                   </label>
                   <div className="settings-field" style={{ maxWidth: '200px', opacity: settings.taste_filter_auto_enabled === 'true' ? 1 : 0.6 }}>
-                    <span className="settings-field-label">Auto threshold (score cutoff){settings.taste_filter_auto_enabled === 'true' ? '' : ' (inactive — enable auto-compute above)'}</span>
+                    <label htmlFor="settings-auto-threshold" className="settings-field-label">Auto threshold (score cutoff){settings.taste_filter_auto_enabled === 'true' ? '' : ' (inactive — enable auto-compute above)'}</label>
                     <input
+                      id="settings-auto-threshold"
                       type="number"
                       step="0.01"
                       min="0"
