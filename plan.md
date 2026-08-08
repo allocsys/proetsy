@@ -1,6 +1,6 @@
 # Plan: Dashboard-Editable Shop Conventions
 
-**Status:** steps 1-3 (backend getter/setter, call sites, server.js routes) done. This file is the working scope doc for this change — check
+**Status:** steps 1-4 (backend getter/setter, call sites, server.js routes, frontend editable form) done. This file is the working scope doc for this change — check
 items off in place as they land so this can be picked up mid-stream by anyone (or any
 agent) without re-deriving the plan. Delete this file in the PR that completes the
 Rollout section.
@@ -254,7 +254,7 @@ errors into a 400, e.g. `upsertConfiguredTemplate`'s pattern in `mockup-template
        pre-existing failures in `lib/tags/user-list.test.js` (unrelated `dryRun`-field
        drift from a separate in-flight change, not touched by this branch).
 3. [x] `server.js` GET/PATCH routes + `server.config-routes.test.js` cases. Done.
-4. [ ] Frontend editable form + tests.
+4. [x] Frontend editable form + tests. Done.
 5. [ ] `ARCHITECTURE.md` updates.
 6. [ ] Delete this `plan.md` in the same PR that lands step 5.
 
