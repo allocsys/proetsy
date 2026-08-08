@@ -17,8 +17,43 @@ const CANDIDATE = {
   categoryConfident: false,
 };
 
+// jsdom has no built-in EventSource -- a minimal stand-in that records every instance
+// TasteFilter.jsx constructs (one per mount, via the watched-folder SSE effect) and lets
+// a test fire a synthetic message straight at the component's own onmessage handler, the
+// same way the real backend stream would. Declared here (not per-describe-block) because
+// every test mounts TasteFilter, and TasteFilter always opens this connection on mount --
+// not just the tests that exercise it directly.
+let sourceInstances;
+
+function defaultFetchMock(url) {
+  // TasteFilter's mount-time effect fetches these unconditionally, before any
+  // interaction the tests below actually care about. Neither response needs to be
+  // realistic -- centroids/prompts only feed datalist suggestions no test asserts on --
+  // it just needs to resolve instead of leaving `fetch(...)` return undefined.
+  if (url === '/api/taste-filter/centroids') return Promise.resolve({ ok: true, json: async () => [] });
+  if (url === '/api/prompts') return Promise.resolve({ ok: true, json: async () => [] });
+  return Promise.resolve({ ok: true, json: async () => ({}) });
+}
+
 beforeEach(() => {
-  global.fetch = vi.fn();
+  global.fetch = vi.fn(defaultFetchMock);
+
+  sourceInstances = [];
+  global.EventSource = class {
+    constructor(url) {
+      this.url = url;
+      this.onmessage = null;
+      this.closed = false;
+      sourceInstances.push(this);
+    }
+    close() {
+      this.closed = true;
+    }
+  };
+});
+
+afterEach(() => {
+  delete global.EventSource;
 });
 
 function makeFile(name = 'candidate.png') {
@@ -267,29 +302,8 @@ describe('TasteFilter — Step 2.9: collapsed Auto-sorted section for autoDecisi
 });
 
 describe('TasteFilter — watched-folder auto-import via SSE (Module 7 -> "Auto-import via watched folder", step 7)', () => {
-  // jsdom has no built-in EventSource -- a minimal stand-in that records every instance
-  // TasteFilter.jsx constructs and lets a test fire a synthetic message straight at the
-  // component's own onmessage handler, the same way the real backend stream would.
-  let sourceInstances;
-
-  beforeEach(() => {
-    sourceInstances = [];
-    global.EventSource = class {
-      constructor(url) {
-        this.url = url;
-        this.onmessage = null;
-        this.closed = false;
-        sourceInstances.push(this);
-      }
-      close() {
-        this.closed = true;
-      }
-    };
-  });
-
-  afterEach(() => {
-    delete global.EventSource;
-  });
+  // global.EventSource and sourceInstances come from the shared outer beforeEach above --
+  // every test mounts TasteFilter, which always opens this connection, not just this block.
 
   it('opens a stream connection to /api/taste-filter/pending/stream on mount', () => {
     render(<TasteFilter />);
