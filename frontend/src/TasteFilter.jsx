@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import StatusPill from './components/StatusPill.jsx';
 
 const PENDING_POLL_INTERVAL_MS = 5000;
 
@@ -12,10 +13,9 @@ function ScoreBadge({ label, score, confident }) {
   if (score === null || score === undefined) return <span className="text-muted mono">—</span>;
   const text = `${label} (${score.toFixed(3)})${confident === false ? ' · cold start' : ''}`;
   return (
-    <span className={`status-pill ${LABEL_CLASS[label] || 'skipped'}`} aria-label={`Score: ${text}`}>
-      <span className="status-dot" aria-hidden="true" />
-      {label} ({score.toFixed(3)}){confident === false ? ' · cold start' : ''}
-    </span>
+    <StatusPill variant={LABEL_CLASS[label] || 'skipped'} ariaLabel={`Score: ${text}`}>
+      {text}
+    </StatusPill>
   );
 }
 
