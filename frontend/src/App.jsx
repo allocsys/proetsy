@@ -176,6 +176,9 @@ function App() {
       refreshApiKeys();
       refreshPipelineConfig();
     }
+    if (view === 'review') {
+      refreshJobs();
+    }
   }
 
   function refreshHealth() {
@@ -303,6 +306,11 @@ function App() {
         acc[key] = (acc[key] || 0) + 1;
         return acc;
       }, {}),
+    [jobs]
+  );
+
+  const recentJobsSorted = useMemo(
+    () => [...jobs].sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || '')),
     [jobs]
   );
 
