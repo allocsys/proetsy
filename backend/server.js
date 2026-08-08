@@ -11,8 +11,9 @@ import {
   getProductSizes,
   migratePipelineConfigSeed,
   invalidatePipelineConfigCache,
+  getShopConventions,
+  setShopConventions,
 } from './config/index.js';
-import { SHOP_CONVENTIONS, MIDJOURNEY_CONVENTIONS } from './config/shop-conventions.js';
 import { createJob, createJobsBulk, getJobWithModules, setManualNotes, setModuleStatus } from './lib/jobs.js';
 import { analyzeArtworkForJob } from './lib/image-analyzer/index.js';
 import { generateListingsForJob } from './lib/listing-generator/index.js';
@@ -206,11 +207,26 @@ app.get('/api/config/product-sizes', (req, res) => {
 });
 
 // Module 6 -> Settings panel: previously "not yet done" -- "shop style conventions...
-// not consolidated into the Settings panel". These are intentionally hardcoded (see
-// ARCHITECTURE.md -> Module 2 -> "Must hardcode shop conventions"), so this is a
-// read-only view for the dashboard, not an editable-then-PATCH resource.
+// not consolidated into the Settings panel". Dashboard-editable (see plan.md ->
+// "Dashboard-Editable Shop Conventions") -- DB-backed via getShopConventions(), no
+// longer a static read of the hardcoded SHOP_CONVENTIONS/MIDJOURNEY_CONVENTIONS module.
+// See PATCH /api/config/shop-conventions below for the write side.
 app.get('/api/config/shop-conventions', (req, res) => {
-  res.json({ listing: SHOP_CONVENTIONS, midjourney: MIDJOURNEY_CONVENTIONS });
+  res.json(getShopConventions());
+});
+
+// Write side of the above. Body: { listing?: {...partial fields}, midjourney?: {...partial
+// fields} } -- partial at both the top level and within each group, matching
+// PATCH /api/settings's "each key upserted independently" behavior. setShopConventions()
+// validates every provided field (and the merged stylizeMin/stylizeMax/defaultStylize
+// trio) before writing anything -- an invalid field 400s with no partial write, same
+// error-to-400 pattern as POST /api/mockup-templates's upsertConfiguredTemplate call.
+app.patch('/api/config/shop-conventions', (req, res) => {
+  try {
+    res.json(setShopConventions(req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // LLM Provider Layer -> "Rate-limit cooldown tracking": previously no dashboard/API
