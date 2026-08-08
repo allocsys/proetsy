@@ -1123,7 +1123,7 @@ function App() {
                   onClick={() => setShowHowItWorks((prev) => !prev)}
                   type="button"
                 >
-                  <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <circle cx="12" cy="12" r="10" />
                     <line x1="12" y1="16" x2="12" y2="12" />
                     <line x1="12" y1="8" x2="12.01" y2="8" />
@@ -1230,7 +1230,7 @@ function App() {
                               <td className="text-muted mono mono-sm">{job.updated_at}</td>
                               <td>
                                 <button className="btn-secondary btn-sm" onClick={() => openJob(job.id)}>
-                                  <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                                     <circle cx="12" cy="12" r="3" />
                                   </svg>
@@ -1285,7 +1285,7 @@ function App() {
                                 <td className="text-muted mono mono-sm">{job.updated_at}</td>
                                 <td>
                                   <button className="btn-secondary btn-sm" onClick={() => openJob(job.id)}>
-                                    <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                                       <circle cx="12" cy="12" r="3" />
                                     </svg>

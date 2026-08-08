@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAsyncTask } from './hooks/useAsyncTask.js';
 
 function tagsToText(tags) {
@@ -12,22 +12,32 @@ function textToTags(text) {
     .filter(Boolean);
 }
 
-// Mirrors backend/config/shop-conventions.js's SHOP_CONVENTIONS. Kept as local
-// constants (not fetched) since these are baked-in, non-editable conventions -- see
-// the read-only "Shop conventions" panel in Settings (App.jsx) which shows the same
-// values from GET /api/config/shop-conventions. Used here only for live inline
-// character/tag-count feedback before Save; the backend's enforceConventions()
-// remains the actual source of truth and re-applies these rules on every PATCH
-// regardless of what this shows.
-const MAX_TITLE_LENGTH = 140;
-const TAGS_PER_LISTING = 13;
-const MAX_TAG_LENGTH = 20;
+// Used only until GET /api/config/shop-conventions resolves (or if it fails) -- mirrors
+// backend/config/shop-conventions.js's SHOP_CONVENTIONS numeric defaults so the live
+// character/tag-count feedback below never shows a blank/zero limit during the brief
+// loading window. The phrase lists default to empty rather than a hardcoded guess, since
+// a false negative (no warning shown) is safer here than a warning for a phrase list
+// that might not match whatever the real backend list actually is.
+const FALLBACK_CONVENTIONS = {
+  maxTitleLength: 140,
+  tagsPerListing: 13,
+  maxTagLength: 20,
+  forbiddenTitleWords: [],
+  aiDisclosurePhrases: [],
+  deliveryDetailPhrases: [],
+};
+
+function findPhraseHits(text, phrases) {
+  if (!text) return [];
+  const lower = text.toLowerCase();
+  return phrases.filter((p) => lower.includes(p.toLowerCase()));
+}
 
 /**
  * One listing variation's review/edit card — polished to match the dark unified
  * design system, spacing scale, and visual hierarchy.
  */
-function ListingCard({ listing, onSaved }) {
+function ListingCard({ listing, onSaved, conventions }) {
   const [title, setTitle] = useState(listing.title || '');
   const [description, setDescription] = useState(listing.description || '');
   const [tagsText, setTagsText] = useState(tagsToText(listing.tags));
@@ -37,9 +47,16 @@ function ListingCard({ listing, onSaved }) {
   const [copied, setCopied] = useState(false);
 
   const parsedTags = textToTags(tagsText);
-  const titleOverLimit = title.length > MAX_TITLE_LENGTH;
-  const tagsOverLimit = parsedTags.length > TAGS_PER_LISTING;
-  const oversizedTagCount = parsedTags.filter((t) => t.length > MAX_TAG_LENGTH).length;
+  const titleOverLimit = title.length > conventions.maxTitleLength;
+  const tagsOverLimit = parsedTags.length > conventions.tagsPerListing;
+  const oversizedTagCount = parsedTags.filter((t) => t.length > conventions.maxTagLength).length;
+  // Live preview of what enforceConventions() (backend/lib/listing-generator/validate.js)
+  // will silently strip on save -- same three phrase lists, same case-insensitive
+  // substring match, so a reviewer sees this coming instead of only finding out from the
+  // post-save warnings list below.
+  const forbiddenTitleHits = findPhraseHits(title, conventions.forbiddenTitleWords);
+  const aiDisclosureHits = findPhraseHits(description, conventions.aiDisclosurePhrases);
+  const deliveryDetailHits = findPhraseHits(description, conventions.deliveryDetailPhrases);
 
   function save() {
     run(async () => {
@@ -84,7 +101,7 @@ function ListingCard({ listing, onSaved }) {
 
       <div className="settings-field mb-3">
         <label className="settings-field-label" htmlFor={`listing-title-${listing.id}`}>
-          Title (max 140 chars)
+          Title (max {conventions.maxTitleLength} chars)
         </label>
         <input
           id={`listing-title-${listing.id}`}
@@ -93,8 +110,13 @@ function ListingCard({ listing, onSaved }) {
           onChange={(e) => setTitle(e.target.value)}
         />
         <span className={`input-helper-text${titleOverLimit ? ' text-danger' : ''}`}>
-          {title.length}/{MAX_TITLE_LENGTH}{titleOverLimit ? ' — over limit, will be truncated on save' : ''}
+          {title.length}/{conventions.maxTitleLength}{titleOverLimit ? ' — over limit, will be truncated on save' : ''}
         </span>
+        {forbiddenTitleHits.length > 0 && (
+          <span className="input-helper-text text-danger">
+            Contains forbidden word(s), will be removed on save: {forbiddenTitleHits.join(', ')}
+          </span>
+        )}
       </div>
 
       <div className="settings-field mb-3">
@@ -107,11 +129,21 @@ function ListingCard({ listing, onSaved }) {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
+        {aiDisclosureHits.length > 0 && (
+          <span className="input-helper-text text-danger">
+            Contains AI-disclosure phrase(s), will be removed on save: {aiDisclosureHits.join(', ')}
+          </span>
+        )}
+        {deliveryDetailHits.length > 0 && (
+          <span className="input-helper-text text-danger">
+            Contains delivery-detail phrase(s), will be removed on save: {deliveryDetailHits.join(', ')}
+          </span>
+        )}
       </div>
 
       <div className="settings-field mb-3">
         <label className="settings-field-label" htmlFor={`listing-tags-${listing.id}`}>
-          Tags (comma-separated, max 13)
+          Tags (comma-separated, max {conventions.tagsPerListing})
         </label>
         <input
           id={`listing-tags-${listing.id}`}
@@ -120,7 +152,7 @@ function ListingCard({ listing, onSaved }) {
           onChange={(e) => setTagsText(e.target.value)}
         />
         <span className={`input-helper-text${tagsOverLimit || oversizedTagCount ? ' text-danger' : ''}`}>
-          {parsedTags.length}/{TAGS_PER_LISTING} tags{oversizedTagCount ? `, ${oversizedTagCount} over ${MAX_TAG_LENGTH} chars` : ''}{tagsOverLimit ? ' — extra tags will be dropped on save' : ''}
+          {parsedTags.length}/{conventions.tagsPerListing} tags{oversizedTagCount ? `, ${oversizedTagCount} over ${conventions.maxTagLength} chars` : ''}{tagsOverLimit ? ' — extra tags will be dropped on save' : ''}
         </span>
       </div>
 
@@ -162,7 +194,23 @@ function ListingCard({ listing, onSaved }) {
  */
 export default function JobListingReview({ jobId }) {
   const [listings, setListings] = useState([]);
+  const [conventions, setConventions] = useState(FALLBACK_CONVENTIONS);
   const { pending: loading, error, run } = useAsyncTask();
+
+  // Live feedback in ListingCard is compared against the real backend conventions
+  // instead of a second hardcoded copy of them (see FALLBACK_CONVENTIONS above for the
+  // brief window before this resolves). Mirrors the read-only "Shop conventions" panel
+  // in Settings (App.jsx), which fetches the same route -- this is a second, independent
+  // fetch rather than shared state, since JobListingReview can mount without App's
+  // settings panel ever having been opened.
+  useEffect(() => {
+    fetch('/api/config/shop-conventions')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.listing) setConventions(data.listing);
+      })
+      .catch(() => {});
+  }, []);
 
   function loadListings() {
     if (!jobId) return;
@@ -187,7 +235,7 @@ export default function JobListingReview({ jobId }) {
       </div>
       {error && <p className="text-danger mb-3">{error}</p>}
       {listings.map((l) => (
-        <ListingCard key={l.id} listing={l} onSaved={handleSaved} />
+        <ListingCard key={l.id} listing={l} onSaved={handleSaved} conventions={conventions} />
       ))}
       {listings.length === 0 && !loading && !error && (
         <p className="empty-state">No listings loaded yet.</p>
