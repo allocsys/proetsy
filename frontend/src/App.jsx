@@ -521,7 +521,13 @@ function App() {
               aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
-              {sidebarCollapsed ? '»' : '«'}
+              <svg className="sidebar-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                {sidebarCollapsed ? (
+                  <path d="M8 5l7 7-7 7M15 5l7 7-7 7" />
+                ) : (
+                  <path d="M16 5l-7 7 7 7M9 5l-7 7 7 7" />
+                )}
+              </svg>
             </button>
           </div>
           {navGroups.map((group) => (
