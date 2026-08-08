@@ -6,17 +6,19 @@ const VERSION_RE = /--v\s+7\b/i;
 const STYLE_RAW_RE = /--style\s+raw/i;
 
 /**
- * Enforces the hardcoded Midjourney conventions (MIDJOURNEY_CONVENTIONS) on one
- * generated prompt string. The prompt already asks the model for these (see
- * buildPromptHelperPrompt), but this is the belt-and-braces backstop — same pattern as
- * listing-generator/validate.js's enforceConventions — so a convention violation never
- * reaches the dashboard even if the model drifts. Appends any missing flag rather than
- * rejecting the prompt outright (a missing flag is fixable; nothing about a prompt's
- * descriptive text is validated or rewritten here), and clamps an out-of-range --s value
- * into [stylizeMin, stylizeMax] rather than dropping it.
+ * Enforces the shop's current Midjourney conventions (dashboard-editable, see
+ * config/index.js's getShopConventions().midjourney) on one generated prompt string. The
+ * prompt already asks the model for these (see buildPromptHelperPrompt), but this is the
+ * belt-and-braces backstop — same pattern as listing-generator/validate.js's
+ * enforceConventions — so a convention violation never reaches the dashboard even if the
+ * model drifts. Reads conventions fresh on every call (no caching), so a dashboard edit
+ * takes effect on the next generation without a restart. Appends any missing flag rather
+ * than rejecting the prompt outright (a missing flag is fixable; nothing about a
+ * prompt's descriptive text is validated or rewritten here), and clamps an out-of-range
+ * --s value into [stylizeMin, stylizeMax] rather than dropping it.
  *
  * @param {string} promptText
- * @param {string} category - drives which --ar value gets appended if missing; no --ar is added for an unrecognized category (MIDJOURNEY_CONVENTIONS.aspectRatioByCategory has no entry for it)
+ * @param {string} category - drives which --ar value gets appended if missing; no --ar is added for an unrecognized category (the shop's aspectRatioByCategory has no entry for it)
  * @returns {{ text: string, warnings: string[] }}
  */
 export function enforceMidjourneyConventions(promptText, category) {
