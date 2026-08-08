@@ -1,4 +1,4 @@
-import { SHOP_CONVENTIONS } from '../../config/shop-conventions.js';
+import { getShopConventions } from '../../config/index.js';
 
 function stripForbiddenPhrases(text, phrases) {
   if (!text) return { text, hits: [] };
@@ -20,6 +20,7 @@ function stripForbiddenPhrases(text, phrases) {
 // violation never reaches the dashboard even if the model drifts. Returns the cleaned
 // variation plus a `warnings` list surfaced to the reviewer, never silently dropped.
 export function enforceConventions(variation) {
+  const SHOP_CONVENTIONS = getShopConventions().listing;
   const warnings = [];
 
   let title = variation.title || '';
