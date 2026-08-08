@@ -37,7 +37,7 @@ import { generatePromptsForTrend, listPrompts } from './lib/prompt-helper/index.
 import { embedImage } from './lib/taste-filter/embeddings.js';
 import { scoreCandidate, autoDecision } from './lib/taste-filter/scoring.js';
 import { getCentroids, addImagePreference, recomputeCentroids, tallyPromptTermsForLabel } from './lib/taste-filter/store.js';
-import { syncWatcherFromSettings, getPendingCandidates, removePendingCandidate, getWatcherStatus } from './lib/taste-filter/watcher.js';
+import { syncWatcherFromSettings, getPendingCandidates, removePendingCandidate, getWatcherStatus, onPendingCandidate } from './lib/taste-filter/watcher.js';
 import {
   scanTemplatesFolder,
   listConfiguredTemplates,
@@ -1019,6 +1019,41 @@ app.post('/api/taste-filter/promote', (req, res) => {
 // merge results from both sources into one local list without a separate code path.
 app.get('/api/taste-filter/pending', (req, res) => {
   res.json({ candidates: getPendingCandidates() });
+});
+
+// Live-push counterpart to GET /api/taste-filter/pending above, so the dashboard finds
+// out about a watcher-detected candidate the instant it's scored instead of waiting for
+// the next poll tick -- chokidar's own 'add' handler already reacts synchronously (see
+// watcher.js), the poll interval was the only remaining delay. Standard SSE: one
+// `data: <candidate JSON>` event per candidate, sent immediately for whatever's already
+// queued (so a client that just connected doesn't miss anything the watcher found before
+// it opened the connection), then one more event per candidate as chokidar detects new
+// files for as long as the connection stays open. GET /api/taste-filter/pending is left
+// completely unchanged -- this is an additional channel on top of it, not a replacement;
+// a client that never opens this stream still works exactly as before.
+app.get('/api/taste-filter/pending/stream', (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
+  res.flushHeaders();
+
+  const send = (candidate) => {
+    res.write(`data: ${JSON.stringify(candidate)}\n\n`);
+  };
+  for (const candidate of getPendingCandidates()) send(candidate);
+
+  const unsubscribe = onPendingCandidate(send);
+  // Keeps the connection alive through proxies/load balancers that time out an
+  // otherwise-idle HTTP connection. A comment line per the SSE spec -- EventSource's
+  // onmessage never sees it, so it can't reach TasteFilter.jsx as a fake candidate.
+  const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 30000);
+
+  req.on('close', () => {
+    unsubscribe();
+    clearInterval(heartbeat);
+  });
 });
 
 // Read-only status for the dashboard Settings panel -- whether the watcher is currently
