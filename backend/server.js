@@ -28,6 +28,7 @@ import { initRateLimitCache } from './lib/llm/rate-limits.js';
 import { listKeysMasked, addKey, setKeyEnabled, deleteKey, getKeysForProvider } from './lib/llm/key-store.js';
 import { getTrends } from './lib/trends/index.js';
 import { addManualTrend, importFromCsvRows, rowsFromCsvText } from './lib/trends/manual.js';
+import { parseCsv } from './lib/csv.js';
 import {
   importTagsFromCsvRows,
   tagRowsFromCsvText,
@@ -408,7 +409,14 @@ app.post('/api/tags/csv', (req, res) => {
   const { csv } = req.body || {};
   if (!csv) return res.status(400).json({ error: 'csv is required (raw CSV text)' });
   const rows = tagRowsFromCsvText(csv);
-  if (!rows.length) return res.status(400).json({ error: 'No usable rows found (expected a tag_text/tag/text/keyword column)' });
+  if (!rows.length) {
+    // Same distinction as POST /api/trends/csv above -- header-only/empty file vs. rows
+    // present but none have a usable tag-text column.
+    const error = parseCsv(csv).length > 0
+      ? 'No usable rows found (expected a tag_text/tag/text/keyword column)'
+      : 'CSV has no data rows to import (only a header row, or the file is empty)';
+    return res.status(400).json({ error });
+  }
   const inserted = importTagsFromCsvRows(rows);
   const db = getDb();
   res.status(201).json({ inserted, tags: db.prepare('SELECT * FROM tags ORDER BY tag_text').all() });
@@ -792,7 +800,16 @@ app.post('/api/trends/csv', (req, res) => {
   const { csv } = req.body || {};
   if (!csv) return res.status(400).json({ error: 'csv is required (raw CSV text)' });
   const rows = rowsFromCsvText(csv);
-  if (!rows.length) return res.status(400).json({ error: 'No usable rows found (expected a term/keyword/trend column)' });
+  if (!rows.length) {
+    // Same rows.length === 0 result covers two different problems: a header-only/empty
+    // export (parseCsv finds zero raw rows at all) vs. rows that exist but none have a
+    // usable term/keyword/trend column (rowsFromCsvText's own filter drops them). Give
+    // each its own message rather than blaming a missing column on a file that has one.
+    const error = parseCsv(csv).length > 0
+      ? 'No usable rows found (expected a term/keyword/trend column)'
+      : 'CSV has no data rows to import (only a header row, or the file is empty)';
+    return res.status(400).json({ error });
+  }
   const inserted = importFromCsvRows(rows);
   res.status(201).json({ imported: inserted });
 });
