@@ -13,10 +13,12 @@ Both render the same checkbox list off `pipelineDefault.pipeline`, but nothing i
 
 **What shipped:** Upload-page copy now explicitly points to Settings → Pipeline Modules as the actual saved default (previously it wrongly pointed to `pipeline.config.json`). Each toggle that differs from the saved default is labeled "(changed for this upload)", and a "Reset to saved default" button appears whenever any override is active. Settings copy now leads with "This is the saved default" to make the asymmetry explicit.
 
-## 2. Sidebar defaults to collapsed
+## 2. Sidebar defaults to collapsed — ✅ Done (`d538ce6`)
 `sidebarCollapsed` initializes to `true`, so a first-time user lands on icon-only nav with no labels until they find and click the collapse toggle.
 
 **Fix direction:** Default to expanded; persist the user's preference (e.g. localStorage) once they collapse it themselves.
+
+**What shipped:** Sidebar now defaults to expanded on first visit. Once a user collapses or expands it, the choice is saved to `localStorage` (`proetsy_sidebar_collapsed`) and restored on future visits.
 
 ## 3. Job Review requires manually typing a job ID
 The "Review a Job" view is a bare number input + "Load job" button — no picker, no autocomplete. Listing History already has a clickable table of jobs, but if a user lands on Review first they're stuck guessing/typing IDs.
