@@ -41,10 +41,12 @@ Tags, trends, and API keys all delete via native `window.confirm()` popups — j
 
 **What shipped:** All three destructive actions (tag delete, trend delete, API key delete) now route through a single shared `requestConfirm(message, onConfirm)` helper and one styled modal (`.modal-overlay` / `.modal-box`) rendered once at the app root, instead of three separate `window.confirm()` calls. The native browser dialog is gone entirely. Tests updated to drive the modal (open → Cancel does nothing → open → Delete calls the DELETE endpoint) for all three cases.
 
-## 6. Bulk upload is N sequential round-trips
+## 6. Bulk upload is N sequential round-trips — ✅ Done
 `handleFiles` loops `for (const artwork of artworks)` and does one `POST /api/jobs` per file, awaited serially, instead of a single bulk-create endpoint.
 
 **Fix direction:** Add a `POST /api/jobs/bulk` endpoint accepting an array of artwork IDs, or at minimum fire the per-file requests concurrently (`Promise.all`) instead of sequentially.
+
+**What shipped:** Backend gained `createJobsBulk` (backend/lib/jobs.js) and `POST /api/jobs/bulk` (backend/server.js), which create every job for a batch in one DB transaction, all-or-nothing across the array, with the same per-module seeding rules (required modules always pending, overrides apply per-run only) as the existing single-job path. `handleFiles` in frontend/src/App.jsx now calls this once per upload with `artwork_ids: artworks.map(a => a.id)` instead of looping `POST /api/jobs` per file. App.test.jsx updated to assert the single bulk request.
 
 ## 7. Everything dumped into one Settings mega-page
 Tags, trends, shop conventions, API keys (sensitive), automation/watch-folder config, and rate-limit diagnostics are all one long scroll with no sub-navigation. Sensitive key management sits directly next to trivial fields like default price.
