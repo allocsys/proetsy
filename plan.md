@@ -34,10 +34,12 @@ The "Review a Job" view is a bare number input + "Load job" button — no picker
 
 **What shipped:** Backend now supports `POST /api/tags/backfill-categories?dry_run=true`, which computes the exact same tag→category matches without writing anything (matching logic is deterministic, so preview and apply always agree — covered by a new test). The button now says "Suggest categories…", fetches a preview first, and shows the full list of proposed changes with explicit Apply / Cancel buttons — the native `confirm()` dialog is gone.
 
-## 5. Inconsistent delete UX
+## 5. Inconsistent delete UX — ✅ Done (`be84df6`, `4de14b2`, `30b3190`)
 Tags, trends, and API keys all delete via native `window.confirm()` popups — jarring against an otherwise custom-styled dashboard, and inconsistent with item 4 above, which also confirms but can't be undone even after confirming.
 
 **Fix direction:** Standardize on in-app confirmation UI (styled modal or inline "confirm delete" state) instead of native browser dialogs, applied consistently across all destructive actions.
+
+**What shipped:** All three destructive actions (tag delete, trend delete, API key delete) now route through a single shared `requestConfirm(message, onConfirm)` helper and one styled modal (`.modal-overlay` / `.modal-box`) rendered once at the app root, instead of three separate `window.confirm()` calls. The native browser dialog is gone entirely. Tests updated to drive the modal (open → Cancel does nothing → open → Delete calls the DELETE endpoint) for all three cases.
 
 ## 6. Bulk upload is N sequential round-trips
 `handleFiles` loops `for (const artwork of artworks)` and does one `POST /api/jobs` per file, awaited serially, instead of a single bulk-create endpoint.
