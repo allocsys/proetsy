@@ -979,6 +979,10 @@ input:focus, select:focus, textarea:focus {
 .dropzone p { margin: var(--space-1) 0; color: var(--studio-ink-soft); }
 
 .data-table { width: 100%; border-collapse: collapse; margin-top: var(--space-2); }
+.data-table-wrapper {
+  overflow-x: auto;
+  width: 100%;
+}
 .data-table th, .data-table td {
   padding: 0.6rem var(--space-3);
   text-align: left;
