@@ -70,6 +70,13 @@ describe('POST /api/trends/csv', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/No usable rows/);
   });
+
+  it('400s with a distinct message for a header-only CSV (no data rows at all)', async () => {
+    const res = await request(app).post('/api/trends/csv').send({ csv: 'term,category' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/no data rows/i);
+    expect(res.body.error).not.toMatch(/No usable rows/);
+  });
 });
 
 describe('POST /api/tags/csv', () => {
@@ -109,6 +116,13 @@ describe('POST /api/tags/csv', () => {
     const res = await request(app).post('/api/tags/csv').send({ csv: 'foo,bar\nx,y' });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/No usable rows/);
+  });
+
+  it('400s with a distinct message for a header-only CSV (no data rows at all)', async () => {
+    const res = await request(app).post('/api/tags/csv').send({ csv: 'tag_text,category' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/no data rows/i);
+    expect(res.body.error).not.toMatch(/No usable rows/);
   });
 });
 
