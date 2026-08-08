@@ -10,7 +10,14 @@ import { parseCsv, firstColumn } from '../csv.js';
 // re-tag. Deliberately conservative: only ever assigns a category that's already in use
 // by at least one other tag, never invents a new one, and never touches a tag that
 // already has a category (no silent overwrites).
-export function suggestCategoriesForUncategorizedTags() {
+// `dryRun: true` computes the same matches without writing anything -- lets the
+// dashboard show the user exactly which tags would get which category before
+// committing (see server.js's POST /api/tags/backfill-categories?dry_run=true). The
+// matching logic itself is pure/deterministic (substring match against
+// already-in-use categories), so a dry run and a real run against the same tag data
+// always agree -- there's no risk of the preview promising something the real run
+// then does differently.
+export function suggestCategoriesForUncategorizedTags({ dryRun = false } = {}) {
   const db = getDb();
   const allTags = db.prepare('SELECT * FROM tags').all();
 
@@ -22,7 +29,7 @@ export function suggestCategoriesForUncategorizedTags() {
   const uncategorized = allTags.filter((t) => !t.category);
   const updates = [];
 
-  const run = db.transaction(() => {
+  const computeMatches = () => {
     for (const tag of uncategorized) {
       const haystack = tag.tag_text.toLowerCase();
       // First matching known category wins; longest-first so a more specific category
@@ -32,15 +39,21 @@ export function suggestCategoriesForUncategorizedTags() {
         .sort((a, b) => b.length - a.length)
         .find((category) => haystack.includes(category.toLowerCase()));
       if (!match) continue;
-      update.run(match, tag.id);
+      if (!dryRun) update.run(match, tag.id);
       updates.push({ tagText: tag.tag_text, category: match });
     }
-  });
-  run();
+  };
+
+  if (dryRun) {
+    computeMatches();
+  } else {
+    db.transaction(computeMatches)();
+  }
 
   return {
+    dryRun,
     checked: uncategorized.length,
-    updated: updates.length,
+    updated: dryRun ? 0 : updates.length,
     updates,
   };
 }
