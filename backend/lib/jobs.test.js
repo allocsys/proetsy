@@ -96,6 +96,12 @@ describe('getJobWithModules', () => {
       'mockup_composer',
     ]);
   });
+
+  it('includes artwork_file_path joined from the artworks table (same alias GET /api/jobs uses)', () => {
+    const jobId = createJob(artworkId);
+    const job = getJobWithModules(jobId);
+    expect(job.artwork_file_path).toBe('artwork.png');
+  });
 });
 
 describe('setManualNotes', () => {
