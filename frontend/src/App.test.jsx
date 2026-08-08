@@ -468,7 +468,7 @@ describe('App', () => {
 
     expect(await screen.findByText('primary')).toBeInTheDocument();
     expect(screen.getByText('********...abcd')).toBeInTheDocument();
-    expect(screen.getByText('✅ Enabled')).toBeInTheDocument();
+    expect(screen.getByText('Enabled')).toBeInTheDocument();
   });
 
   it('shows the empty state when no dashboard-managed keys exist yet', async () => {

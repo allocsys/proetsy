@@ -66,7 +66,7 @@ function ListingCard({ listing, onSaved }) {
   }
 
   return (
-    <div className="glass-card paper-card mb-4">
+    <div className="card paper-card mb-4">
       <div className="settings-readonly-header mb-4">
         <h4 className="listing-card-title">{listing.variation?.replace('_', ' ')}</h4>
         <span className="read-only-badge">AI Listing</span>
@@ -78,7 +78,7 @@ function ListingCard({ listing, onSaved }) {
         </label>
         <input
           id={`listing-title-${listing.id}`}
-          className="glass-input"
+          className="input"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
@@ -90,7 +90,7 @@ function ListingCard({ listing, onSaved }) {
         </label>
         <textarea
           id={`listing-desc-${listing.id}`}
-          className="listing-textarea glass-input"
+          className="listing-textarea input"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
@@ -102,7 +102,7 @@ function ListingCard({ listing, onSaved }) {
         </label>
         <input
           id={`listing-tags-${listing.id}`}
-          className="glass-input"
+          className="input"
           value={tagsText}
           onChange={(e) => setTagsText(e.target.value)}
         />
@@ -114,7 +114,7 @@ function ListingCard({ listing, onSaved }) {
         </label>
         <input
           id={`listing-alt-tags-${listing.id}`}
-          className="glass-input"
+          className="input"
           value={tagAltText}
           onChange={(e) => setTagAltText(e.target.value)}
         />

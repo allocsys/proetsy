@@ -466,14 +466,10 @@ function App() {
 
   return (
     <div className="app-shell">
-      <header className="app-titlebar glass-nav">
+      <header className="app-titlebar nav">
         <div className="wordmark-container">
           <div className="logo-badge" aria-hidden="true">M</div>
           <h1 className="wordmark">ProEtsy</h1>
-          <span className="status-pill success" aria-label="Status: Local Print Pipeline active">
-            <span className="status-dot" aria-hidden="true" />
-            Print Studio Active
-          </span>
         </div>
         <div className="header-right">
           <div className="backend-status-row">
@@ -503,7 +499,7 @@ function App() {
         </div>
       </header>
 
-      <div className="mobile-nav-strip glass-nav">
+      <div className="mobile-nav-strip nav">
         {NAV_ITEMS.map((item) => (
           <button
             key={item.id}
@@ -517,7 +513,7 @@ function App() {
       </div>
 
       <div className="app-body">
-        <nav className={`sidebar glass-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
+        <nav className={`sidebar sidebar-shell ${sidebarCollapsed ? 'collapsed' : ''}`}>
           <div className="sidebar-toggle-row">
             <button
               className="sidebar-toggle-btn"
@@ -600,9 +596,9 @@ function App() {
             <div className="setup-alert">
               <strong>Setup incomplete</strong>
               <ul>
-                <li>{setupStatus.geminiKeyConfigured ? '✅' : '⚠️'} Gemini API key configured — add one below in Settings</li>
-                <li>{setupStatus.hasTagLibrary ? '✅' : '⚠️'} Tag library has at least one tag — add one below in Settings</li>
-                <li>{setupStatus.hasProductSize ? '✅' : '⚠️ (optional)'} At least one product size / mockup template configured</li>
+                <li><span style={{ color: setupStatus.geminiKeyConfigured ? 'var(--state-success)' : 'var(--state-pending)', fontWeight: 600 }}>{setupStatus.geminiKeyConfigured ? 'Ready' : 'Action Required'}</span> Gemini API key configured — add one below in Settings</li>
+                <li><span style={{ color: setupStatus.hasTagLibrary ? 'var(--state-success)' : 'var(--state-pending)', fontWeight: 600 }}>{setupStatus.hasTagLibrary ? 'Ready' : 'Action Required'}</span> Tag library has at least one tag — add one below in Settings</li>
+                <li><span style={{ color: setupStatus.hasProductSize ? 'var(--state-success)' : 'var(--studio-ink-soft)', fontWeight: 600 }}>{setupStatus.hasProductSize ? 'Ready' : 'Optional'}</span> At least one product size / mockup template configured</li>
               </ul>
             </div>
           )}
@@ -613,14 +609,14 @@ function App() {
 
               <div className="settings-dashboard-grid">
 
-              <div className="settings-section-card glass-card settings-card-tags">
+              <div className="settings-section-card card settings-card-tags">
                 <h3 className="settings-section-title">Tags & Trends</h3>
 
                 <div className="settings-subsection">
                   <h4 className="settings-sub-heading">Tag library</h4>
                   <textarea
                     rows={5}
-                    className="mono glass-input"
+                    className="mono input"
                     style={{ width: '100%', marginBottom: '0.75rem' }}
                     value={tagsText}
                     onChange={(e) => setTagsText(e.target.value)}
@@ -696,7 +692,7 @@ function App() {
                 </div>
               </div>
 
-              <div className="settings-section-card glass-card settings-card-defaults">
+              <div className="settings-section-card card settings-card-defaults">
                 <h3 className="settings-section-title">Shop Defaults & Conventions</h3>
 
                 <div className="settings-subsection">
@@ -744,7 +740,7 @@ function App() {
 
               </div>
 
-              <div className="settings-section-card glass-card settings-card-keys">
+              <div className="settings-section-card card settings-card-keys">
                 <h3 className="settings-section-title">API Keys</h3>
 
                 <div className="settings-subsection">
@@ -768,7 +764,12 @@ function App() {
                             <td className="mono">{key.provider}</td>
                             <td>{key.label || <span className="text-muted">—</span>}</td>
                             <td className="mono mono-sm">{key.maskedKey}</td>
-                            <td>{key.enabled ? '✅ Enabled' : '⚪ Disabled'}</td>
+                            <td>
+                              <span className={`status-pill ${key.enabled ? 'success' : 'pending'}`}>
+                                <span className="status-dot" aria-hidden="true" />
+                                {key.enabled ? 'Enabled' : 'Disabled'}
+                              </span>
+                            </td>
                             <td>
                               <div className="flex-row" style={{ gap: '0.5rem' }}>
                                 <button className="btn-secondary btn-sm" onClick={() => toggleApiKeyEnabled(key)}>
@@ -816,7 +817,7 @@ function App() {
                 </div>
               </div>
 
-              <div className="settings-section-card glass-card settings-card-modules">
+              <div className="settings-section-card card settings-card-modules">
                 <h3 className="settings-section-title">Pipeline Modules</h3>
 
                 <div className="settings-subsection" style={{ marginBottom: 0 }}>
@@ -844,7 +845,7 @@ function App() {
                 </div>
               </div>
 
-              <div className="settings-section-card glass-card settings-card-automation">
+              <div className="settings-section-card card settings-card-automation">
                 <h3 className="settings-section-title">Automation & Diagnostics</h3>
 
                 <div className="settings-subsection">
@@ -883,7 +884,7 @@ function App() {
                   </div>
                   {watchStatus && (
                     <p className="text-muted mono-sm" style={{ marginTop: '0.75rem' }}>
-                      {watchStatus.active ? `✅ Watching ${watchStatus.folder}` : '⚠️ Not currently watching'}
+                      <span style={{ color: watchStatus.active ? 'var(--state-success)' : 'var(--state-pending)', fontWeight: 600 }}>{watchStatus.active ? 'Active' : 'Inactive'}</span> {watchStatus.active ? `— Watching ${watchStatus.folder}` : '— Not currently watching'}
                       {watchStatus.category ? ` (category: ${watchStatus.category})` : ''}
                       {watchStatus.pendingCount ? ` — ${watchStatus.pendingCount} pending` : ''}
                       {watchStatus.lastError ? ` — ${watchStatus.lastError}` : ''}
@@ -938,7 +939,12 @@ function App() {
                             <tr key={`${r.keyIndex}-${r.model}`}>
                               <td className="mono">{r.keyIndex}</td>
                               <td className="mono">{r.model}</td>
-                              <td>{r.currentlyLimited ? '⚠️ Cooling down' : '✅ OK'}</td>
+                              <td>
+                                <span className={`status-pill ${r.currentlyLimited ? 'danger' : 'success'}`}>
+                                  <span className="status-dot" aria-hidden="true" />
+                                  {r.currentlyLimited ? 'Cooling down' : 'OK'}
+                                </span>
+                              </td>
                               <td>{r.consecutiveHits}</td>
                               <td className="text-muted mono mono-sm">{r.currentlyLimited ? r.limitedUntil : '—'}</td>
                             </tr>
@@ -956,7 +962,7 @@ function App() {
           )}
 
           {activeView === 'upload' && (
-            <section className="paper-card glass-card upload-pipeline-card">
+            <section className="paper-card card upload-pipeline-card">
               <div className="upload-header-row">
                 <div>
                   <h2 style={{ marginTop: 0, marginBottom: '0.25rem' }}>Upload & Curation Pipeline</h2>
@@ -1036,23 +1042,11 @@ function App() {
                 </div>
               </details>
 
-              <div className="pipeline-card-footer">
-                <div className="pipeline-footer-left">
-                  <svg className="footer-shield-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                  </svg>
-                  <span>Your files are secure and processed privately.</span>
-                </div>
-                <div className="pipeline-footer-right">
-                  <span>Need help? </span>
-                  <a href="#" className="docs-link" onClick={(e) => e.preventDefault()}>View docs</a>
-                </div>
-              </div>
             </section>
           )}
 
           {activeView === 'history' && (
-            <section className="paper-card glass-card">
+            <section className="paper-card card">
               <h2 style={{ marginTop: 0 }}>Listing History</h2>
               {jobs.length === 0 ? (
                 <div className="empty-state-box" style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--studio-ink-soft)' }}>
@@ -1162,7 +1156,7 @@ function App() {
 
           {activeView === 'review' && (
             <section className="paper-card" style={{ padding: 0, background: 'transparent', border: 'none', boxShadow: 'none' }}>
-              <div className="paper-card glass-card" style={{ marginBottom: '1rem' }}>
+              <div className="paper-card card" style={{ marginBottom: '1rem' }}>
                 <h2 style={{ marginTop: 0, marginBottom: '1rem' }}>Job Workspace</h2>
                 <div className="settings-field-row" style={{ alignItems: 'flex-start' }}>
                   <div className="settings-field">
@@ -1248,7 +1242,7 @@ function App() {
                   </div>
                 </div>
               ) : (
-                <div className="paper-card glass-card">
+                <div className="paper-card card">
                   <p className="empty-state">Enter a job ID above, or open one from Listing History to start reviewing.</p>
                 </div>
               )}
@@ -1256,14 +1250,14 @@ function App() {
           )}
 
           {activeView === 'prompt-helper' && (
-            <section className="paper-card glass-card">
+            <section className="paper-card card">
               <h2 style={{ marginTop: 0 }}>Trend / Prompt Helper</h2>
               <PromptHelper />
             </section>
           )}
 
           {activeView === 'mockup-templates' && (
-            <section className="paper-card glass-card">
+            <section className="paper-card card">
               <MockupTemplates />
             </section>
           )}

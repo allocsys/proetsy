@@ -32,9 +32,7 @@ function AnalysisSummary({ analysis }) {
 }
 
 /**
- * Module 1 (Image Analyzer) review surface — polished to match the app shell's
- * dark unified design system, spacing scale, card styles, and visual hierarchy
- * distinguishing AI-generated content from user actions.
+ * Module 1 (Image Analyzer) review surface.
  */
 export default function JobArtworkAnalysisReview({ jobId }) {
   const [job, setJob] = useState(null);
@@ -105,7 +103,7 @@ export default function JobArtworkAnalysisReview({ jobId }) {
   }
 
   return (
-    <div className="glass-card artwork-analysis-card">
+    <div className="card artwork-analysis-card">
       <div className="flex-row mb-4" style={{ gap: 'var(--space-2)' }}>
         <button className="btn-primary" onClick={loadJobAndAnalysis} disabled={!jobId || loading}>
           {loading ? 'Loading…' : 'Load analysis'}
@@ -118,7 +116,7 @@ export default function JobArtworkAnalysisReview({ jobId }) {
       {error && <p className="text-danger mt-2">{error}</p>}
 
       {analysis ? (
-        <div className="settings-readonly-box glass-panel" style={{ marginTop: '1rem', marginBottom: '1rem' }}>
+        <div className="settings-readonly-box panel" style={{ marginTop: '1rem', marginBottom: '1rem' }}>
           <div className="settings-readonly-header">
             <span className="settings-readonly-title">AI Analysis Result</span>
             <span className="read-only-badge">AI Generated</span>
@@ -135,7 +133,7 @@ export default function JobArtworkAnalysisReview({ jobId }) {
             <label className="settings-field-label">Manual notes fallback</label>
             <span className="input-helper-text">Used by listing generator when AI analysis is skipped or fails.</span>
             <textarea
-              className="listing-textarea glass-input"
+              className="listing-textarea input"
               value={manualNotes}
               onChange={(e) => setManualNotes(e.target.value)}
               placeholder="Enter custom style, subject, or mood notes..."
