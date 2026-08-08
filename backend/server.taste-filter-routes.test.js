@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import request from 'supertest';
@@ -191,6 +192,45 @@ describe('POST /api/taste-filter/label -> prompt-feedback link (Module 7 -> Modu
   });
 });
 
+// Connects with node:http directly rather than supertest -- supertest/superagent waits
+// for the response to fully end before resolving, which an SSE stream deliberately never
+// does while the connection is open. Resolves with the live `http.ClientRequest` (so the
+// caller can req.destroy() it once done) and invokes onEvent for each parsed `data: ...`
+// message as it arrives, buffering across chunk boundaries the same way EventSource's
+// real parser would.
+function connectSseStream(port, streamPath, onEvent) {
+  return new Promise((resolve, reject) => {
+    let buffer = '';
+    const req = http.get({ port, path: streamPath }, (res) => {
+      res.on('data', (chunk) => {
+        buffer += chunk.toString();
+        let boundary = buffer.indexOf('\n\n');
+        while (boundary !== -1) {
+          const rawEvent = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary + 2);
+          const dataLine = rawEvent.split('\n').find((line) => line.startsWith('data: '));
+          if (dataLine) onEvent(JSON.parse(dataLine.slice('data: '.length)));
+          boundary = buffer.indexOf('\n\n');
+        }
+      });
+    });
+    req.on('error', reject);
+    req.on('socket', () => resolve(req));
+  });
+}
+
+// Polls a condition function the same way the existing GET /pending poll-loop test
+// below does, instead of a fixed sleep -- SSE delivery here rides on the same chokidar
+// awaitWriteFinish debounce as GET /pending, so timing isn't instant.
+async function waitUntil(conditionFn, timeoutMs = 10000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (conditionFn()) return;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error('Timed out waiting for condition');
+}
+
 describe('GET /api/taste-filter/pending + /watch-status (Module 7 -> "Auto-import via watched folder", step 7)', () => {
   it('watch-status reports inactive when nothing has been configured', async () => {
     const res = await request(app).get('/api/taste-filter/watch-status');
@@ -249,6 +289,58 @@ describe('GET /api/taste-filter/pending + /watch-status (Module 7 -> "Auto-impor
     // Turn the watcher back off so it doesn't linger past this test.
     await request(app).patch('/api/settings').send({ taste_filter_watch_enabled: 'false' });
   });
+
+  it(
+    'GET /pending/stream sends already-pending candidates immediately, then pushes newly-detected ones live, without touching GET /pending',
+    async () => {
+      const watchFolder = fs.mkdtempSync(path.join(tmpRoot, 'watch-stream-'));
+      await request(app).patch('/api/settings').send({
+        taste_filter_watch_enabled: 'true',
+        taste_filter_watch_folder: watchFolder,
+      });
+
+      fs.writeFileSync(path.join(watchFolder, 'already-pending.png'), 'fake-png-bytes');
+      // Same inline poll-loop style as the GET /pending test above -- waitUntil's
+      // predicate is synchronous, and getting a candidate here requires an awaited HTTP
+      // call, so it's polled directly rather than through that helper.
+      let firstCandidate;
+      const pollStart = Date.now();
+      while (Date.now() - pollStart < 10000 && !firstCandidate) {
+        const pendingRes = await request(app).get('/api/taste-filter/pending');
+        if (pendingRes.body.candidates.length > 0) firstCandidate = pendingRes.body.candidates[0];
+        else await new Promise((r) => setTimeout(r, 100));
+      }
+      expect(firstCandidate).toBeDefined();
+
+      const server = app.listen(0);
+      const { port } = server.address();
+      const events = [];
+      const streamReq = await connectSseStream(port, '/api/taste-filter/pending/stream', (e) => events.push(e));
+
+      try {
+        // Immediate snapshot: the already-pending candidate above streams right away, with
+        // no need to wait for a new file to land.
+        await waitUntil(() => events.length >= 1);
+        expect(events[0].imagePath).toBe(firstCandidate.imagePath);
+        expect(events[0].imageUrl).toMatch(/^\/taste-filter-files\//);
+
+        fs.writeFileSync(path.join(watchFolder, 'pushed-live.png'), 'fake-png-bytes');
+        await waitUntil(() => events.length >= 2);
+        expect(events[1].imagePath).not.toBe(firstCandidate.imagePath);
+        expect(events[1].imageUrl).toMatch(/^\/taste-filter-files\//);
+
+        // The poll route is untouched by the stream having been opened -- both candidates
+        // are still there for a client that never subscribes to the stream at all.
+        const pendingRes = await request(app).get('/api/taste-filter/pending');
+        expect(pendingRes.body.candidates.length).toBeGreaterThanOrEqual(2);
+      } finally {
+        streamReq.destroy();
+        server.close();
+        await request(app).patch('/api/settings').send({ taste_filter_watch_enabled: 'false' });
+      }
+    },
+    20000
+  );
 });
 
 // Step 1.3 (plan.md -> Part 1 -> "Backend: promote-route tests"). Exercises the route
