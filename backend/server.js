@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
@@ -166,6 +167,18 @@ syncWatcherFromSettings(CANDIDATES_DIR);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
+});
+
+// Module 7 -> "Auto-import via watched folder": a one-click default for the watched-
+// folder Settings field, so the user doesn't have to type/paste a full path just to try
+// the feature. os.homedir() resolves correctly cross-platform (including Windows --
+// C:\Users\<name>\Downloads), and Downloads is the most common landing spot for
+// Midjourney web-app / browser-saved images. `exists: false` just means the guess is a
+// folder the user would need to create -- never auto-created here, since watching (or
+// creating) an arbitrary folder without confirmation isn't this route's call to make.
+app.get('/api/system/default-watch-folder', (req, res) => {
+  const suggested = path.join(os.homedir(), 'Downloads');
+  res.json({ suggested, exists: fs.existsSync(suggested) });
 });
 
 // ARCHITECTURE.md -> First-Run Setup -> "Detection: on backend startup, check for (1) at
