@@ -123,7 +123,7 @@ React frontend (`frontend/src/App.jsx`) that:
 **What it does:** ranks a batch of raw Midjourney-generated candidates against a learned taste profile, so obvious "slop" gets flagged before it ever becomes a listing candidate.
 
 **Input:** a batch of candidate images (generated manually in Midjourney, dragged into the dashboard, or auto-picked up from a watched folder)
-**Output:** each candidate gets **two taste scores** — global and per-category — plus a suggested label (likely-keep / likely-discard / uncertain). Nothing is auto-deleted; the user confirms keep/discard, and that confirmation is the training signal.
+**Output:** each candidate gets **two taste scores** — global and per-category — plus a suggested label (likely-keep / likely-discard / uncertain). By default every decision is a manual keep/discard confirmation, which is the training signal; an opt-in auto-compute mode (off by default — see below) can also apply a high-confidence decision automatically. Either way, nothing is ever auto-*deleted* — a discarded image's file always stays on disk.
 **Tech:** local image embeddings via a **JS-only CLIP implementation** — `onnxruntime-web` (WASM) running the pre-converted `Xenova/clip-vit-base-patch32` ONNX model, called directly from the Node backend. No API key, no per-request cost, no network dependency, no second runtime to manage.
 
 **Why WASM over native (`onnxruntime-node`):** no prebuilt binary to match against a specific libc/ABI — runs on Termux/Android (whose Bionic libc breaks `onnxruntime-node`'s prebuilt binaries) and sidesteps Electron's native-module rebuild step entirely. Trade-off: WASM CPU inference is slower than native, acceptable for single-user, one-batch-at-a-time use.
@@ -133,8 +133,9 @@ React frontend (`frontend/src/App.jsx`) that:
 - **Two sets of centroids:** a global kept/discarded pair, and a per-category pair for each product category. A new candidate is scored against both via cosine similarity (kept minus discarded).
 - Centroids recompute automatically after every labeled batch, plus a manual "Recompute now" button for after relabeling.
 - **Cold start:** with only a handful of labels the system shows scores but doesn't filter confidently (`COLD_START_MIN_EXAMPLES = 30` combined examples, per category too).
-- **Never auto-discards** — only ranks and flags; the user always confirms.
-- No "pending candidates" DB table by design: an imported-but-unlabeled batch lives only in the frontend's local state (manual import) or an in-process Map (watched-folder import) plus the files on disk — nothing is written to `image_preferences` until actually labeled.
+- **Never auto-discards a file** — a "discard" decision (manual or auto-applied, see below) only records a preference row; the underlying image is never deleted.
+- **Auto-compute (opt-in, off by default):** a Settings toggle (`taste_filter_auto_enabled` / `taste_filter_auto_threshold`) lets `POST /api/taste-filter/import` apply a decision automatically instead of waiting for a click, writing straight to `image_preferences` with `auto_labeled = 1`. Guardrails: only acts on a pair that's already cleared the same cold-start bar manual scoring requires; when a candidate has a category, the global and category-level decisions must independently agree, or it falls back to `null` (manual review) rather than one signal overriding the other. Auto-decided candidates still surface in the dashboard (a collapsible "Auto-sorted" section) and can be corrected with a normal Keep/Discard click — since `image_preferences` upserts on `image_path` (one row per image), a correction updates that row and clears `auto_labeled` back to `0`, rather than adding a second, contradictory row (see `docs/fixes/taste-filter-duplicate-labels.md` for the bug this closed).
+- No "pending candidates" DB table by design: an imported batch that neither the user nor auto-compute has decided on yet lives only in the frontend's local state (manual import) or an in-process Map (watched-folder import) plus the files on disk — nothing is written to `image_preferences` for it until a decision, manual or auto, exists.
 
 **Prompt-feedback link to Module 4 (optional, opt-in):** since Module 7's embeddings and Module 4's text prompts don't share a representation, the link is tracked via **which prompt terms tend to produce kept vs. discarded images** — each candidate is tagged with its originating prompt, and as labels accumulate, recurring prompt terms are tallied into `prompt_terms.kept_count`/`discarded_count`. Module 4 can optionally pull the top terms as a style hint (biases word choice, never overrides the user's trend selection). Secondary and opt-in — Module 4 works the same with it off.
 
@@ -161,7 +162,7 @@ React frontend (`frontend/src/App.jsx`) that:
 Labeling *is* the training — no separate training mode, and it never "finishes," since it keeps adapting as taste changes over time.
 
 **Can be skipped if:** the user is hand-picking Midjourney output already and doesn't want the extra step.
-**Dashboard:** `frontend/src/TasteFilter.jsx` (not job-scoped) — category/prompt-ID fields, drag-and-drop batch importer, ranked grid with score badges, Keep/Discard buttons, Recompute-now.
+**Dashboard:** `frontend/src/TasteFilter.jsx` (not job-scoped) — category/prompt-ID fields, drag-and-drop batch importer, ranked grid with score badges, Keep/Discard buttons (including on auto-sorted candidates, to correct them), a collapsible "Auto-sorted" section, Recompute-now.
 
 ---
 
@@ -337,11 +338,11 @@ SQLite. `pipeline_config` and backups stay as JSON/files, not tables.
 - `prompts` — id, trend_id (FK, nullable), category, prompt_text, created_at
 
 **Taste model (Module 7)**
-- `image_preferences` — id, image_path, embedding (BLOB), label (keep/discard), category, prompt_id (FK, nullable), promoted_artwork_id (FK, nullable), created_at
+- `image_preferences` — id, image_path (**unique** — one row per image; `POST /api/taste-filter/label` and the auto-compute decision path both upsert on it, so a relabel or a manual correction of an auto-decided row updates it in place rather than adding a second row), embedding (BLOB), label (keep/discard), category, prompt_id (FK, nullable), promoted_artwork_id (FK, nullable), auto_labeled (0/1 — set when a row was written by auto-compute rather than a manual click; cleared back to 0 by a manual correction), created_at
 - `taste_centroids` — id, category (NULL = global), kept_centroid (BLOB), discarded_centroid (BLOB), updated_at
 - `prompt_terms` — term, kept_count, discarded_count, updated_at
 
-**Indexes:** `job_modules(job_id)`, `listings(job_id)`, `mockups(job_id)`, `image_preferences(category)`, `trends(term)`.
+**Indexes:** `job_modules(job_id)`, `listings(job_id)`, `mockups(job_id)`, `image_preferences(category)`, `image_preferences(image_path)` (**unique**), `trends(term)`.
 
 **Cascade behavior:** deleting a `job` cascades to its `job_modules`, `listings`, and `mockups`. `artworks`, `image_preferences`, `trends`, and `tags` are never cascade-deleted — they're independent reference data.
 
