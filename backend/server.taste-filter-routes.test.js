@@ -132,7 +132,10 @@ describe('GET /api/taste-filter/model-status(/stream) -- CLIP model download pro
       response.on('error', () => cb(null, data));
     });
 
-    expect(res.text).toContain('data: {"status":"ready"');
+    // A custom .parse() callback's result lands on res.body, not res.text -- the latter
+    // is only populated by supertest's own built-in text buffering, which a custom
+    // parser bypasses.
+    expect(res.body).toContain('data: {"status":"ready"');
   });
 
   it('GET /api/taste-filter/model-status/stream pushes a later state change to the listener registered via onModelDownloadProgress', async () => {
