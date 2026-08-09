@@ -8,6 +8,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Readable } from 'node:stream';
+import { pipeline as streamPipeline } from 'node:stream/promises';
 import Jimp from 'jimp';
 import * as ort from 'onnxruntime-web';
 
@@ -24,10 +26,65 @@ const CLIP_STD = [0.26862954, 0.26130258, 0.27577711];
 // The .onnx weights file is a large binary and isn't committed to the repo — resolved
 // via an env-driven path, same pattern as mockup-generator.js's MOCKUP_TEMPLATES_DIR.
 // Expected to hold Xenova/clip-vit-base-patch32's vision encoder exported to ONNX
-// (e.g. the `onnx/model.onnx` file from that model's Hugging Face repo).
+// (e.g. the `onnx/model.onnx` file from that model's Hugging Face repo). No longer a
+// manual-download requirement -- see downloadModel()/getSession() below, which fetch it
+// into place automatically the first time it's needed if it isn't already there.
 const MODEL_PATH = process.env.TASTE_FILTER_MODEL_PATH
   ? path.resolve(process.cwd(), process.env.TASTE_FILTER_MODEL_PATH)
   : path.join(BACKEND_ROOT, 'models', 'clip-vit-base-patch32.onnx');
+
+// Where getSession() downloads MODEL_PATH from when it isn't already present.
+// Overridable (e.g. to point at a mirror, or a quantized variant) via
+// TASTE_FILTER_MODEL_URL without touching code.
+const MODEL_DOWNLOAD_URL =
+  process.env.TASTE_FILTER_MODEL_URL ||
+  'https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/vision_model.onnx';
+
+// The real export is ~350MB. Anything drastically smaller means a previous download was
+// interrupted or saved an HTML error page instead of the binary -- treated as "not there"
+// rather than trusted as-is, so a half-downloaded file doesn't silently get loaded into
+// onnxruntime (which would fail with a much more confusing error than "missing").
+const MIN_VALID_MODEL_BYTES = 50 * 1024 * 1024;
+
+function isValidModelFile(filePath) {
+  try {
+    return fs.statSync(filePath).size >= MIN_VALID_MODEL_BYTES;
+  } catch {
+    return false;
+  }
+}
+
+// Downloads MODEL_DOWNLOAD_URL straight to MODEL_PATH. Streams to a sibling `.download`
+// temp file first and only renames it into place once fully written (rename is atomic on
+// the same volume, on Windows and POSIX alike) -- so a crash or interrupted connection
+// mid-download never leaves a corrupt file sitting at MODEL_PATH for the next run to trip
+// over. Pure Node.js (fs/fetch/streams) -- no shell-out, no platform-specific download
+// tool, so this runs identically on Windows, macOS, Linux, and Render.
+async function downloadModel() {
+  fs.mkdirSync(path.dirname(MODEL_PATH), { recursive: true });
+  const tmpPath = `${MODEL_PATH}.download`;
+  console.log(`[taste-filter] Downloading CLIP vision model from ${MODEL_DOWNLOAD_URL} ...`);
+
+  const response = await fetch(MODEL_DOWNLOAD_URL, { redirect: 'follow' });
+  if (!response.ok || !response.body) {
+    throw new Error(
+      `Failed to download Taste Filter model: HTTP ${response.status} from ${MODEL_DOWNLOAD_URL}`
+    );
+  }
+
+  await streamPipeline(Readable.fromWeb(response.body), fs.createWriteStream(tmpPath));
+
+  if (!isValidModelFile(tmpPath)) {
+    fs.rmSync(tmpPath, { force: true });
+    throw new Error(
+      `Downloaded Taste Filter model from ${MODEL_DOWNLOAD_URL} looks truncated/invalid ` +
+        '(smaller than expected). Check your network connection and try again.'
+    );
+  }
+
+  fs.renameSync(tmpPath, MODEL_PATH);
+  console.log(`[taste-filter] CLIP vision model ready at ${MODEL_PATH}`);
+}
 
 // Lazily-created, cached across calls — loading the ONNX session is expensive and the
 // model is stateless/reusable across every embedImage() call, so there's no reason to
@@ -38,14 +95,20 @@ let sessionPromise = null;
 function getSession() {
   if (!sessionPromise) {
     sessionPromise = (async () => {
-      if (!fs.existsSync(MODEL_PATH)) {
-        throw new Error(
-          `Taste Filter model not found at ${MODEL_PATH}. Download the ONNX export of ` +
-            'Xenova/clip-vit-base-patch32 (its vision encoder) and place it there, or set ' +
-            'TASTE_FILTER_MODEL_PATH to point at it. See ARCHITECTURE.md -> Module 7.'
-        );
+      try {
+        // No-op if a valid model file is already at MODEL_PATH (the common case after the
+        // first run) -- only downloads when it's missing or looks corrupt/truncated.
+        if (!isValidModelFile(MODEL_PATH)) {
+          await downloadModel();
+        }
+        return await ort.InferenceSession.create(MODEL_PATH);
+      } catch (err) {
+        // Don't cache a permanent failure -- a transient network error (or an interrupted
+        // download) shouldn't poison every future call for the life of the process. The
+        // next embedImage() call gets a fresh attempt instead of replaying this rejection.
+        sessionPromise = null;
+        throw err;
       }
-      return ort.InferenceSession.create(MODEL_PATH);
     })();
   }
   return sessionPromise;
