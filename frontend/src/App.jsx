@@ -281,19 +281,19 @@ function App() {
     await saveWatchSetting({ taste_filter_watch_folder: suggestion.suggested, taste_filter_watch_enabled: true });
   }
 
-  function refreshRateLimits() {
+  const refreshRateLimits = useCallback(() => {
     fetch('/api/llm/rate-limits')
       .then((r) => r.json())
       .then((data) => { setRateLimits(data); setRateLimitsLoading(false); setRateLimitsUpdatedAt(new Date()); })
       .catch((err) => { setRateLimitsLoading(false); reportFetchError('refreshRateLimits')(err); });
-  }
+  }, [reportFetchError]);
 
-  function refreshApiKeys() {
+  const refreshApiKeys = useCallback(() => {
     fetch('/api/settings/api-keys')
       .then((r) => r.json())
       .then((data) => { setApiKeys(data); setApiKeysLoading(false); })
       .catch((err) => { setApiKeysLoading(false); reportFetchError('refreshApiKeys')(err); });
-  }
+  }, [reportFetchError]);
 
   function refreshPipelineConfig() {
     fetch('/api/config/pipeline')
