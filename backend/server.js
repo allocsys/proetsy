@@ -44,6 +44,7 @@ import {
   recomputeCentroids,
   tallyPromptTermsForLabel,
   getImagePreferenceState,
+  recomputePromptTerms,
 } from './lib/taste-filter/store.js';
 import { syncWatcherFromSettings, getPendingCandidates, removePendingCandidate, getWatcherStatus, onPendingCandidate } from './lib/taste-filter/watcher.js';
 import {
@@ -959,11 +960,20 @@ app.post('/api/taste-filter/import', uploadCandidate.array('files', 100), async 
       });
 
       if (decision) {
-        // Same two effects as a manual label (POST /api/taste-filter/label above):
-        // persist the training signal with `autoLabeled: true` (Step 2.2), then
-        // recompute centroids. Never deletes the underlying file, in either the
-        // auto-keep or auto-discard case — unchanged from today's manual-discard
+        // Same effects as a manual label (POST /api/taste-filter/label above): persist
+        // the training signal with `autoLabeled: true` (Step 2.2), tally its prompt's
+        // terms, then recompute centroids. Never deletes the underlying file, in either
+        // the auto-keep or auto-discard case — unchanged from today's manual-discard
         // behavior, per Part 2's "Why" constraint.
+        //
+        // Captured before addImagePreference()'s upsert overwrites this image's row --
+        // same before/after-diff pattern the manual label route uses (see
+        // docs/fixes/prompt-terms-double-count.md), so an auto-decision landing on a
+        // path that was already labeled (e.g. a watched-folder re-import) still tallies
+        // correctly instead of double-counting. An auto-decision is itself a real
+        // training signal, same as a manual click — it was previously never tallied at
+        // all (issue #59, part 1).
+        const previousState = getImagePreferenceState(file.path);
         addImagePreference({
           imagePath: file.path,
           embedding,
@@ -972,6 +982,7 @@ app.post('/api/taste-filter/import', uploadCandidate.array('files', 100), async 
           promptId,
           autoLabeled: true,
         });
+        tallyPromptTermsForLabel(promptId, decision, previousState);
         recomputeCentroids();
         // Refresh the centroids used for scoring so later candidates in this same
         // batch are scored (and auto-decided) against the just-updated centroids —
@@ -1143,6 +1154,13 @@ app.get('/api/taste-filter/centroids', (req, res) => {
 // batch").
 app.post('/api/taste-filter/recompute', (req, res) => {
   const counts = recomputeCentroids();
+  // Also rebuilds prompt_terms from scratch off the current image_preferences table
+  // (issue #59, part 2) -- unlike the incremental tally, this can't drift regardless of
+  // relabeling history, so running it here self-heals any prompt_terms rows left
+  // inflated by relabeling that happened before docs/fixes/prompt-terms-double-count.md's
+  // fix shipped. Cheap to run unconditionally alongside the existing centroid recompute,
+  // same "manual trigger, no partial-state risk" contract this route already has.
+  recomputePromptTerms();
   res.json({
     counts: Object.fromEntries(Array.from(counts.entries()).map(([k, v]) => [k === null ? 'global' : k, v])),
   });
