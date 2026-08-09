@@ -954,8 +954,18 @@ app.get('/api/taste-filter/model-status/stream', (req, res) => {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     Connection: 'keep-alive',
+    // Tells nginx-style reverse proxies (Render's edge included) not to buffer this
+    // response -- without it, a small final message like the 'ready' transition below
+    // can sit in the proxy's buffer indefinitely instead of reaching the client right
+    // away, since nothing else is written afterward to force a flush.
+    'X-Accel-Buffering': 'no',
   });
   res.flushHeaders();
+  // Disables Nagle's algorithm on the underlying TCP socket so small writes (every
+  // message here is a few dozen bytes) go out immediately instead of being held back
+  // waiting to coalesce with more data that, for a stream like this, may not arrive for
+  // seconds -- the same reason chat/game-server SSE and WebSocket code sets this.
+  res.socket？.setNoDelay?.(true);
 
   const send = (state) => {
     res.write(`data: ${JSON.stringify(state)}\n\n`);
