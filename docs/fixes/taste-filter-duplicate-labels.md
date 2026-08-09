@@ -1,6 +1,6 @@
 # Fix scope: duplicate/contradictory rows in `image_preferences`
 
-**Status:** scoping only — no code changes in this branch yet.
+**Status:** implemented and tested (steps 1-3 of the proposed fix below). Full backend suite green (519/519). Step 4 (route change) confirmed as "no change needed."
 **Found during:** functional correctness review, 2026-08-09.
 
 ## Bug
