@@ -324,10 +324,18 @@ function App() {
     refreshWatchStatus();
     refreshRateLimits();
     refreshApiKeys();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount-only
-    // init: these refreshers are plain functions re-created every render, not memoized,
-    // and this effect must run exactly once on mount, not on every render.
-  }, []);
+    // These refreshers are now stabilized with useCallback ([reportFetchError], which is
+    // itself stabilized with []), so listing them here does not turn this into a
+    // run-on-every-render effect -- it still only runs once on mount, as intended.
+  }, [
+    refreshApiKeys,
+    refreshJobs,
+    refreshRateLimits,
+    refreshSetupStatus,
+    refreshTags,
+    refreshTrends,
+    refreshWatchStatus,
+  ]);
 
   const tagCategories = useMemo(
     () => Array.from(new Set(tags.map((t) => t.category).filter(Boolean))).sort(),
