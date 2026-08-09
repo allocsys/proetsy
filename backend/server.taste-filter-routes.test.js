@@ -86,6 +86,23 @@ describe('POST /api/taste-filter/import (ARCHITECTURE.md -> Module 7 -> "Build s
     const res = await request(app).post('/api/taste-filter/import').field('category', 'square-canvas');
     expect(res.status).toBe(400);
   });
+
+  it("does not fail the whole batch when one file's embedding fails", async () => {
+    embedImageMock.mockImplementationOnce(async () => {
+      throw new Error('corrupt image');
+    });
+
+    const res = await request(app)
+      .post('/api/taste-filter/import')
+      .attach('files', Buffer.from('bad'), 'broken.png')
+      .attach('files', Buffer.from('fine'), 'ok.png');
+
+    expect(res.status).toBe(201);
+    expect(res.body.candidates).toHaveLength(2);
+    expect(res.body.candidates[0].error).toMatch(/corrupt image/);
+    expect(res.body.candidates[1].error).toBeUndefined();
+    expect(res.body.candidates[1].embedding).toBeDefined();
+  });
 });
 
 describe('GET /api/taste-filter/model-status(/stream) -- CLIP model download progress', () => {
@@ -146,23 +163,6 @@ describe('GET /api/taste-filter/model-status(/stream) -- CLIP model download pro
     });
 
     expect(events.join('')).toContain('"bytesDownloaded":175');
-  });
-
-  it("does not fail the whole batch when one file's embedding fails", async () => {
-    embedImageMock.mockImplementationOnce(async () => {
-      throw new Error('corrupt image');
-    });
-
-    const res = await request(app)
-      .post('/api/taste-filter/import')
-      .attach('files', Buffer.from('bad'), 'broken.png')
-      .attach('files', Buffer.from('fine'), 'ok.png');
-
-    expect(res.status).toBe(201);
-    expect(res.body.candidates).toHaveLength(2);
-    expect(res.body.candidates[0].error).toMatch(/corrupt image/);
-    expect(res.body.candidates[1].error).toBeUndefined();
-    expect(res.body.candidates[1].embedding).toBeDefined();
   });
 });
 
