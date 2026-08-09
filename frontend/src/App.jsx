@@ -142,6 +142,7 @@ function App() {
   const [configBackupMessage, setConfigBackupMessage] = useState('');
   const [configImportMessage, setConfigImportMessage] = useState(null); // { text, ok } | null
   const [configImporting, setConfigImporting] = useState(false);
+  const [suggestedWatchFolder, setSuggestedWatchFolder] = useState(null); // { suggested, exists } | null
 
   useEffect(() => {
     if (!activeJobId) {
@@ -257,6 +258,24 @@ function App() {
       .then((r) => r.json())
       .then(setWatchStatus)
       .catch(reportFetchError('refreshWatchStatus'));
+  }
+
+  // One-click default for the watched-folder field (see #3 in the automation pass) --
+  // fills the field with the suggested Downloads folder and turns watching on in one
+  // action, instead of requiring the user to hand-type a full path first.
+  async function useDefaultWatchFolder() {
+    let suggestion = suggestedWatchFolder;
+    if (!suggestion) {
+      try {
+        const res = await fetch('/api/system/default-watch-folder');
+        suggestion = await res.json();
+        setSuggestedWatchFolder(suggestion);
+      } catch {
+        return;
+      }
+    }
+    setSettings((s) => ({ ...s, taste_filter_watch_folder: suggestion.suggested, taste_filter_watch_enabled: 'true' }));
+    await saveWatchSetting({ taste_filter_watch_folder: suggestion.suggested, taste_filter_watch_enabled: true });
   }
 
   function refreshRateLimits() {
@@ -1210,13 +1229,19 @@ function App() {
                   <div className="settings-field-row">
                     <div className="settings-field" style={{ flex: 1, minWidth: '260px' }}>
                       <label htmlFor="settings-watched-folder" className="settings-field-label">Watched folder path{savedFlashes.taste_filter_watch_folder ? <span className="field-saved-hint">Saved</span> : null}</label>
-                      <input
-                        id="settings-watched-folder"
-                        value={settings.taste_filter_watch_folder || ''}
-                        onChange={(e) => setSettings((s) => ({ ...s, taste_filter_watch_folder: e.target.value }))}
-                        onBlur={(e) => saveWatchSetting({ taste_filter_watch_folder: e.target.value })}
-                        placeholder="/home/you/midjourney-downloads"
-                      />
+                      <div className="flex-row" style={{ gap: '0.5rem', alignItems: 'center' }}>
+                        <input
+                          id="settings-watched-folder"
+                          style={{ flex: 1 }}
+                          value={settings.taste_filter_watch_folder || ''}
+                          onChange={(e) => setSettings((s) => ({ ...s, taste_filter_watch_folder: e.target.value }))}
+                          onBlur={(e) => saveWatchSetting({ taste_filter_watch_folder: e.target.value })}
+                          placeholder="/home/you/midjourney-downloads"
+                        />
+                        <button type="button" className="btn-secondary btn-sm" onClick={useDefaultWatchFolder} title="Fill in your Downloads folder and turn watching on">
+                          Use Downloads folder
+                        </button>
+                      </div>
                     </div>
                     <div className="settings-field">
                       <label htmlFor="settings-watch-category" className="settings-field-label">Category (optional){savedFlashes.taste_filter_watch_category ? <span className="field-saved-hint">Saved</span> : null}</label>
