@@ -178,4 +178,76 @@ describe('runDefensiveMigrations (via getDb — not exported separately)', () =>
 
     expect(() => second.getDb()).not.toThrow();
   });
+
+  it('dedupes existing image_preferences rows by image_path before creating the unique index, preferring a manual label over an auto-labeled one', async () => {
+    // See docs/fixes/taste-filter-duplicate-labels.md. Simulates a pre-existing DB
+    // (created before idx_image_preferences_image_path existed) that already has a
+    // duplicate image_path -- the exact case the pre-migration cleanup exists for: an
+    // older auto-labeled row (auto_labeled = 1) plus a newer manual correction
+    // (auto_labeled = 0) for the same image. Built directly with better-sqlite3 rather
+    // than through getDb(), since schema.sql now bakes the unique index into a
+    // brand-new DB and would reject the duplicate insert below.
+    const dbPath = path.join(tmpRoot, 'proetsy.db');
+    process.env.DB_PATH = dbPath;
+
+    const Database = (await import('better-sqlite3')).default;
+    const seedDb = new Database(dbPath);
+    seedDb.exec(`
+      CREATE TABLE image_preferences (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        image_path TEXT NOT NULL,
+        embedding BLOB,
+        label TEXT NOT NULL,
+        category TEXT,
+        prompt_id INTEGER,
+        promoted_artwork_id INTEGER,
+        auto_labeled INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+    `);
+    seedDb
+      .prepare('INSERT INTO image_preferences (image_path, label, auto_labeled, created_at) VALUES (?, ?, ?, ?)')
+      .run('/candidates/duplicate.png', 'discard', 1, '2026-01-01T00:00:00Z');
+    seedDb
+      .prepare('INSERT INTO image_preferences (image_path, label, auto_labeled, created_at) VALUES (?, ?, ?, ?)')
+      .run('/candidates/duplicate.png', 'keep', 0, '2026-01-02T00:00:00Z');
+    seedDb.close();
+
+    const { getDb } = await import('./init.js');
+    expect(() => getDb()).not.toThrow();
+    const db = getDb();
+
+    const rows = db.prepare('SELECT * FROM image_preferences WHERE image_path = ?').all('/candidates/duplicate.png');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].label).toBe('keep');
+    expect(rows[0].auto_labeled).toBe(0);
+  });
+
+  it('is a no-op on a DB with no duplicate image_path rows', async () => {
+    process.env.DB_PATH = path.join(tmpRoot, 'proetsy.db');
+    const { getDb } = await import('./init.js');
+    const db = getDb();
+
+    db.prepare('INSERT INTO image_preferences (image_path, label) VALUES (?, ?)').run('/candidates/a.png', 'keep');
+    db.prepare('INSERT INTO image_preferences (image_path, label) VALUES (?, ?)').run('/candidates/b.png', 'discard');
+
+    vi.resetModules();
+    process.env.DB_PATH = path.join(tmpRoot, 'proetsy.db');
+    const reopened = await import('./init.js');
+    expect(() => reopened.getDb()).not.toThrow();
+
+    const rows = reopened.getDb().prepare('SELECT image_path FROM image_preferences ORDER BY image_path').all();
+    expect(rows.map((r) => r.image_path)).toEqual(['/candidates/a.png', '/candidates/b.png']);
+  });
+
+  it('creates idx_image_preferences_image_path as a unique index, rejecting a second insert for the same image_path', async () => {
+    process.env.DB_PATH = path.join(tmpRoot, 'proetsy.db');
+    const { getDb } = await import('./init.js');
+    const db = getDb();
+
+    db.prepare('INSERT INTO image_preferences (image_path, label) VALUES (?, ?)').run('/candidates/one.png', 'keep');
+    expect(() =>
+      db.prepare('INSERT INTO image_preferences (image_path, label) VALUES (?, ?)').run('/candidates/one.png', 'discard')
+    ).toThrow(/UNIQUE constraint failed/);
+  });
 });
