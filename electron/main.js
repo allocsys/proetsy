@@ -71,6 +71,12 @@ export function packagedBackendEnv() {
     ARTWORK_UPLOADS_DIR: path.join(userDataDir, 'data', 'uploads'),
     TASTE_FILTER_CANDIDATES_DIR: path.join(userDataDir, 'data', 'taste-filter'),
     MOCKUP_OUTPUT_DIR: path.join(userDataDir, 'data', 'mockups'),
+    // The downloaded CLIP model (~350MB, fetched on first use by
+    // backend/lib/taste-filter/embeddings.js) -- without this override it defaults to a
+    // path inside the app's own install directory, which is read-only once packaged (e.g.
+    // Program Files on Windows), so every download attempt would fail with a permissions
+    // error instead of succeeding once and persisting like every other directory here.
+    TASTE_FILTER_MODEL_PATH: path.join(userDataDir, 'models', 'clip-vit-base-patch32.onnx'),
   };
 }
 
