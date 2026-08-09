@@ -86,26 +86,62 @@ async function downloadModel() {
   console.log(`[taste-filter] CLIP vision model ready at ${MODEL_PATH}`);
 }
 
-// Lazily-created, cached across calls — loading the ONNX session is expensive and the
-// model is stateless/reusable across every embedImage() call, so there's no reason to
-// reload it per call. Module-level singleton, same rationale as gemini.js's key-pool
-// caching a single provider layer instance rather than reconstructing it per request.
-let sessionPromise = null;
+// Lazily-created, cached across calls -- de-duped the same way for the same reason as
+// sessionPromise below, but covering ONLY the download-check+download step, not session
+// creation. Split out from getSession() (which used to do both inline) so a caller that
+// wants the ~350MB download paid for up front -- e.g. server.js at boot, before any
+// request can reach embedImage() -- can await just that cost, without also forcing an
+// InferenceSession.create() call or a real inference. See server.js's boot sequence for
+// why: downloading (and loading) a large model inside a live request handler is exactly
+// the kind of memory/time pressure that gets a process killed mid-request on a
+// resource-constrained host, which surfaces to the client as an empty response body
+// rather than a real error -- paying that cost once at startup instead makes a failure
+// (or a slow/OOM-prone environment) visible in boot logs instead of as a mystifying
+// client-side JSON parse error.
+let modelReadyPromise = null;
 
-function getSession() {
-  if (!sessionPromise) {
-    sessionPromise = (async () => {
+export function ensureModelReady() {
+  if (!modelReadyPromise) {
+    modelReadyPromise = (async () => {
       try {
         // No-op if a valid model file is already at MODEL_PATH (the common case after the
         // first run) -- only downloads when it's missing or looks corrupt/truncated.
         if (!isValidModelFile(MODEL_PATH)) {
           await downloadModel();
         }
-        return await ort.InferenceSession.create(MODEL_PATH);
       } catch (err) {
         // Don't cache a permanent failure -- a transient network error (or an interrupted
         // download) shouldn't poison every future call for the life of the process. The
-        // next embedImage() call gets a fresh attempt instead of replaying this rejection.
+        // next ensureModelReady()/embedImage() call gets a fresh attempt instead of
+        // replaying this rejection.
+        modelReadyPromise = null;
+        throw err;
+      }
+    })();
+  }
+  return modelReadyPromise;
+}
+
+// Lazily-created, cached across calls — loading the ONNX session is expensive and the
+// model is stateless/reusable across every embedImage() call, so there's no reason to
+// reload it per call. Module-level singleton, same rationale as gemini.js's key-pool
+// caching a single provider layer instance rather than reconstructing it per request.
+// Callers that only care about the model file being on disk (not a live session) should
+// use ensureModelReady() instead -- this always implies that, but also pays the session-
+// creation cost, which a boot-time "just get the download out of the way" call doesn't
+// need.
+let sessionPromise = null;
+
+function getSession() {
+  if (!sessionPromise) {
+    sessionPromise = (async () => {
+      try {
+        await ensureModelReady();
+        return await ort.InferenceSession.create(MODEL_PATH);
+      } catch (err) {
+        // Same don't-cache-a-permanent-failure rationale as ensureModelReady() above --
+        // a transient failure (including one bubbled up from ensureModelReady() itself)
+        // shouldn't poison every future call for the life of the process.
         sessionPromise = null;
         throw err;
       }
