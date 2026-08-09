@@ -335,6 +335,7 @@ function App() {
     refreshTags,
     refreshTrends,
     refreshWatchStatus,
+    reportFetchError,
   ]);
 
   const tagCategories = useMemo(
