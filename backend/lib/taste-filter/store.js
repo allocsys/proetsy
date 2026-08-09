@@ -285,3 +285,56 @@ export function tallyPromptTermsForLabel(promptId, label, previous = null) {
 
   adjustPromptTermCounts(db, promptId, label, 1);
 }
+
+/**
+ * Full rebuild of `prompt_terms.kept_count`/`discarded_count` from the *current*
+ * `image_preferences` table, rather than trusting the incremental running total
+ * tallyPromptTermsForLabel() maintains. Mirrors recomputeCentroids()'s "recompute
+ * everything from the labeled set" pattern above -- same idea, applied to prompt terms
+ * instead of embedding centroids.
+ *
+ * Why this exists alongside the incremental tally: it's the backfill/self-healing half
+ * of the fix in docs/fixes/prompt-terms-double-count.md (issue #59, part 2) -- any
+ * `prompt_terms` rows left inflated by relabeling *before* that fix shipped are not
+ * corrected by the incremental fix alone (it only stops *new* drift). Reading every
+ * image's current label directly here, instead of relying on a running delta, can never
+ * drift, so running this is always safe and always correct regardless of history.
+ *
+ * Resets every existing `prompt_terms` row's counts to 0 first (not a delete -- keeps
+ * the term rows and lets `updated_at` reflect this recompute), then re-tallies from
+ * every `image_preferences` row that resolves to a real prompt. Whole thing runs in one
+ * transaction so a caller never sees a partially-reset table.
+ */
+export function recomputePromptTerms() {
+  const db = getDb();
+
+  const run = db.transaction(() => {
+    db.prepare('UPDATE prompt_terms SET kept_count = 0, discarded_count = 0').run();
+
+    const labeledRows = db
+      .prepare(
+        `SELECT ip.label AS label, p.prompt_text AS prompt_text
+         FROM image_preferences ip
+         JOIN prompts p ON p.id = ip.prompt_id
+         WHERE ip.prompt_id IS NOT NULL`
+      )
+      .all();
+
+    const upsertKept = db.prepare(
+      `INSERT INTO prompt_terms (term, kept_count, updated_at) VALUES (?, 1, datetime('now'))
+       ON CONFLICT(term) DO UPDATE SET kept_count = kept_count + 1, updated_at = datetime('now')`
+    );
+    const upsertDiscarded = db.prepare(
+      `INSERT INTO prompt_terms (term, discarded_count, updated_at) VALUES (?, 1, datetime('now'))
+       ON CONFLICT(term) DO UPDATE SET discarded_count = discarded_count + 1, updated_at = datetime('now')`
+    );
+
+    for (const row of labeledRows) {
+      const terms = extractPromptTerms(row.prompt_text);
+      if (!terms.size) continue;
+      const upsert = row.label === 'keep' ? upsertKept : upsertDiscarded;
+      for (const term of terms) upsert.run(term);
+    }
+  });
+  run();
+}
