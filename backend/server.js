@@ -38,7 +38,13 @@ import {
 import { generatePromptsForTrend, listPrompts } from './lib/prompt-helper/index.js';
 import { embedImage } from './lib/taste-filter/embeddings.js';
 import { scoreCandidate, autoDecision } from './lib/taste-filter/scoring.js';
-import { getCentroids, addImagePreference, recomputeCentroids, tallyPromptTermsForLabel } from './lib/taste-filter/store.js';
+import {
+  getCentroids,
+  addImagePreference,
+  recomputeCentroids,
+  tallyPromptTermsForLabel,
+  getImagePreferenceState,
+} from './lib/taste-filter/store.js';
 import { syncWatcherFromSettings, getPendingCandidates, removePendingCandidate, getWatcherStatus, onPendingCandidate } from './lib/taste-filter/watcher.js';
 import {
   scanTemplatesFolder,
@@ -1006,6 +1012,11 @@ app.post('/api/taste-filter/label', (req, res) => {
 
   try {
     const resolvedPromptId = prompt_id ? Number(prompt_id) : null;
+    // Captured before addImagePreference()'s upsert below overwrites this image's row --
+    // the "before" half of tallyPromptTermsForLabel()'s before/after diff, so a relabel
+    // (e.g. correcting an auto-sorted candidate) undoes its old term tally instead of
+    // only ever adding to it. See docs/fixes/prompt-terms-double-count.md.
+    const previousState = getImagePreferenceState(image_path);
     const id = addImagePreference({
       imagePath: image_path,
       embedding: Float32Array.from(embedding),
@@ -1018,7 +1029,7 @@ app.post('/api/taste-filter/label', (req, res) => {
     // label's prompt's terms into prompt_terms.kept_count/discarded_count. A no-op when
     // no prompt_id was given or it doesn't resolve to a real prompt -- optional/opt-in,
     // never blocks the label above from having already saved.
-    tallyPromptTermsForLabel(resolvedPromptId, label);
+    tallyPromptTermsForLabel(resolvedPromptId, label, previousState);
     // Step 7's auto-import queue (see lib/taste-filter/watcher.js): if this label was for
     // a watched-folder candidate, drop it from the pending queue so a subsequent
     // GET /api/taste-filter/pending poll doesn't re-surface an already-labeled image. A
