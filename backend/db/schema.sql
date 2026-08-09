@@ -140,11 +140,15 @@ CREATE TABLE IF NOT EXISTS image_preferences (
   created_at TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_image_preferences_category ON image_preferences(category);
--- One row per image: POST /api/taste-filter/label upserts on this constraint so a
--- manual Keep/Discard correcting an earlier auto-labeled row (auto_labeled = 1) updates
--- it in place instead of inserting a second, potentially contradictory row that would
--- double-count in centroid recompute. See docs/fixes/taste-filter-duplicate-labels.md.
-CREATE UNIQUE INDEX IF NOT EXISTS idx_image_preferences_image_path ON image_preferences(image_path);
+-- idx_image_preferences_image_path (one row per image, so POST /api/taste-filter/label
+-- can upsert instead of ever inserting a second, potentially contradictory row -- see
+-- docs/fixes/taste-filter-duplicate-labels.md) is deliberately NOT created here.
+-- db.exec(schema) (init.js's getDb()) runs this file on every startup, before
+-- runDefensiveMigrations()'s one-time dedup cleanup for pre-existing DBs -- creating a
+-- UNIQUE index here would enforce the constraint against old duplicate data before that
+-- cleanup has a chance to run. Same reason idx_jobs_batch_id below is migration-only
+-- rather than declared here. The index is created in db/init.js's runDefensiveMigrations(),
+-- immediately after the dedup DELETE.
 
 CREATE TABLE IF NOT EXISTS taste_centroids (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
