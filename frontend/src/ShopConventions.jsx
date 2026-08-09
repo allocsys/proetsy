@@ -24,7 +24,10 @@ function ShopConventions() {
 
   useEffect(() => {
     fetch('/api/config/shop-conventions')
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`Server returned status ${r.status}`);
+        return r.json();
+      })
       .then((cfg) => {
         setLoading(false);
         if (cfg.listing) {
