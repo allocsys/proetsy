@@ -21,6 +21,47 @@ function formatMB(bytes) {
   return (bytes / (1024 * 1024)).toFixed(0);
 }
 
+// Reads a fetch Response as JSON, but with two failure modes turned into a message a
+// user can actually act on instead of a raw browser exception string:
+//   - A response that ends early (e.g. the connection dropped, or the backend process
+//     restarted mid-request -- res.ok but the body isn't valid JSON) would otherwise
+//     surface as `res.json()`'s own "Failed to execute 'json' on 'Response': Unexpected
+//     end of JSON input", which reads like an internal error even though "try again" is
+//     the correct and sufficient fix.
+//   - A non-OK response whose body also isn't valid JSON (e.g. a proxy's own HTML error
+//     page for a 502/504) gets a message built from the status code instead of the same
+//     confusing exception.
+// Reads the body as text first (rather than res.json() directly) specifically so a
+// parse failure can be told apart from "the server sent a real {error: ...} JSON body",
+// which still takes priority when present.
+async function parseJsonResponse(res) {
+  const text = await res.text();
+  let data;
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error(
+      res.ok
+        ? 'The connection dropped before the server finished responding (this can happen during a deploy). Please try again.'
+        : `Server error (HTTP ${res.status}). Please try again.`
+    );
+  }
+  if (!res.ok) throw new Error(data.error || `Request failed (HTTP ${res.status})`);
+  return data;
+}
+
+// Same idea as above, one level earlier: fetch() itself rejects (rather than resolving
+// with a Response) when the request never made it to/from the server at all -- offline,
+// DNS failure, CORS, etc. -- and that rejection is a TypeError with a terse, browser-
+// specific message ('Failed to fetch' in Chrome/Samsung Internet, 'NetworkError when
+// attempting to fetch resource' in Firefox). Centralized here so every call site's catch
+// block can show one consistent, actionable message instead of whatever string this
+// particular browser happened to choose.
+function friendlyErrorMessage(err) {
+  if (err instanceof TypeError) return 'Could not reach the server — check your connection and try again.';
+  return err.message;
+}
+
 function ModelDownloadBar({ modelStatus }) {
   if (!modelStatus || modelStatus.status === 'ready' || modelStatus.status === 'idle') return null;
 
