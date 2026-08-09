@@ -75,7 +75,8 @@ that comment.
   is additive (`+1` per label call) and isn't touched by this fix. Relabeling an image will
   still increment the *new* label's count without decrementing the *old* one, so term
   stats can still drift after a correction. Tracked as a separate follow-up — it needs its
-  own before/after diff logic, not just an upsert.
+  own before/after diff logic, not just an upsert. **Fixed separately, see
+  `docs/fixes/prompt-terms-double-count.md`.**
 - **Whether "auto-compute" should exist at all.** ARCHITECTURE.md's Module 7 section
   states labels are always user-confirmed; the auto-compute setting (default off) is a
   real, shipped feature that isn't reflected there. Reconciling the doc is a separate,

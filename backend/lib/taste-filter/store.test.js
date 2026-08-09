@@ -15,6 +15,8 @@ let listImagePreferences;
 let recomputeCentroids;
 let getCentroids;
 let tallyPromptTermsForLabel;
+let getImagePreferenceState;
+let recomputePromptTerms;
 let tmpRoot;
 
 beforeAll(async () => {
@@ -22,7 +24,15 @@ beforeAll(async () => {
   process.env.DB_PATH = path.join(tmpRoot, 'test.db');
 
   ({ getDb } = await import('../../db/init.js'));
-  ({ addImagePreference, listImagePreferences, recomputeCentroids, getCentroids, tallyPromptTermsForLabel } = await import('./store.js'));
+  ({
+    addImagePreference,
+    listImagePreferences,
+    recomputeCentroids,
+    getCentroids,
+    tallyPromptTermsForLabel,
+    getImagePreferenceState,
+    recomputePromptTerms,
+  } = await import('./store.js'));
 });
 
 afterAll(() => {
@@ -196,5 +206,137 @@ describe('tallyPromptTermsForLabel (Module 7 -> Module 4 prompt-feedback link, w
       .map((r) => r.term);
     expect(top).toContain('radiant');
     expect(top).toContain('sunrise');
+  });
+
+  // docs/fixes/prompt-terms-double-count.md: a relabel must undo the prior tally, not
+  // just add the new one, or kept_count/discarded_count drift out of sync with the
+  // current set of labeled images.
+  it('undoes the prior tally when the same image is relabeled to a different label on the same prompt', () => {
+    const db = getDb();
+    const { lastInsertRowid: promptId } = db
+      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square', 'a glowing lantern at dusk --ar 1:1')`)
+      .run();
+
+    tallyPromptTermsForLabel(promptId, 'keep');
+    let lantern = db.prepare('SELECT * FROM prompt_terms WHERE term = ?').get('lantern');
+    expect(lantern.kept_count).toBe(1);
+    expect(lantern.discarded_count).toBe(0);
+
+    // Relabel: previous state was { promptId, label: 'keep' }, new label is 'discard'.
+    tallyPromptTermsForLabel(promptId, 'discard', { promptId, label: 'keep' });
+    lantern = db.prepare('SELECT * FROM prompt_terms WHERE term = ?').get('lantern');
+    expect(lantern.kept_count).toBe(0);
+    expect(lantern.discarded_count).toBe(1);
+  });
+
+  it('is a pure no-op when the relabel is redundant (same promptId and label as before)', () => {
+    const db = getDb();
+    const { lastInsertRowid: promptId } = db
+      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square', 'a quiet harbor at dawn --ar 1:1')`)
+      .run();
+
+    tallyPromptTermsForLabel(promptId, 'keep');
+    tallyPromptTermsForLabel(promptId, 'keep', { promptId, label: 'keep' }); // redundant re-label
+
+    const harbor = db.prepare('SELECT * FROM prompt_terms WHERE term = ?').get('harbor');
+    expect(harbor.kept_count).toBe(1); // not 2 -- nothing to add or undo
+  });
+
+  it('never decrements a term below 0, even if the prior state predates this fix', () => {
+    const db = getDb();
+    const { lastInsertRowid: promptId } = db
+      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square', 'a solitary lighthouse --ar 1:1')`)
+      .run();
+
+    // No prior tallyPromptTermsForLabel() call ever ran for this prompt's 'discard'
+    // label -- simulates a pre-fix row where the "before" half was never recorded.
+    tallyPromptTermsForLabel(promptId, 'keep', { promptId, label: 'discard' });
+
+    const lighthouse = db.prepare('SELECT * FROM prompt_terms WHERE term = ?').get('lighthouse');
+    expect(lighthouse.discarded_count).toBe(0); // clamped, not -1
+    expect(lighthouse.kept_count).toBe(1);
+  });
+});
+
+describe('getImagePreferenceState', () => {
+  it('returns null for an image that has never been labeled', () => {
+    expect(getImagePreferenceState('/tmp/never-labeled.png')).toBeNull();
+  });
+
+  it("round-trips the image's current label and prompt_id after addImagePreference()", () => {
+    const db = getDb();
+    const { lastInsertRowid: promptId } = db
+      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square', 'a field of tulips --ar 1:1')`)
+      .run();
+    const embedding = new Float32Array([1, 2]);
+
+    addImagePreference({ imagePath: '/tmp/state-check.png', embedding, label: 'discard', promptId });
+
+    expect(getImagePreferenceState('/tmp/state-check.png')).toEqual({ promptId, label: 'discard' });
+  });
+});
+
+describe('recomputePromptTerms (issue #59, part 2 -- full rebuild, self-heals drift)', () => {
+  it('rebuilds a term\'s counts to match the current image_preferences state, correcting stale/inflated counts', () => {
+    const db = getDb();
+    const { lastInsertRowid: promptId } = db
+      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square', 'a rusty anchor on the shore --ar 1:1')`)
+      .run();
+
+    // Simulate pre-#58 drift directly: two increments to kept_count with no
+    // corresponding image_preferences rows backing them (the exact kind of phantom
+    // leftover the old increment-only tallyPromptTermsForLabel() could produce).
+    tallyPromptTermsForLabel(promptId, 'keep');
+    tallyPromptTermsForLabel(promptId, 'keep');
+    let anchor = db.prepare('SELECT * FROM prompt_terms WHERE term = ?').get('anchor');
+    expect(anchor.kept_count).toBe(2);
+
+    // The actual current labeled state backing this prompt is a single 'discard'.
+    addImagePreference({
+      imagePath: '/tmp/anchor.png',
+      embedding: new Float32Array([1, 1]),
+      label: 'discard',
+      promptId,
+    });
+
+    recomputePromptTerms();
+
+    anchor = db.prepare('SELECT * FROM prompt_terms WHERE term = ?').get('anchor');
+    expect(anchor.kept_count).toBe(0); // drift corrected, not left at 2
+    expect(anchor.discarded_count).toBe(1); // matches the one real labeled row
+  });
+
+  it('reflects multiple images sharing a prompt, and ignores rows with no prompt_id', () => {
+    const db = getDb();
+    const { lastInsertRowid: promptId } = db
+      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square', 'a windswept dune at twilight --ar 1:1')`)
+      .run();
+
+    addImagePreference({ imagePath: '/tmp/dune1.png', embedding: new Float32Array([1, 0]), label: 'keep', promptId });
+    addImagePreference({ imagePath: '/tmp/dune2.png', embedding: new Float32Array([0, 1]), label: 'keep', promptId });
+    addImagePreference({ imagePath: '/tmp/dune3.png', embedding: new Float32Array([1, 1]), label: 'discard', promptId });
+    // No prompt_id at all -- must not affect the tally or throw.
+    addImagePreference({ imagePath: '/tmp/no-prompt-for-recompute.png', embedding: new Float32Array([2, 2]), label: 'keep' });
+
+    recomputePromptTerms();
+
+    const dune = db.prepare('SELECT * FROM prompt_terms WHERE term = ?').get('dune');
+    expect(dune.kept_count).toBe(2);
+    expect(dune.discarded_count).toBe(1);
+  });
+
+  it('is idempotent -- running it twice in a row does not change the result', () => {
+    const db = getDb();
+    const { lastInsertRowid: promptId } = db
+      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square', 'a crumbling stone bridge --ar 1:1')`)
+      .run();
+    addImagePreference({ imagePath: '/tmp/bridge.png', embedding: new Float32Array([1, 0]), label: 'keep', promptId });
+
+    recomputePromptTerms();
+    const first = db.prepare('SELECT kept_count, discarded_count FROM prompt_terms WHERE term = ?').get('bridge');
+    recomputePromptTerms();
+    const second = db.prepare('SELECT kept_count, discarded_count FROM prompt_terms WHERE term = ?').get('bridge');
+
+    expect(second).toEqual(first);
   });
 });

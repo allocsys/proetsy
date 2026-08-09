@@ -198,6 +198,60 @@ export function getCentroids(category = null) {
 }
 
 /**
+ * Reads back an image's *current* label/prompt, before a new label overwrites it --
+ * the "before" half of tallyPromptTermsForLabel()'s before/after diff (see
+ * docs/fixes/prompt-terms-double-count.md). Must be called prior to addImagePreference()'s
+ * upsert for the same image_path, since that upsert is what overwrites the row this reads.
+ * Returns null when the image has never been labeled before (first label, nothing to undo).
+ * @param {string} imagePath
+ * @returns {{ promptId: number | null, label: 'keep' | 'discard' } | null}
+ */
+export function getImagePreferenceState(imagePath) {
+  const db = getDb();
+  const row = db.prepare('SELECT prompt_id, label FROM image_preferences WHERE image_path = ?').get(imagePath);
+  if (!row) return null;
+  return { promptId: row.prompt_id, label: row.label };
+}
+
+// Column name is interpolated from a fixed two-value ternary (never user input), so this
+// is safe -- not a dynamic/user-controlled SQL fragment. Shared by both the increment and
+// decrement sides of tallyPromptTermsForLabel() below.
+function columnForLabel(label) {
+  return label === 'keep' ? 'kept_count' : 'discarded_count';
+}
+
+// Applies one prompt's worth of term deltas (+1 for the label just applied, -1 to undo a
+// label being replaced) to `prompt_terms`. No-op when promptId/label is missing, the
+// prompt no longer exists, or its text yields no extractable terms -- same tolerance
+// tallyPromptTermsForLabel() has always had for an unlinked/missing prompt.
+function adjustPromptTermCounts(db, promptId, label, delta) {
+  if (!promptId || !label) return;
+  const prompt = db.prepare('SELECT prompt_text FROM prompts WHERE id = ?').get(promptId);
+  if (!prompt) return;
+
+  const terms = extractPromptTerms(prompt.prompt_text);
+  if (!terms.size) return;
+
+  const column = columnForLabel(label);
+  const statement =
+    delta > 0
+      ? db.prepare(
+          `INSERT INTO prompt_terms (term, ${column}, updated_at) VALUES (?, 1, datetime('now'))
+           ON CONFLICT(term) DO UPDATE SET ${column} = ${column} + 1, updated_at = datetime('now')`
+        )
+      : // Clamped at 0 via MAX() -- a term whose count is already 0 (e.g. rows written
+        // before this fix shipped, which never got their share of an earlier relabel's
+        // increment reversed) must never go negative from an unrelated later correction.
+        db.prepare(
+          `UPDATE prompt_terms SET ${column} = MAX(${column} - 1, 0), updated_at = datetime('now') WHERE term = ?`
+        );
+  const run = db.transaction((termList) => {
+    for (const term of termList) statement.run(term);
+  });
+  run(Array.from(terms));
+}
+
+/**
  * Write side of the Module 7 -> Module 4 prompt-feedback link (ARCHITECTURE.md ->
  * Module 7 -> "Prompt-feedback link to Module 4", build sequence step 6). Looks up the
  * prompt that generated a just-labeled candidate, extracts its terms via
@@ -205,31 +259,82 @@ export function getCentroids(category = null) {
  * discarded_count in `prompt_terms` -- the same counts Module 4's getStyleHints()
  * (prompt-helper/index.js) reads back later as "terms that have worked well".
  *
- * No-op (not an error) when `promptId` is null/missing or the prompt no longer exists --
- * this link is optional/opt-in per the architecture doc, so a missing or unlinked prompt
- * should never block the label itself from saving (addImagePreference() above always
- * succeeds independently of this).
+ * `previous` (optional): the image's prior { promptId, label } state, from
+ * getImagePreferenceState() called *before* addImagePreference()'s upsert overwrote it.
+ * When given and it differs from the (promptId, label) being applied now, that prior
+ * state's contribution is undone first (-1, clamped at 0) before the new one is tallied
+ * (+1) -- fixes prompt_terms drifting out of sync with the current labeled set on a
+ * relabel (see docs/fixes/prompt-terms-double-count.md). Omitted (or identical to the new
+ * state -- a redundant re-label), this behaves exactly as the original increment-only
+ * version did.
+ *
+ * No-op for the new label's own tally when `promptId` is null/missing or the prompt no
+ * longer exists -- this link is optional/opt-in per the architecture doc, so a missing or
+ * unlinked prompt should never block the label itself from saving (addImagePreference()
+ * always succeeds independently of this).
  * @param {number | null} promptId
  * @param {'keep' | 'discard'} label
+ * @param {{ promptId: number | null, label: 'keep' | 'discard' } | null} [previous]
  */
-export function tallyPromptTermsForLabel(promptId, label) {
-  if (!promptId) return;
+export function tallyPromptTermsForLabel(promptId, label, previous = null) {
   const db = getDb();
-  const prompt = db.prepare('SELECT prompt_text FROM prompts WHERE id = ?').get(promptId);
-  if (!prompt) return;
 
-  const terms = extractPromptTerms(prompt.prompt_text);
-  if (!terms.size) return;
+  if (previous && (previous.promptId !== promptId || previous.label !== label)) {
+    adjustPromptTermCounts(db, previous.promptId, previous.label, -1);
+  }
 
-  // Column name is interpolated from a fixed two-value ternary (never user input), so
-  // this is safe -- not a dynamic/user-controlled SQL fragment.
-  const column = label === 'keep' ? 'kept_count' : 'discarded_count';
-  const upsert = db.prepare(
-    `INSERT INTO prompt_terms (term, ${column}, updated_at) VALUES (?, 1, datetime('now'))
-     ON CONFLICT(term) DO UPDATE SET ${column} = ${column} + 1, updated_at = datetime('now')`
-  );
-  const run = db.transaction((termList) => {
-    for (const term of termList) upsert.run(term);
+  adjustPromptTermCounts(db, promptId, label, 1);
+}
+
+/**
+ * Full rebuild of `prompt_terms.kept_count`/`discarded_count` from the *current*
+ * `image_preferences` table, rather than trusting the incremental running total
+ * tallyPromptTermsForLabel() maintains. Mirrors recomputeCentroids()'s "recompute
+ * everything from the labeled set" pattern above -- same idea, applied to prompt terms
+ * instead of embedding centroids.
+ *
+ * Why this exists alongside the incremental tally: it's the backfill/self-healing half
+ * of the fix in docs/fixes/prompt-terms-double-count.md (issue #59, part 2) -- any
+ * `prompt_terms` rows left inflated by relabeling *before* that fix shipped are not
+ * corrected by the incremental fix alone (it only stops *new* drift). Reading every
+ * image's current label directly here, instead of relying on a running delta, can never
+ * drift, so running this is always safe and always correct regardless of history.
+ *
+ * Resets every existing `prompt_terms` row's counts to 0 first (not a delete -- keeps
+ * the term rows and lets `updated_at` reflect this recompute), then re-tallies from
+ * every `image_preferences` row that resolves to a real prompt. Whole thing runs in one
+ * transaction so a caller never sees a partially-reset table.
+ */
+export function recomputePromptTerms() {
+  const db = getDb();
+
+  const run = db.transaction(() => {
+    db.prepare('UPDATE prompt_terms SET kept_count = 0, discarded_count = 0').run();
+
+    const labeledRows = db
+      .prepare(
+        `SELECT ip.label AS label, p.prompt_text AS prompt_text
+         FROM image_preferences ip
+         JOIN prompts p ON p.id = ip.prompt_id
+         WHERE ip.prompt_id IS NOT NULL`
+      )
+      .all();
+
+    const upsertKept = db.prepare(
+      `INSERT INTO prompt_terms (term, kept_count, updated_at) VALUES (?, 1, datetime('now'))
+       ON CONFLICT(term) DO UPDATE SET kept_count = kept_count + 1, updated_at = datetime('now')`
+    );
+    const upsertDiscarded = db.prepare(
+      `INSERT INTO prompt_terms (term, discarded_count, updated_at) VALUES (?, 1, datetime('now'))
+       ON CONFLICT(term) DO UPDATE SET discarded_count = discarded_count + 1, updated_at = datetime('now')`
+    );
+
+    for (const row of labeledRows) {
+      const terms = extractPromptTerms(row.prompt_text);
+      if (!terms.size) continue;
+      const upsert = row.label === 'keep' ? upsertKept : upsertDiscarded;
+      for (const term of terms) upsert.run(term);
+    }
   });
-  run(Array.from(terms));
+  run();
 }
