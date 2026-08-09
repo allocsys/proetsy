@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Readable } from 'node:stream';
+import { Readable, Transform } from 'node:stream';
 import { pipeline as streamPipeline } from 'node:stream/promises';
 import Jimp from 'jimp';
 import * as ort from 'onnxruntime-web';
@@ -54,6 +54,53 @@ function isValidModelFile(filePath) {
   }
 }
 
+// Model-download progress, for the dashboard's loading bar (server.js's
+// GET /api/taste-filter/model-status(/stream) routes read this). A plain module-level
+// object + pub-sub, same lightweight pattern as watcher.js's pending-candidates
+// subscribers -- no need for a full EventEmitter here, just "tell whoever's listening
+// the state changed."
+//   status: 'idle' | 'downloading' | 'ready' | 'error'
+//   bytesDownloaded: number
+//   totalBytes: number | null (null when the server didn't send Content-Length)
+//   error: string | null
+let downloadState = { status: 'idle', bytesDownloaded: 0, totalBytes: null, error: null };
+const downloadStateListeners = new Set();
+
+function setDownloadState(patch) {
+  downloadState = { ...downloadState, ...patch };
+  for (const listener of downloadStateListeners) listener(downloadState);
+}
+
+// Current snapshot -- for a plain GET poll / a client's first render before its SSE
+// connection (see onModelDownloadProgress below) delivers anything.
+export function getModelDownloadState() {
+  return downloadState;
+}
+
+// Subscribes to every downloadState change from here on (not just future ones -- the
+// caller is expected to read getModelDownloadState() for the current snapshot first,
+// same split as watcher.js's getPendingCandidates()/onPendingCandidate() pair). Returns
+// an unsubscribe function.
+export function onModelDownloadProgress(listener) {
+  downloadStateListeners.add(listener);
+  return () => downloadStateListeners.delete(listener);
+}
+
+// A pass-through stream that does nothing to the bytes themselves -- just counts them as
+// they flow past, so downloadModel() can report progress without buffering the whole
+// response in memory to measure it (defeating the entire point of streaming a 350MB
+// file straight to disk).
+function progressCounterStream(totalBytes) {
+  let bytesDownloaded = 0;
+  return new Transform({
+    transform(chunk, _enc, callback) {
+      bytesDownloaded += chunk.length;
+      setDownloadState({ status: 'downloading', bytesDownloaded, totalBytes, error: null });
+      callback(null, chunk);
+    },
+  });
+}
+
 // Downloads MODEL_DOWNLOAD_URL straight to MODEL_PATH. Streams to a sibling `.download`
 // temp file first and only renames it into place once fully written (rename is atomic on
 // the same volume, on Windows and POSIX alike) -- so a crash or interrupted connection
@@ -72,7 +119,18 @@ async function downloadModel() {
     );
   }
 
-  await streamPipeline(Readable.fromWeb(response.body), fs.createWriteStream(tmpPath));
+  // Content-Length is what Hugging Face's resolve/ URLs send for this file in practice,
+  // but treat it as advisory -- a redirect through a mirror or CDN that omits/lies about
+  // it just means the dashboard's progress bar falls back to indeterminate, not a reason
+  // to fail the download.
+  const totalBytes = Number(response.headers.get('content-length')) || null;
+  setDownloadState({ status: 'downloading', bytesDownloaded: 0, totalBytes, error: null });
+
+  await streamPipeline(
+    Readable.fromWeb(response.body),
+    progressCounterStream(totalBytes),
+    fs.createWriteStream(tmpPath)
+  );
 
   if (!isValidModelFile(tmpPath)) {
     fs.rmSync(tmpPath, { force: true });
@@ -86,26 +144,66 @@ async function downloadModel() {
   console.log(`[taste-filter] CLIP vision model ready at ${MODEL_PATH}`);
 }
 
+// Lazily-created, cached across calls -- de-duped the same way for the same reason as
+// sessionPromise below, but covering ONLY the download-check+download step, not session
+// creation. Split out from getSession() (which used to do both inline) so a caller that
+// wants the ~350MB download paid for up front -- e.g. server.js at boot, before any
+// request can reach embedImage() -- can await just that cost, without also forcing an
+// InferenceSession.create() call or a real inference. See server.js's boot sequence for
+// why: downloading (and loading) a large model inside a live request handler is exactly
+// the kind of memory/time pressure that gets a process killed mid-request on a
+// resource-constrained host, which surfaces to the client as an empty response body
+// rather than a real error -- paying that cost once at startup instead makes a failure
+// (or a slow/OOM-prone environment) visible in boot logs instead of as a mystifying
+// client-side JSON parse error.
+let modelReadyPromise = null;
+
+export function ensureModelReady() {
+  if (!modelReadyPromise) {
+    modelReadyPromise = (async () => {
+      try {
+        // No-op if a valid model file is already at MODEL_PATH (the common case after the
+        // first run) -- only downloads when it's missing or looks corrupt/truncated. Goes
+        // straight to 'ready' with no 'downloading' phase in that case -- there's nothing
+        // for a progress bar to show.
+        if (!isValidModelFile(MODEL_PATH)) {
+          await downloadModel();
+        }
+        setDownloadState({ status: 'ready', error: null });
+      } catch (err) {
+        // Don't cache a permanent failure -- a transient network error (or an interrupted
+        // download) shouldn't poison every future call for the life of the process. The
+        // next ensureModelReady()/embedImage() call gets a fresh attempt instead of
+        // replaying this rejection.
+        modelReadyPromise = null;
+        setDownloadState({ status: 'error', error: err.message });
+        throw err;
+      }
+    })();
+  }
+  return modelReadyPromise;
+}
+
 // Lazily-created, cached across calls — loading the ONNX session is expensive and the
 // model is stateless/reusable across every embedImage() call, so there's no reason to
 // reload it per call. Module-level singleton, same rationale as gemini.js's key-pool
 // caching a single provider layer instance rather than reconstructing it per request.
+// Callers that only care about the model file being on disk (not a live session) should
+// use ensureModelReady() instead -- this always implies that, but also pays the session-
+// creation cost, which a boot-time "just get the download out of the way" call doesn't
+// need.
 let sessionPromise = null;
 
 function getSession() {
   if (!sessionPromise) {
     sessionPromise = (async () => {
       try {
-        // No-op if a valid model file is already at MODEL_PATH (the common case after the
-        // first run) -- only downloads when it's missing or looks corrupt/truncated.
-        if (!isValidModelFile(MODEL_PATH)) {
-          await downloadModel();
-        }
+        await ensureModelReady();
         return await ort.InferenceSession.create(MODEL_PATH);
       } catch (err) {
-        // Don't cache a permanent failure -- a transient network error (or an interrupted
-        // download) shouldn't poison every future call for the life of the process. The
-        // next embedImage() call gets a fresh attempt instead of replaying this rejection.
+        // Same don't-cache-a-permanent-failure rationale as ensureModelReady() above --
+        // a transient failure (including one bubbled up from ensureModelReady() itself)
+        // shouldn't poison every future call for the life of the process.
         sessionPromise = null;
         throw err;
       }

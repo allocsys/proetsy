@@ -131,6 +131,17 @@ describe('packagedBackendEnv', () => {
     expect(env.MOCKUP_OUTPUT_DIR).toBe(path.join('/fake/userData', 'data', 'mockups'));
   });
 
+  it('points the Taste Filter CLIP model at userData/models when packaged (install dir is read-only)', () => {
+    mockApp.isPackaged = true;
+    mockApp.getPath.mockReturnValue('/fake/userData');
+
+    const env = main.packagedBackendEnv();
+
+    expect(env.TASTE_FILTER_MODEL_PATH).toBe(
+      path.join('/fake/userData', 'models', 'clip-vit-base-patch32.onnx')
+    );
+  });
+
   it('never includes MOCKUP_TEMPLATES_DIR -- templates ship with the app, not written at runtime', () => {
     mockApp.isPackaged = true;
     expect(main.packagedBackendEnv()).not.toHaveProperty('MOCKUP_TEMPLATES_DIR');

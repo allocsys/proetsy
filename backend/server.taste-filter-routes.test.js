@@ -14,6 +14,10 @@ import request from 'supertest';
 let app;
 let tmpRoot;
 let embedImageMock;
+// See the mock factory below -- a mutable box + listener set standing in for
+// embeddings.js's real downloadState/pub-sub, so route tests can simulate a state change.
+const modelDownloadState = { current: null };
+let modelDownloadListeners;
 
 // Deterministic fake embeddings so tests can reason about which candidate should score
 // as "keep-leaning" vs "discard-leaning" once labels exist. Orthogonal-ish 4-dim vectors
@@ -33,8 +37,21 @@ beforeAll(async () => {
   process.env.ARTWORK_UPLOADS_DIR = path.join(tmpRoot, 'uploads');
 
   embedImageMock = vi.fn(async () => KEEP_LEANING);
+  // Controllable from individual tests (see the "GET /api/taste-filter/model-status"
+  // describe block below) via modelDownloadState.current -- a plain mutable box rather
+  // than vi.fn() return-value plumbing, since getModelDownloadState() is called
+  // synchronously and repeatedly (once per SSE connect, once per poll) and tests want to
+  // change what it returns mid-test without re-mocking.
+  modelDownloadState.current = { status: 'ready', bytesDownloaded: 0, totalBytes: null, error: null };
+  modelDownloadListeners = new Set();
   vi.doMock('./lib/taste-filter/embeddings.js', () => ({
     embedImage: (...args) => embedImageMock(...args),
+    ensureModelReady: async () => {},
+    getModelDownloadState: () => modelDownloadState.current,
+    onModelDownloadProgress: (listener) => {
+      modelDownloadListeners.add(listener);
+      return () => modelDownloadListeners.delete(listener);
+    },
   }));
 
   ({ default: app } = await import('./server.js'));
@@ -85,6 +102,70 @@ describe('POST /api/taste-filter/import (ARCHITECTURE.md -> Module 7 -> "Build s
     expect(res.body.candidates[0].error).toMatch(/corrupt image/);
     expect(res.body.candidates[1].error).toBeUndefined();
     expect(res.body.candidates[1].embedding).toBeDefined();
+  });
+});
+
+describe('GET /api/taste-filter/model-status(/stream) -- CLIP model download progress', () => {
+  it('GET /api/taste-filter/model-status returns the current snapshot', async () => {
+    modelDownloadState.current = { status: 'downloading', bytesDownloaded: 1000, totalBytes: 2000, error: null };
+
+    const res = await request(app).get('/api/taste-filter/model-status');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ status: 'downloading', bytesDownloaded: 1000, totalBytes: 2000, error: null });
+  });
+
+  it('GET /api/taste-filter/model-status/stream sends the current snapshot immediately on connect', async () => {
+    modelDownloadState.current = { status: 'ready', bytesDownloaded: 0, totalBytes: null, error: null };
+
+    const res = await request(app).get('/api/taste-filter/model-status/stream').buffer(true).parse((response, cb) => {
+      let data = '';
+      response.on('data', (chunk) => {
+        data += chunk.toString();
+        // The route never closes the connection on its own (see server.js) -- end the
+        // request as soon as the first event has arrived, same pattern the existing
+        // pending/stream tests elsewhere in this suite use for an SSE endpoint that
+        // stays open.
+        if (data.includes('\n\n')) response.destroy();
+      });
+      response.on('close', () => cb(null, data));
+      response.on('error', () => cb(null, data));
+    });
+
+    // A custom .parse() callback's result lands on res.body, not res.text -- the latter
+    // is only populated by supertest's own built-in text buffering, which a custom
+    // parser bypasses.
+    expect(res.body).toContain('data: {"status":"ready"');
+  });
+
+  it('GET /api/taste-filter/model-status/stream pushes a later state change to the listener registered via onModelDownloadProgress', async () => {
+    modelDownloadState.current = { status: 'downloading', bytesDownloaded: 0, totalBytes: 350, error: null };
+
+    const req = request(app).get('/api/taste-filter/model-status/stream');
+    const events = [];
+    await new Promise((resolve) => {
+      req.buffer(true).parse((response, cb) => {
+        response.on('data', (chunk) => {
+          events.push(chunk.toString());
+          if (events.length === 1) {
+            // First chunk is the immediate current-snapshot send; now simulate a real
+            // progress update the same way downloadModel()'s progress-counter stream
+            // would, by notifying every subscriber the route registered.
+            const update = { status: 'downloading', bytesDownloaded: 175, totalBytes: 350, error: null };
+            for (const listener of modelDownloadListeners) listener(update);
+          }
+          if (events.length >= 2) {
+            response.destroy();
+            resolve();
+          }
+        });
+        response.on('close', () => cb(null, events.join('')));
+        response.on('error', () => cb(null, events.join('')));
+      });
+      req.end(() => {});
+    });
+
+    expect(events.join('')).toContain('"bytesDownloaded":175');
   });
 });
 

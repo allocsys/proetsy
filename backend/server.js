@@ -39,7 +39,12 @@ import {
   suggestCategoriesForUncategorizedTags,
 } from './lib/tags/user-list.js';
 import { generatePromptsForTrend, listPrompts } from './lib/prompt-helper/index.js';
-import { embedImage } from './lib/taste-filter/embeddings.js';
+import {
+  embedImage,
+  ensureModelReady,
+  getModelDownloadState,
+  onModelDownloadProgress,
+} from './lib/taste-filter/embeddings.js';
 import { scoreCandidate, autoDecision } from './lib/taste-filter/scoring.js';
 import {
   getCentroids,
@@ -931,6 +936,41 @@ app.get('/api/prompts', (req, res) => {
 // freshly-saved files, matching the doc's "nothing extra needs to be built" closed-loop
 // design.
 
+// Read-only snapshot of the CLIP model download (see embeddings.js's downloadState) --
+// backs the dashboard's loading bar so a slow/in-progress boot-time download (see
+// server.js's ensureModelReady() call at startup) shows real progress instead of the
+// Taste Filter panel just looking broken/unresponsive until it's done.
+app.get('/api/taste-filter/model-status', (req, res) => {
+  res.json(getModelDownloadState());
+});
+
+// Live version of the route above, same SSE shape/rationale as
+// /api/taste-filter/pending/stream below: sends the current snapshot immediately (so a
+// client that connects mid-download doesn't have to wait for the next change to see
+// where things stand), then one more event per subsequent state change for as long as
+// the connection stays open.
+app.get('/api/taste-filter/model-status/stream', (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
+  res.flushHeaders();
+
+  const send = (state) => {
+    res.write(`data: ${JSON.stringify(state)}\n\n`);
+  };
+  send(getModelDownloadState());
+
+  const unsubscribe = onModelDownloadProgress(send);
+  const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 30000);
+
+  req.on('close', () => {
+    unsubscribe();
+    clearInterval(heartbeat);
+  });
+});
+
 // Batch import: saves each uploaded file to disk, embeds it via the local CLIP model, and
 // scores it against the CURRENT global + (optional) category centroids. Body fields
 // alongside the `files` multipart field: `category` (optional -- applies to the whole
@@ -1211,6 +1251,16 @@ app.post('/api/taste-filter/recompute', (req, res) => {
 // real port. Only binds when server.js is actually run as the entry point.
 const isMainModule = process.argv[1] && import.meta.url === `file://${process.argv[1]}`;
 if (isMainModule) {
+  // Fire-and-forget, started alongside (not before) app.listen() -- see this edit's
+  // commit message. Logged rather than thrown: Taste Filter is one module among many,
+  // and a download/disk failure here shouldn't take down job/listing/mockup routes that
+  // have nothing to do with it. embedImage() still calls ensureModelReady() itself on
+  // each use, so a failure here just means the first real import request re-attempts
+  // the same download instead of finding it already done.
+  ensureModelReady()
+    .then(() => console.log('[taste-filter] CLIP model ready at boot.'))
+    .catch((err) => console.error(`[taste-filter] Model prefetch at boot failed (will retry on first use): ${err.message}`));
+
   app.listen(PORT, () => {
     console.log(`ProEtsy backend listening on http://localhost:${PORT}`);
   });

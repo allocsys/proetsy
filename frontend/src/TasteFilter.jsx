@@ -17,6 +17,59 @@ function ScoreBadge({ label, score, confident }) {
   );
 }
 
+function formatMB(bytes) {
+  return (bytes / (1024 * 1024)).toFixed(0);
+}
+
+function ModelDownloadBar({ modelStatus }) {
+  if (!modelStatus || modelStatus.status === 'ready' || modelStatus.status === 'idle') return null;
+
+  if (modelStatus.status === 'error') {
+    return (
+      <div className="card p-3 mb-4" role="alert">
+        <p className="text-danger mb-1">Taste Filter model download failed: {modelStatus.error}</p>
+        <p className="text-muted mono-sm">Will retry automatically the next time you import images.</p>
+      </div>
+    );
+  }
+
+  const { bytesDownloaded, totalBytes } = modelStatus;
+  const pct = totalBytes ? Math.min(100, Math.round((bytesDownloaded / totalBytes) * 100)) : null;
+
+  return (
+    <div className="card p-3 mb-4" role="status" aria-live="polite">
+      <p className="mb-2">
+        Downloading Taste Filter&rsquo;s image model (one-time, ~350MB)
+        {pct !== null ? ` — ${pct}% (${formatMB(bytesDownloaded)} / ${formatMB(totalBytes)} MB)` : ` — ${formatMB(bytesDownloaded)} MB so far`}
+      </p>
+      <div
+        style={{
+          width: '100%',
+          height: '8px',
+          borderRadius: '999px',
+          background: 'var(--surface-2, #222)',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          role="progressbar"
+          aria-valuenow={pct ?? undefined}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          style={{
+            height: '100%',
+            borderRadius: '999px',
+            background: 'var(--accent, #e07a3f)',
+            width: pct !== null ? `${pct}%` : '35%',
+            transition: 'width 0.2s ease',
+          }}
+        />
+      </div>
+      <p className="text-muted mono-sm mt-2">You can keep using the rest of the dashboard while this finishes.</p>
+    </div>
+  );
+}
+
 function TasteFilter({ overrides, refreshJobs } = {}) {
   const [category, setCategory] = useState('');
   const [promptId, setPromptId] = useState('');
@@ -27,6 +80,7 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
   const [autoSortedExpanded, setAutoSortedExpanded] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState('');
   const [dragActive, setDragActive] = useState(false);
+  const [modelStatus, setModelStatus] = useState(null);
   const fileInputRef = useRef(null);
   const seenPathsRef = useRef(new Set());
 
@@ -70,6 +124,24 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
       if (!candidate || !candidate.imagePath || seenPathsRef.current.has(candidate.imagePath)) return;
       seenPathsRef.current.add(candidate.imagePath);
       setCandidates((prev) => [candidate, ...prev]);
+    };
+    return () => source.close();
+  }, []);
+
+  useEffect(() => {
+    // Live progress for the CLIP model download (see backend/lib/taste-filter/
+    // embeddings.js's downloadState + server.js's GET /api/taste-filter/model-status/
+    // stream). Same EventSource pattern as the pending-candidates stream just above --
+    // sends the current snapshot immediately on connect, then one more event per state
+    // change, so this renders correctly whether the download is already underway, already
+    // finished, or hasn't started yet by the time this component mounts.
+    const source = new EventSource('/api/taste-filter/model-status/stream');
+    source.onmessage = (event) => {
+      try {
+        setModelStatus(JSON.parse(event.data));
+      } catch {
+        // Malformed event -- keep whatever state we already have rather than clearing it.
+      }
     };
     return () => source.close();
   }, []);
@@ -253,6 +325,8 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
           Recompute now
         </button>
       </div>
+
+      <ModelDownloadBar modelStatus={modelStatus} />
 
       <div
         className={`dropzone taste-dropzone ${dragActive ? 'active' : ''}`}
