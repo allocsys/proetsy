@@ -15,6 +15,7 @@ let listImagePreferences;
 let recomputeCentroids;
 let getCentroids;
 let tallyPromptTermsForLabel;
+let getImagePreferenceState;
 let tmpRoot;
 
 beforeAll(async () => {
@@ -22,7 +23,14 @@ beforeAll(async () => {
   process.env.DB_PATH = path.join(tmpRoot, 'test.db');
 
   ({ getDb } = await import('../../db/init.js'));
-  ({ addImagePreference, listImagePreferences, recomputeCentroids, getCentroids, tallyPromptTermsForLabel } = await import('./store.js'));
+  ({
+    addImagePreference,
+    listImagePreferences,
+    recomputeCentroids,
+    getCentroids,
+    tallyPromptTermsForLabel,
+    getImagePreferenceState,
+  } = await import('./store.js'));
 });
 
 afterAll(() => {
