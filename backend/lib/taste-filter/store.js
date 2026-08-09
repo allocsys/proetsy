@@ -35,9 +35,13 @@ function blobToVector(blob) {
 
 /**
  * Records one keep/discard decision — the training signal itself, per ARCHITECTURE.md ->
- * Module 7 -> "How the 'training' works". Always inserts a new row (never upserts): like
- * `prompts`, this is meant to be a full history of labeled examples, not one current value
- * per key — re-labeling the same image is a new data point, not a correction to an old one.
+ * Module 7 -> "How the 'training' works". Upserts on `image_path` (one row per image,
+ * enforced by the idx_image_preferences_image_path unique index — see
+ * docs/fixes/taste-filter-duplicate-labels.md): unlike `prompts`, this is meant to hold
+ * the *current* judgment for each image, not a full history, so re-labeling the same
+ * image — including a manual Keep/Discard that corrects an earlier auto-labeled row —
+ * updates that one row in place rather than adding a second, potentially contradictory
+ * one that would double-count in recomputeCentroids() below.
  * @param {object} params
  * @param {string} params.imagePath
  * @param {Float32Array} params.embedding
@@ -46,8 +50,9 @@ function blobToVector(blob) {
  * @param {number | null} [params.promptId] - links to the `prompts` row that generated this candidate, if any
  * @param {boolean} [params.autoLabeled] - true when this row was written by the auto-compute
  *   decision rule (plan.md Part 2) rather than a manual Keep/Discard click. Defaults to
- *   false, so existing callers are unaffected.
- * @returns {number} the new row's id
+ *   false, so a plain manual label call — including one correcting a prior auto-labeled
+ *   row for the same image_path — always clears this back to 0 on upsert.
+ * @returns {number} the row's id (existing, if this call updated it; new, otherwise)
  */
 export function addImagePreference({
   imagePath,
@@ -62,21 +67,29 @@ export function addImagePreference({
   }
 
   const db = getDb();
-  const result = db
-    .prepare(
-      `INSERT INTO image_preferences (image_path, embedding, label, category, prompt_id, auto_labeled)
-       VALUES (@image_path, @embedding, @label, @category, @prompt_id, @auto_labeled)`
-    )
-    .run({
-      image_path: imagePath,
-      embedding: vectorToBlob(embedding),
-      label,
-      category,
-      prompt_id: promptId,
-      auto_labeled: autoLabeled ? 1 : 0,
-    });
+  db.prepare(
+    `INSERT INTO image_preferences (image_path, embedding, label, category, prompt_id, auto_labeled)
+     VALUES (@image_path, @embedding, @label, @category, @prompt_id, @auto_labeled)
+     ON CONFLICT(image_path) DO UPDATE SET
+       embedding = excluded.embedding,
+       label = excluded.label,
+       category = excluded.category,
+       prompt_id = excluded.prompt_id,
+       auto_labeled = excluded.auto_labeled`
+  ).run({
+    image_path: imagePath,
+    embedding: vectorToBlob(embedding),
+    label,
+    category,
+    prompt_id: promptId,
+    auto_labeled: autoLabeled ? 1 : 0,
+  });
 
-  return result.lastInsertRowid;
+  // better-sqlite3's lastInsertRowid isn't reliable for the ON CONFLICT ... DO UPDATE
+  // branch — SQLite's last_insert_rowid() only advances on an actual INSERT, not an
+  // UPDATE — so look the row up by its unique key instead. Correct either way: a fresh
+  // insert or an update of the existing row.
+  return db.prepare('SELECT id FROM image_preferences WHERE image_path = ?').get(imagePath).id;
 }
 
 /**
