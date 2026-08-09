@@ -13,6 +13,8 @@ import {
   invalidatePipelineConfigCache,
   getShopConventions,
   setShopConventions,
+  exportAllConfig,
+  importAllConfig,
 } from './config/index.js';
 import { createJob, createJobsBulk, getJobWithModules, setManualNotes, setModuleStatus } from './lib/jobs.js';
 import { analyzeArtworkForJob } from './lib/image-analyzer/index.js';
@@ -231,6 +233,31 @@ app.get('/api/config/shop-conventions', (req, res) => {
 app.patch('/api/config/shop-conventions', (req, res) => {
   try {
     res.json(setShopConventions(req.body || {}));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Full config backup/restore -- settings, product sizes/mockup templates, tag library,
+// and (by default) API keys, bundled into one downloadable JSON file. Deliberately
+// excludes job/artwork/listing/taste-filter data -- see exportAllConfig()'s doc comment.
+// Works identically on any OS the dashboard runs on (Windows, macOS, Linux) since it's
+// just a JSON file the browser downloads/uploads -- no server-side filesystem access to
+// the user's machine involved. ?include_api_keys=false strips key material from the
+// export, e.g. before sharing a config file with someone else.
+app.get('/api/config/export', (req, res) => {
+  const includeApiKeys = req.query.include_api_keys !== 'false';
+  res.json(exportAllConfig({ includeApiKeys }));
+});
+
+// Body is a bundle previously returned by GET /api/config/export (or a hand-edited
+// subset of one -- every section is optional, see importAllConfig()). Upserts/dedupes
+// rather than wiping first, so this is safe to run against a backup taken a while ago
+// without losing config added since.
+app.post('/api/config/import', (req, res) => {
+  try {
+    const counts = importAllConfig(req.body || {});
+    res.json({ imported: counts });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
