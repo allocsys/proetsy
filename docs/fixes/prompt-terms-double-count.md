@@ -34,13 +34,15 @@ Module 4 suggests.
 2. **`server.js`**'s `POST /api/taste-filter/label` route calls
    `getImagePreferenceState(image_path)` before `addImagePreference()`, and passes the
    result as `tallyPromptTermsForLabel(promptId, label, previousState)`'s third argument.
-3. **`tallyPromptTermsForLabel()`** now takes an optional `previous` argument. When given
-   and it differs from the `(promptId, label)` being applied — a real relabel, not a
-   redundant re-submit of the same state — it first undoes the previous state's
-   contribution (`-1`, via a new `adjustPromptTermCounts()` helper, clamped at 0 with
-   `MAX(column - 1, 0)` so a term can never go negative) before tallying the new one
-   (`+1`). No `previous`, or an identical `previous`, behaves exactly as the
-   original increment-only version did.
+3. **`tallyPromptTermsForLabel()`** now takes an optional `previous` argument, with three
+   cases: no `previous` given behaves as a fresh `+1` tally (same as the original
+   increment-only version, for callers that don't track state); `previous` differing from
+   the `(promptId, label)` being applied is a real relabel -- undoes the previous state's
+   contribution first (`-1`, via a new `adjustPromptTermCounts()` helper, clamped at 0
+   with `MAX(column - 1, 0)` so a term can never go negative) before tallying the new one
+   (`+1`); `previous` identical to the new state is a redundant re-label -- a pure no-op,
+   returned early before either the decrement or increment runs, since it already
+   contributed its `+1` the first time.
 
 The clamp-at-0 matters for rows written before this fix shipped: an old relabel's
 increment was never reversed, so decrementing today's relabel against that
