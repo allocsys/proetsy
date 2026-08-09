@@ -190,6 +190,44 @@ describe('POST /api/taste-filter/label -> prompt-feedback link (Module 7 -> Modu
     });
     expect(res.status).toBe(201);
   });
+
+  it('relabeling the same image_path moves its prompt terms from one column to the other, not both', async () => {
+    // docs/fixes/prompt-terms-double-count.md: before the fix, tallyPromptTermsForLabel()
+    // was purely additive, so this sequence would leave kept_count at 1 AND
+    // discarded_count at 1 for the same term -- double-counted instead of moved.
+    const { getDb } = await import('./db/init.js');
+    const db = getDb();
+    const { lastInsertRowid: promptId } = db
+      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square-canvas', 'a golden meadow at sunrise --ar 1:1')`)
+      .run();
+
+    const firstLabel = await request(app).post('/api/taste-filter/label').send({
+      image_path: '/tmp/meadow.png',
+      embedding: Array.from(KEEP_LEANING),
+      label: 'keep',
+      category: 'square-canvas',
+      prompt_id: promptId,
+    });
+    expect(firstLabel.status).toBe(201);
+
+    let meadow = db.prepare('SELECT * FROM prompt_terms WHERE term = ?').get('meadow');
+    expect(meadow.kept_count).toBe(1);
+    expect(meadow.discarded_count).toBe(0);
+
+    // Correct it: same image_path, same prompt_id, opposite label.
+    const secondLabel = await request(app).post('/api/taste-filter/label').send({
+      image_path: '/tmp/meadow.png',
+      embedding: Array.from(KEEP_LEANING),
+      label: 'discard',
+      category: 'square-canvas',
+      prompt_id: promptId,
+    });
+    expect(secondLabel.status).toBe(201);
+
+    meadow = db.prepare('SELECT * FROM prompt_terms WHERE term = ?').get('meadow');
+    expect(meadow.kept_count).toBe(0);
+    expect(meadow.discarded_count).toBe(1);
+  });
 });
 
 // Connects with node:http directly rather than supertest -- supertest/superagent waits
