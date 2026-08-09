@@ -139,6 +139,9 @@ function App() {
   const [savedFlashes, setSavedFlashes] = useState({});
   const [confirmAction, setConfirmAction] = useState(null); // { message, onConfirm } | null
   const [settingsTab, setSettingsTab] = useState('tags-trends'); // plan.md step 7: which Settings sub-tab is active
+  const [configBackupMessage, setConfigBackupMessage] = useState('');
+  const [configImportMessage, setConfigImportMessage] = useState(null); // { text, ok } | null
+  const [configImporting, setConfigImporting] = useState(false);
 
   useEffect(() => {
     if (!activeJobId) {
@@ -570,6 +573,69 @@ function App() {
     refreshPipelineConfig();
   }
 
+  // Downloads a full config backup (settings, product sizes/mockup templates, tag
+  // library, API keys) as a JSON file via the browser's normal download flow -- same
+  // mechanism on Windows/macOS/Linux, nothing platform-specific to install or configure.
+  async function downloadConfigBackup() {
+    setConfigBackupMessage('Preparing backup…');
+    try {
+      const res = await fetch('/api/config/export');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to export config');
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      a.href = url;
+      a.download = `proetsy-config-backup-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setConfigBackupMessage(`Backup downloaded (${data.settings.length} setting(s), ${data.productSizes.length} product size(s), ${data.tags.length} tag(s), ${data.apiKeys.length} API key(s)).`);
+    } catch (err) {
+      setConfigBackupMessage(`Backup failed: ${err.message}`);
+    }
+  }
+
+  // Restores a previously downloaded backup file. Upserts/dedupes server-side rather
+  // than wiping first, so this is safe to re-run without losing anything added since.
+  async function importConfigBackup(file) {
+    if (!file) return;
+    setConfigImporting(true);
+    setConfigImportMessage({ text: `Importing ${file.name}…`, ok: true });
+    try {
+      const text = await file.text();
+      let bundle;
+      try {
+        bundle = JSON.parse(text);
+      } catch {
+        throw new Error('That file is not valid JSON — pick a backup downloaded from this app.');
+      }
+      const res = await fetch('/api/config/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bundle),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Import failed');
+      const c = data.imported;
+      setConfigImportMessage({
+        text: `Imported: ${c.settings} setting(s), ${c.productSizes} product size(s), ${c.tags} new tag(s), ${c.apiKeys} new API key(s).`,
+        ok: true,
+      });
+    } catch (err) {
+      setConfigImportMessage({ text: `Import failed: ${err.message}`, ok: false });
+    }
+    setConfigImporting(false);
+    // Refresh every panel a restored bundle could have touched.
+    fetch('/api/settings').then((r) => r.json()).then(setSettings).catch(() => {});
+    refreshPipelineConfig();
+    refreshApiKeys();
+    refreshTags();
+    refreshWatchStatus();
+  }
+
   async function addTrendFromSettings() {
     if (!newTrendTerm.trim()) return;
     await fetch('/api/trends', {
@@ -942,6 +1008,33 @@ function App() {
                     <button className="btn-primary btn-sm" onClick={addTrendFromSettings} disabled={!newTrendTerm.trim()}>Add trend</button>
                   </div>
                 </div>
+              </div>
+              )}
+
+              {settingsTab === 'general' && (
+              <div className="settings-section-card card settings-full-width-card">
+                <h3 className="settings-section-title">Backup & Restore</h3>
+                <p className="text-muted mono-sm" style={{ marginTop: 0, marginBottom: '0.75rem' }}>
+                  Downloads a JSON file with your shop/Midjourney conventions, pipeline settings, product sizes &amp; mockup templates, tag library, and API keys — not job/listing/mockup history. Restoring adds/updates from the file without deleting anything not covered by it.
+                </p>
+                <div className="settings-actions-row">
+                  <button className="btn-primary btn-sm" onClick={downloadConfigBackup}>Download backup</button>
+                  <label className="settings-inline-action">
+                    Restore from file
+                    <input
+                      type="file"
+                      accept=".json,application/json"
+                      disabled={configImporting}
+                      onChange={(e) => importConfigBackup(e.target.files?.[0])}
+                    />
+                  </label>
+                </div>
+                {configBackupMessage && <p className="text-muted mono-sm" style={{ marginTop: '0.5rem' }}>{configBackupMessage}</p>}
+                {configImportMessage && (
+                  <p className={`mono-sm ${configImportMessage.ok ? 'text-success' : 'text-danger'}`} style={{ marginTop: '0.5rem' }}>
+                    {configImportMessage.text}
+                  </p>
+                )}
               </div>
               )}
 
