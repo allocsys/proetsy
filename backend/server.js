@@ -39,7 +39,12 @@ import {
   suggestCategoriesForUncategorizedTags,
 } from './lib/tags/user-list.js';
 import { generatePromptsForTrend, listPrompts } from './lib/prompt-helper/index.js';
-import { embedImage, ensureModelReady } from './lib/taste-filter/embeddings.js';
+import {
+  embedImage,
+  ensureModelReady,
+  getModelDownloadState,
+  onModelDownloadProgress,
+} from './lib/taste-filter/embeddings.js';
 import { scoreCandidate, autoDecision } from './lib/taste-filter/scoring.js';
 import {
   getCentroids,
@@ -930,6 +935,41 @@ app.get('/api/prompts', (req, res) => {
 // image_preferences. No separate "pending candidates" table -- just a scoring pass over
 // freshly-saved files, matching the doc's "nothing extra needs to be built" closed-loop
 // design.
+
+// Read-only snapshot of the CLIP model download (see embeddings.js's downloadState) --
+// backs the dashboard's loading bar so a slow/in-progress boot-time download (see
+// server.js's ensureModelReady() call at startup) shows real progress instead of the
+// Taste Filter panel just looking broken/unresponsive until it's done.
+app.get('/api/taste-filter/model-status', (req, res) => {
+  res.json(getModelDownloadState());
+});
+
+// Live version of the route above, same SSE shape/rationale as
+// /api/taste-filter/pending/stream below: sends the current snapshot immediately (so a
+// client that connects mid-download doesn't have to wait for the next change to see
+// where things stand), then one more event per subsequent state change for as long as
+// the connection stays open.
+app.get('/api/taste-filter/model-status/stream', (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
+  res.flushHeaders();
+
+  const send = (state) => {
+    res.write(`data: ${JSON.stringify(state)}\n\n`);
+  };
+  send(getModelDownloadState());
+
+  const unsubscribe = onModelDownloadProgress(send);
+  const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 30000);
+
+  req.on('close', () => {
+    unsubscribe();
+    clearInterval(heartbeat);
+  });
+});
 
 // Batch import: saves each uploaded file to disk, embeds it via the local CLIP model, and
 // scores it against the CURRENT global + (optional) category centroids. Body fields
