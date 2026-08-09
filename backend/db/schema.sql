@@ -140,6 +140,11 @@ CREATE TABLE IF NOT EXISTS image_preferences (
   created_at TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_image_preferences_category ON image_preferences(category);
+-- One row per image: POST /api/taste-filter/label upserts on this constraint so a
+-- manual Keep/Discard correcting an earlier auto-labeled row (auto_labeled = 1) updates
+-- it in place instead of inserting a second, potentially contradictory row that would
+-- double-count in centroid recompute. See docs/fixes/taste-filter-duplicate-labels.md.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_image_preferences_image_path ON image_preferences(image_path);
 
 CREATE TABLE IF NOT EXISTS taste_centroids (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
