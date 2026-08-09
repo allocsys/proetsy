@@ -311,8 +311,8 @@ describe('TasteFilter — watched-folder auto-import via SSE (Module 7 -> "Auto-
 
   it('opens a stream connection to /api/taste-filter/pending/stream on mount', () => {
     render(<TasteFilter />);
-    expect(sourceInstances).toHaveLength(1);
-    expect(sourceInstances[0].url).toBe('/api/taste-filter/pending/stream');
+    const urls = sourceInstances.map((s) => s.url);
+    expect(urls).toContain('/api/taste-filter/pending/stream');
   });
 
   it('merges a watcher-pushed candidate into the grid when a message event arrives', async () => {
@@ -358,10 +358,93 @@ describe('TasteFilter — watched-folder auto-import via SSE (Module 7 -> "Auto-
 
   it('closes the stream connection on unmount', () => {
     const { unmount } = render(<TasteFilter />);
-    const [source] = sourceInstances;
+    const source = sourceInstances.find((s) => s.url === '/api/taste-filter/pending/stream');
 
     unmount();
 
     expect(source.closed).toBe(true);
+  });
+});
+
+describe('TasteFilter — CLIP model download progress bar', () => {
+  // global.EventSource and sourceInstances come from the shared outer beforeEach above.
+  function modelStatusSource() {
+    return sourceInstances.find((s) => s.url === '/api/taste-filter/model-status/stream');
+  }
+
+  it('opens a stream connection to /api/taste-filter/model-status/stream on mount, and closes it on unmount', () => {
+    const { unmount } = render(<TasteFilter />);
+    const source = modelStatusSource();
+    expect(source).toBeDefined();
+
+    unmount();
+    expect(source.closed).toBe(true);
+  });
+
+  it('renders nothing before the stream delivers a first message', () => {
+    render(<TasteFilter />);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+  });
+
+  it('renders nothing once status is ready', async () => {
+    render(<TasteFilter />);
+    act(() => {
+      modelStatusSource().onmessage({
+        data: JSON.stringify({ status: 'ready', bytesDownloaded: 0, totalBytes: null, error: null }),
+      });
+    });
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+  });
+
+  it('renders a determinate progress bar with percentage when Content-Length was known', async () => {
+    render(<TasteFilter />);
+    act(() => {
+      modelStatusSource().onmessage({
+        data: JSON.stringify({
+          status: 'downloading',
+          bytesDownloaded: 175 * 1024 * 1024,
+          totalBytes: 350 * 1024 * 1024,
+          error: null,
+        }),
+      });
+    });
+
+    expect(await screen.findByText(/50% \(175 \/ 350 MB\)/)).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '50');
+  });
+
+  it('renders an indeterminate bar (MB downloaded only) when totalBytes is null', async () => {
+    render(<TasteFilter />);
+    act(() => {
+      modelStatusSource().onmessage({
+        data: JSON.stringify({
+          status: 'downloading',
+          bytesDownloaded: 40 * 1024 * 1024,
+          totalBytes: null,
+          error: null,
+        }),
+      });
+    });
+
+    expect(await screen.findByText(/40 MB so far/)).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).not.toHaveAttribute('aria-valuenow');
+  });
+
+  it('surfaces a download error inline', async () => {
+    render(<TasteFilter />);
+    act(() => {
+      modelStatusSource().onmessage({
+        data: JSON.stringify({
+          status: 'error',
+          bytesDownloaded: 0,
+          totalBytes: null,
+          error: 'HTTP 503 from huggingface.co',
+        }),
+      });
+    });
+
+    expect(await screen.findByText(/HTTP 503 from huggingface\.co/)).toBeInTheDocument();
+    expect(screen.getByText(/retry automatically/)).toBeInTheDocument();
   });
 });
