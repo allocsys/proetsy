@@ -39,7 +39,7 @@ function ModelDownloadBar({ modelStatus }) {
   return (
     <div className="card p-3 mb-4" role="status" aria-live="polite">
       <p className="mb-2">
-        Downloading Taste Filter's image model (one-time, ~350MB)
+        Downloading Taste Filter&rsquo;s image model (one-time, ~350MB)
         {pct !== null ? ` — ${pct}% (${formatMB(bytesDownloaded)} / ${formatMB(totalBytes)} MB)` : ` — ${formatMB(bytesDownloaded)} MB so far`}
       </p>
       <div
