@@ -289,6 +289,129 @@ function validateFieldValue(def, value) {
  * validation happens before the DB transaction starts. Returns the fresh
  * getShopConventions() result.
  */
+const CONFIG_EXPORT_VERSION = 1;
+
+/**
+ * Exports every "configuration" table as one importable JSON bundle: the settings table
+ * (shop/Midjourney conventions, pipeline module toggles, watch-folder & auto-sort
+ * settings, default price/delivery text, etc.), product sizes / configured mockup
+ * templates, the tag library, and -- optionally -- LLM provider API keys.
+ *
+ * Deliberately excludes everything that's *data* rather than *config*: jobs, listings,
+ * mockups, artworks, trends, taste-filter labels/centroids, prompts, and
+ * llm_rate_limits (transient cooldown state, not worth restoring). Restoring a backup
+ * should never touch a shop's actual work in progress -- only how the app is set up.
+ *
+ * @param {{ includeApiKeys?: boolean }} [options] includeApiKeys defaults to true; set
+ *   false to produce a backup with no key material in it (e.g. before sharing a config
+ *   file with someone else).
+ */
+export function exportAllConfig({ includeApiKeys = true } = {}) {
+  const db = getDb();
+  return {
+    version: CONFIG_EXPORT_VERSION,
+    exportedAt: new Date().toISOString(),
+    settings: db.prepare('SELECT key, value FROM settings').all(),
+    productSizes: db
+      .prepare(
+        'SELECT size_key, dimensions, dpi, orientation, mockup_template_path, placement_layer, category FROM product_sizes'
+      )
+      .all(),
+    tags: db.prepare('SELECT tag_text, category, source FROM tags').all(),
+    apiKeys: includeApiKeys
+      ? db.prepare('SELECT provider, key_value, label, enabled FROM api_keys').all()
+      : [],
+  };
+}
+
+/**
+ * Restores a bundle produced by exportAllConfig(). Every section is optional/independent
+ * -- a bundle missing a section (e.g. `apiKeys` on an includeApiKeys: false export) just
+ * leaves that part of the current config untouched. Settings and product sizes are
+ * upserted by their natural key (settings.key / product_sizes.size_key), so re-importing
+ * the same backup twice is idempotent. Tags and API keys are deduped against what's
+ * already there (by tag_text, and by provider+key_value respectively) and only new rows
+ * are inserted -- nothing is deleted, so importing an older backup can't silently wipe
+ * config added since it was taken. Runs as a single transaction: a malformed bundle
+ * fails without partially applying. Returns how many rows were written per section.
+ * @param {object} bundle
+ */
+export function importAllConfig(bundle = {}) {
+  const db = getDb();
+  const counts = { settings: 0, productSizes: 0, tags: 0, apiKeys: 0 };
+
+  const run = db.transaction(() => {
+    if (Array.isArray(bundle.settings)) {
+      const upsert = db.prepare(
+        'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+      );
+      for (const row of bundle.settings) {
+        if (!row || typeof row.key !== 'string') continue;
+        upsert.run(row.key, row.value ?? null);
+        counts.settings += 1;
+      }
+    }
+
+    if (Array.isArray(bundle.productSizes)) {
+      const upsert = db.prepare(`
+        INSERT INTO product_sizes (size_key, dimensions, dpi, orientation, mockup_template_path, placement_layer, category)
+        VALUES (@size_key, @dimensions, @dpi, @orientation, @mockup_template_path, @placement_layer, @category)
+        ON CONFLICT(size_key) DO UPDATE SET
+          dimensions = excluded.dimensions,
+          dpi = excluded.dpi,
+          orientation = excluded.orientation,
+          mockup_template_path = excluded.mockup_template_path,
+          placement_layer = excluded.placement_layer,
+          category = excluded.category
+      `);
+      for (const row of bundle.productSizes) {
+        if (!row || !row.size_key) continue;
+        upsert.run({
+          size_key: row.size_key,
+          dimensions: row.dimensions ?? null,
+          dpi: row.dpi ?? null,
+          orientation: row.orientation ?? null,
+          mockup_template_path: row.mockup_template_path ?? null,
+          placement_layer: row.placement_layer ?? null,
+          category: row.category ?? null,
+        });
+        counts.productSizes += 1;
+      }
+    }
+
+    if (Array.isArray(bundle.tags)) {
+      const existingTags = new Set(db.prepare('SELECT tag_text FROM tags').all().map((r) => r.tag_text));
+      const insert = db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)');
+      for (const row of bundle.tags) {
+        if (!row || !row.tag_text || existingTags.has(row.tag_text)) continue;
+        insert.run(row.tag_text, row.category ?? null, row.source ?? 'backup');
+        existingTags.add(row.tag_text);
+        counts.tags += 1;
+      }
+    }
+
+    if (Array.isArray(bundle.apiKeys)) {
+      const existingKeys = new Set(
+        db.prepare('SELECT provider, key_value FROM api_keys').all().map((r) => `${r.provider}:${r.key_value}`)
+      );
+      const insert = db.prepare('INSERT INTO api_keys (provider, key_value, label, enabled) VALUES (?, ?, ?, ?)');
+      for (const row of bundle.apiKeys) {
+        if (!row || !row.provider || !row.key_value) continue;
+        const dedupeKey = `${row.provider}:${row.key_value}`;
+        if (existingKeys.has(dedupeKey)) continue;
+        insert.run(row.provider, row.key_value, row.label ?? null, row.enabled === false ? 0 : 1);
+        existingKeys.add(dedupeKey);
+        counts.apiKeys += 1;
+      }
+    }
+  });
+  run();
+
+  // A settings-table import may have touched a pipeline_module_<n>_enabled key.
+  invalidatePipelineConfigCache();
+  return counts;
+}
+
 export function setShopConventions(partial = {}) {
   const current = getShopConventions();
   const merged = { listing: { ...current.listing }, midjourney: { ...current.midjourney } };
