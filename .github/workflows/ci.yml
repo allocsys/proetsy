@@ -23,14 +23,16 @@ name: CI
 on:
   push:
     branches: ['**']
+    # Any markdown file, anywhere in the repo (not just the two root docs) -- a
+    # docs-only change (e.g. docs/fixes/*.md) shouldn't burn a full install+lint+test+
+    # build run. Only skips the workflow when EVERY changed file matches; a push that
+    # touches both a .md file and real code still runs normally.
     paths-ignore:
-      - 'README.md'
-      - 'ARCHITECTURE.md'
+      - '**.md'
   pull_request:
     branches: [main]
     paths-ignore:
-      - 'README.md'
-      - 'ARCHITECTURE.md'
+      - '**.md'
 
 # Cancel superseded runs on the same branch/PR so pushing a fixup doesn't leave stale
 # runs queued behind it.
