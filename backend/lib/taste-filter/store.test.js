@@ -46,12 +46,47 @@ describe('addImagePreference / listImagePreferences', () => {
     expect(() => addImagePreference({ imagePath: '/tmp/b.png', embedding, label: 'maybe' })).toThrow(/Invalid label/);
   });
 
-  it('inserts a new row per call rather than upserting (full label history, like prompts)', () => {
+  it('updates the existing row when the same image_path is labeled again, rather than inserting a duplicate', () => {
+    // See docs/fixes/taste-filter-duplicate-labels.md: image_preferences holds the
+    // *current* judgment per image, not a full history (unlike `prompts`, which is
+    // append-only) -- a relabel must upsert, not accumulate rows that would double-count
+    // in recomputeCentroids().
     const before = listImagePreferences().length;
-    const embedding = new Float32Array([1, 1]);
-    addImagePreference({ imagePath: '/tmp/c.png', embedding, label: 'discard' });
-    addImagePreference({ imagePath: '/tmp/c.png', embedding, label: 'keep' }); // same path, relabeled
-    expect(listImagePreferences().length).toBe(before + 2);
+    const firstEmbedding = new Float32Array([1, 1]);
+    const secondEmbedding = new Float32Array([2, 2]);
+    const firstId = addImagePreference({ imagePath: '/tmp/c.png', embedding: firstEmbedding, label: 'discard' });
+    const secondId = addImagePreference({ imagePath: '/tmp/c.png', embedding: secondEmbedding, label: 'keep' }); // same path, relabeled
+
+    expect(listImagePreferences().length).toBe(before + 1);
+    expect(secondId).toBe(firstId);
+
+    const row = listImagePreferences().find((r) => r.imagePath === '/tmp/c.png');
+    expect(row.label).toBe('keep');
+    expect(Array.from(row.embedding)).toEqual(Array.from(secondEmbedding));
+  });
+
+  it('clears auto_labeled back to 0 when a manual label corrects an earlier auto-labeled row for the same image', () => {
+    // The schema.sql comment on the auto_labeled column has always promised this; this
+    // is the behavior that makes it true (previously nothing did -- see
+    // docs/fixes/taste-filter-duplicate-labels.md).
+    const db = getDb();
+    const embedding = new Float32Array([3, 3]);
+
+    addImagePreference({ imagePath: '/tmp/auto-correct.png', embedding, label: 'discard', autoLabeled: true });
+    let row = db
+      .prepare('SELECT auto_labeled, label FROM image_preferences WHERE image_path = ?')
+      .get('/tmp/auto-correct.png');
+    expect(row.auto_labeled).toBe(1);
+    expect(row.label).toBe('discard');
+
+    // A plain manual Keep/Discard call never passes autoLabeled -- defaults to false --
+    // same as how POST /api/taste-filter/label calls addImagePreference() today.
+    addImagePreference({ imagePath: '/tmp/auto-correct.png', embedding, label: 'keep' });
+    row = db
+      .prepare('SELECT auto_labeled, label FROM image_preferences WHERE image_path = ?')
+      .get('/tmp/auto-correct.png');
+    expect(row.auto_labeled).toBe(0);
+    expect(row.label).toBe('keep');
   });
 });
 
