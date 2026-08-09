@@ -46,19 +46,24 @@ The clamp-at-0 matters for rows written before this fix shipped: an old relabel'
 increment was never reversed, so decrementing today's relabel against that
 already-inflated count must not push it negative.
 
-## Explicitly out of scope for this fix
+## Follow-ups (issue #59) — now fixed in this same branch/PR
 
-- **Auto-decided labels never tally at all.** `POST /api/taste-filter/import`'s
-  auto-compute decision path calls `addImagePreference()` directly and never calls
-  `tallyPromptTermsForLabel()` — an auto-applied keep/discard currently contributes
-  nothing to `prompt_terms`, whether it's a first decision or later manually corrected via
-  `POST /api/taste-filter/label` (which *would* tally, per this fix, but only sees its own
-  call — an auto-decision's "previous" state exists in `image_preferences` but was never
-  reflected in `prompt_terms` to begin with, so there's nothing consistent to undo).
-  Deciding whether/how auto-decided labels should feed this link is a separate,
-  product-level question, not addressed here.
-- **Backfilling historical drift.** Rows already inflated by the pre-fix bug are not
-  corrected retroactively — this fix only prevents *new* drift going forward.
+Both items originally called out below as out of scope are fixed here too, rather than
+left as separate work:
+
+1. **Auto-decided labels now tally.** `POST /api/taste-filter/import`'s auto-compute
+   decision branch now calls `getImagePreferenceState()` before `addImagePreference()`
+   and passes it into `tallyPromptTermsForLabel(promptId, decision, previousState)`,
+   exactly like the manual label route does. An auto-applied keep/discard is a real
+   training signal and now feeds `prompt_terms` like any other label.
+2. **Historical drift is now correctable.** New `recomputePromptTerms()` (`store.js`)
+   rebuilds every `prompt_terms` row's counts from the *current* `image_preferences`
+   table, the same "full recompute over the current labeled set" pattern
+   `recomputeCentroids()` already uses for centroids — since it reads each image's
+   current label directly rather than trusting a running delta, it can't drift no matter
+   how much relabeling happened, and self-heals any counts left inflated from before this
+   fix shipped. Wired into the existing `POST /api/taste-filter/recompute` ("Recompute
+   now") route, alongside its centroid recompute.
 
 ## Test plan
 
@@ -66,7 +71,11 @@ already-inflated count must not push it negative.
   count from one column to the other rather than leaving both incremented; a redundant
   re-label with an identical `(promptId, label)` is a pure no-op; a decrement never goes
   below 0; `getImagePreferenceState()` round-trips what `addImagePreference()` just wrote
-  and returns `null` for an image that's never been labeled.
+  and returns `null` for an image that's never been labeled; `recomputePromptTerms()`
+  corrects an artificially-inflated count to match the real labeled set, reflects
+  multiple images sharing a prompt, ignores rows with no `prompt_id`, and is idempotent.
 - `server.taste-filter-routes.test.js`: `POST /api/taste-filter/label` called twice for
   the same `image_path` with opposite labels (same `prompt_id`) results in the term's
-  `kept_count`/`discarded_count` reflecting only the current label, not both.
+  `kept_count`/`discarded_count` reflecting only the current label, not both; an
+  auto-decided candidate from `POST /api/taste-filter/import` now shows up in
+  `prompt_terms` the same as a manual label would.
