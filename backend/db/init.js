@@ -58,6 +58,10 @@ function runDefensiveMigrations(db) {
     // Mockup categories (plan.md -> "Mockup categories") -- tags a product_sizes row as
     // "bedroom," "hallway," "mug," etc. See schema.sql's category comment.
     'ALTER TABLE product_sizes ADD COLUMN category TEXT',
+    // One row per image -- see the dedup cleanup run just above this array and
+    // docs/fixes/taste-filter-duplicate-labels.md. IF NOT EXISTS makes this idempotent
+    // across repeated startups the same way idx_jobs_batch_id above already is.
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_image_preferences_image_path ON image_preferences(image_path)',
   ];
 
   // One-time cleanup ahead of the idx_image_preferences_image_path unique index below
