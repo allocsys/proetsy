@@ -571,4 +571,33 @@ describe('POST /api/taste-filter/import -> auto-compute decision rule (Step 2.6,
     expect(res.status).toBe(201);
     expect(res.body.candidates[0].autoDecision).toBeNull();
   });
+
+  it('an auto-decided candidate tallies its prompt terms, same as a manual label (issue #59, part 1)', async () => {
+    const { getDb } = await import('./db/init.js');
+    const db = getDb();
+    const { lastInsertRowid: promptId } = db
+      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square-canvas', 'a radiant glacier at noon --ar 1:1')`)
+      .run();
+
+    await request(app).patch('/api/settings').send({
+      taste_filter_auto_enabled: 'true',
+      taste_filter_auto_threshold: '0.3',
+    });
+
+    embedImageMock.mockImplementationOnce(async () => KEEP_LEANING);
+
+    const res = await request(app)
+      .post('/api/taste-filter/import')
+      .field('prompt_id', String(promptId))
+      .attach('files', Buffer.from('fake'), 'glacier.png');
+
+    expect(res.status).toBe(201);
+    expect(res.body.candidates[0].autoDecision).toBe('keep');
+
+    const glacier = db.prepare('SELECT * FROM prompt_terms WHERE term = ?').get('glacier');
+    expect(glacier).toBeDefined();
+    expect(glacier.kept_count).toBeGreaterThanOrEqual(1);
+
+    await request(app).patch('/api/settings').send({ taste_filter_auto_enabled: 'false' });
+  });
 });
