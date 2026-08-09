@@ -338,11 +338,11 @@ SQLite. `pipeline_config` and backups stay as JSON/files, not tables.
 - `prompts` — id, trend_id (FK, nullable), category, prompt_text, created_at
 
 **Taste model (Module 7)**
-- `image_preferences` — id, image_path, embedding (BLOB), label (keep/discard), category, prompt_id (FK, nullable), promoted_artwork_id (FK, nullable), created_at
+- `image_preferences` — id, image_path (**unique** — one row per image; `POST /api/taste-filter/label` and the auto-compute decision path both upsert on it, so a relabel or a manual correction of an auto-decided row updates it in place rather than adding a second row), embedding (BLOB), label (keep/discard), category, prompt_id (FK, nullable), promoted_artwork_id (FK, nullable), auto_labeled (0/1 — set when a row was written by auto-compute rather than a manual click; cleared back to 0 by a manual correction), created_at
 - `taste_centroids` — id, category (NULL = global), kept_centroid (BLOB), discarded_centroid (BLOB), updated_at
 - `prompt_terms` — term, kept_count, discarded_count, updated_at
 
-**Indexes:** `job_modules(job_id)`, `listings(job_id)`, `mockups(job_id)`, `image_preferences(category)`, `trends(term)`.
+**Indexes:** `job_modules(job_id)`, `listings(job_id)`, `mockups(job_id)`, `image_preferences(category)`, `image_preferences(image_path)` (**unique**), `trends(term)`.
 
 **Cascade behavior:** deleting a `job` cascades to its `job_modules`, `listings`, and `mockups`. `artworks`, `image_preferences`, `trends`, and `tags` are never cascade-deleted — they're independent reference data.
 
