@@ -68,7 +68,7 @@ import {
 const SETTING_AUTO_ENABLED = 'taste_filter_auto_enabled';
 const SETTING_AUTO_THRESHOLD = 'taste_filter_auto_threshold';
 const AUTO_SETTING_DEFAULTS = {
-  [SETTING_AUTO_ENABLED]: 'false',
+  [SETTING_AUTO_ENABLED]: 'true',
   [SETTING_AUTO_THRESHOLD]: '0.3',
 };
 
