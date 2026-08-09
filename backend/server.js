@@ -1203,8 +1203,12 @@ app.get('/api/taste-filter/pending/stream', (req, res) => {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     Connection: 'keep-alive',
+    // See the identical header on /api/taste-filter/model-status/stream above -- same
+    // reverse-proxy buffering concern applies here.
+    'X-Accel-Buffering': 'no',
   });
   res.flushHeaders();
+  res.socket?.setNoDelay?.(true);
 
   const send = (candidate) => {
     res.write(`data: ${JSON.stringify(candidate)}\n\n`);
