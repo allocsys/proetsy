@@ -59,6 +59,31 @@ function runDefensiveMigrations(db) {
     // "bedroom," "hallway," "mug," etc. See schema.sql's category comment.
     'ALTER TABLE product_sizes ADD COLUMN category TEXT',
   ];
+
+  // One-time cleanup ahead of the idx_image_preferences_image_path unique index below
+  // (see docs/fixes/taste-filter-duplicate-labels.md). A DB created before that index
+  // existed may already hold duplicate image_path rows -- e.g. a manual Keep/Discard
+  // that "corrected" an auto-labeled candidate before this fix, which inserted a second,
+  // contradictory row instead of updating the first. Creating the unique index below
+  // would fail against any such DB, so duplicates must be resolved first. For each
+  // image_path with more than one row, keep exactly one: prefer a manually-labeled row
+  // (auto_labeled = 0) over an auto-labeled one, then the most recently created, then
+  // the highest id as a final tiebreak; delete the rest. A no-op (0 rows affected) on a
+  // DB that's never had a duplicate, so safe to run on every startup.
+  db.exec(`
+    DELETE FROM image_preferences
+    WHERE id NOT IN (
+      SELECT id FROM (
+        SELECT id,
+          ROW_NUMBER() OVER (
+            PARTITION BY image_path
+            ORDER BY auto_labeled ASC, created_at DESC, id DESC
+          ) AS rn
+        FROM image_preferences
+      )
+      WHERE rn = 1
+    );
+  `);
   for (const sql of migrations) {
     try {
       db.exec(sql);
