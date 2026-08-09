@@ -199,8 +199,7 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
 
     try {
       const res = await fetch('/api/taste-filter/import', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Import failed');
+      const data = await parseJsonResponse(res);
       data.candidates.forEach((c) => seenPathsRef.current.add(c.imagePath));
       setCandidates((prev) => [...data.candidates, ...prev]);
       setStatus(`Scored ${data.candidates.length} image${data.candidates.length > 1 ? 's' : ''}.`);
@@ -210,7 +209,7 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
         setCategoryOptions((prev) => [...prev, category].sort());
       }
     } catch (err) {
-      setStatus(`Import failed: ${err.message}`);
+      setStatus(`Import failed: ${friendlyErrorMessage(err)}`);
     }
   }
 
