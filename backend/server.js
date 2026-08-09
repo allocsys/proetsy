@@ -39,7 +39,7 @@ import {
   suggestCategoriesForUncategorizedTags,
 } from './lib/tags/user-list.js';
 import { generatePromptsForTrend, listPrompts } from './lib/prompt-helper/index.js';
-import { embedImage } from './lib/taste-filter/embeddings.js';
+import { embedImage, ensureModelReady } from './lib/taste-filter/embeddings.js';
 import { scoreCandidate, autoDecision } from './lib/taste-filter/scoring.js';
 import {
   getCentroids,
@@ -1211,6 +1211,16 @@ app.post('/api/taste-filter/recompute', (req, res) => {
 // real port. Only binds when server.js is actually run as the entry point.
 const isMainModule = process.argv[1] && import.meta.url === `file://${process.argv[1]}`;
 if (isMainModule) {
+  // Fire-and-forget, started alongside (not before) app.listen() -- see this edit's
+  // commit message. Logged rather than thrown: Taste Filter is one module among many,
+  // and a download/disk failure here shouldn't take down job/listing/mockup routes that
+  // have nothing to do with it. embedImage() still calls ensureModelReady() itself on
+  // each use, so a failure here just means the first real import request re-attempts
+  // the same download instead of finding it already done.
+  ensureModelReady()
+    .then(() => console.log('[taste-filter] CLIP model ready at boot.'))
+    .catch((err) => console.error(`[taste-filter] Model prefetch at boot failed (will retry on first use): ${err.message}`));
+
   app.listen(PORT, () => {
     console.log(`ProEtsy backend listening on http://localhost:${PORT}`);
   });
