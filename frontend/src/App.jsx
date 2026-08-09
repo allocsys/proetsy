@@ -321,6 +321,9 @@ function App() {
     refreshWatchStatus();
     refreshRateLimits();
     refreshApiKeys();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount-only
+    // init: these refreshers are plain functions re-created every render, not memoized,
+    // and this effect must run exactly once on mount, not on every render.
   }, []);
 
   const tagCategories = useMemo(
