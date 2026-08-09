@@ -228,40 +228,40 @@ function App() {
       .catch(() => setHealth({ status: 'unreachable' }));
   }
 
-  function refreshJobs() {
+  const refreshJobs = useCallback(() => {
     fetch('/api/jobs')
       .then((r) => r.json())
       .then(setJobs)
       .catch(reportFetchError('refreshJobs'));
-  }
+  }, [reportFetchError]);
 
-  function refreshSetupStatus() {
+  const refreshSetupStatus = useCallback(() => {
     fetch('/api/setup-status')
       .then((r) => r.json())
       .then(setSetupStatus)
       .catch(reportFetchError('refreshSetupStatus'));
-  }
+  }, [reportFetchError]);
 
-  function refreshTrends() {
+  const refreshTrends = useCallback(() => {
     fetch('/api/trends')
       .then((r) => r.json())
       .then((data) => { setTrends(data); setTrendsLoading(false); })
       .catch((err) => { setTrendsLoading(false); reportFetchError('refreshTrends')(err); });
-  }
+  }, [reportFetchError]);
 
-  function refreshTags() {
+  const refreshTags = useCallback(() => {
     fetch('/api/tags')
       .then((r) => r.json())
       .then((data) => { setTags(data); setTagsLoading(false); })
       .catch((err) => { setTagsLoading(false); reportFetchError('refreshTags')(err); });
-  }
+  }, [reportFetchError]);
 
-  function refreshWatchStatus() {
+  const refreshWatchStatus = useCallback(() => {
     fetch('/api/taste-filter/watch-status')
       .then((r) => r.json())
       .then(setWatchStatus)
       .catch(reportFetchError('refreshWatchStatus'));
-  }
+  }, [reportFetchError]);
 
   // One-click default for the watched-folder field (see #3 in the automation pass) --
   // fills the field with the suggested Downloads folder and turns watching on in one
