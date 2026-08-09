@@ -261,12 +261,16 @@ function adjustPromptTermCounts(db, promptId, label, delta) {
  *
  * `previous` (optional): the image's prior { promptId, label } state, from
  * getImagePreferenceState() called *before* addImagePreference()'s upsert overwrote it.
- * When given and it differs from the (promptId, label) being applied now, that prior
- * state's contribution is undone first (-1, clamped at 0) before the new one is tallied
- * (+1) -- fixes prompt_terms drifting out of sync with the current labeled set on a
- * relabel (see docs/fixes/prompt-terms-double-count.md). Omitted (or identical to the new
- * state -- a redundant re-label), this behaves exactly as the original increment-only
- * version did.
+ * Three cases:
+ *   - No `previous` given: a fresh tally, always +1 -- same as the original
+ *     increment-only version (used by callers, e.g. some tests, that don't track state).
+ *   - `previous` differs from the (promptId, label) being applied now: a real relabel --
+ *     the prior state's contribution is undone first (-1, clamped at 0) before the new
+ *     one is tallied (+1). Fixes prompt_terms drifting out of sync with the current
+ *     labeled set on a relabel (see docs/fixes/prompt-terms-double-count.md).
+ *   - `previous` is identical to the (promptId, label) being applied now: a redundant
+ *     re-label (nothing actually changed) -- a pure no-op, since it already contributed
+ *     its +1 the first time.
  *
  * No-op for the new label's own tally when `promptId` is null/missing or the prompt no
  * longer exists -- this link is optional/opt-in per the architecture doc, so a missing or
@@ -279,7 +283,10 @@ function adjustPromptTermCounts(db, promptId, label, delta) {
 export function tallyPromptTermsForLabel(promptId, label, previous = null) {
   const db = getDb();
 
-  if (previous && (previous.promptId !== promptId || previous.label !== label)) {
+  const isRedundant = previous && previous.promptId === promptId && previous.label === label;
+  if (isRedundant) return;
+
+  if (previous) {
     adjustPromptTermCounts(db, previous.promptId, previous.label, -1);
   }
 
