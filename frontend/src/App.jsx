@@ -171,9 +171,12 @@ function App() {
       });
   }, [activeJobId]);
 
-  function reportFetchError(source) {
-    return (err) => setFetchError({ source, message: err.message });
-  }
+  // Memoized so components/effects that depend on it (all the refreshXxx functions
+  // below) get a stable reference instead of a new closure every render.
+  const reportFetchError = useCallback(
+    (source) => (err) => setFetchError({ source, message: err.message }),
+    []
+  );
 
   function flashSaved(field) {
     setSavedFlashes((prev) => ({ ...prev, [field]: true }));
