@@ -46,7 +46,7 @@ function blobToVector(blob) {
  * @param {string} params.imagePath
  * @param {Float32Array} params.embedding
  * @param {'keep' | 'discard'} params.label
- * @param {string | null} [params.orientation] - stored in the `image_preferences.category` DB column (see docs/known-issues/category-vs-orientation-naming.md); kept as `category` in SQL below pending a schema migration, only the JS-level param/variable is renamed here.
+ * @param {string | null} [params.orientation] - stored in the `image_preferences.orientation` DB column.
  * @param {number | null} [params.promptId] - links to the `prompts` row that generated this candidate, if any
  * @param {boolean} [params.autoLabeled] - true when this row was written by the auto-compute
  *   decision rule (plan.md Part 2) rather than a manual Keep/Discard click. Defaults to
@@ -68,19 +68,19 @@ export function addImagePreference({
 
   const db = getDb();
   db.prepare(
-    `INSERT INTO image_preferences (image_path, embedding, label, category, prompt_id, auto_labeled)
-     VALUES (@image_path, @embedding, @label, @category, @prompt_id, @auto_labeled)
+    `INSERT INTO image_preferences (image_path, embedding, label, orientation, prompt_id, auto_labeled)
+     VALUES (@image_path, @embedding, @label, @orientation, @prompt_id, @auto_labeled)
      ON CONFLICT(image_path) DO UPDATE SET
        embedding = excluded.embedding,
        label = excluded.label,
-       category = excluded.category,
+       orientation = excluded.orientation,
        prompt_id = excluded.prompt_id,
        auto_labeled = excluded.auto_labeled`
   ).run({
     image_path: imagePath,
     embedding: vectorToBlob(embedding),
     label,
-    category: orientation,
+    orientation,
     prompt_id: promptId,
     auto_labeled: autoLabeled ? 1 : 0,
   });
@@ -105,7 +105,7 @@ export function listImagePreferences() {
     imagePath: row.image_path,
     embedding: blobToVector(row.embedding),
     label: row.label,
-    orientation: row.category,
+    orientation: row.orientation,
     promptId: row.prompt_id,
   }));
 }
@@ -131,28 +131,28 @@ export function recomputeCentroids() {
   const examples = listImagePreferences();
   const centroidPairs = computeAllCentroidPairs(examples);
 
-  // Not a SQL-level `ON CONFLICT` upsert: `taste_centroids.category` has no UNIQUE
+  // Not a SQL-level `ON CONFLICT` upsert: `taste_centroids.orientation` has no UNIQUE
   // constraint in schema.sql, and even if it did, SQLite treats every NULL as distinct
   // for uniqueness purposes — which would defeat exactly the row we need it for most (the
-  // global pair, stored as `category IS NULL`). So this does a NULL-safe
+  // global pair, stored as `orientation IS NULL`). So this does a NULL-safe
   // select-then-update-or-insert instead, in one transaction so a recompute can't leave
-  // some categories updated and others not if it fails partway through.
-  const findExisting = db.prepare('SELECT id FROM taste_centroids WHERE category IS ?');
+  // some orientations updated and others not if it fails partway through.
+  const findExisting = db.prepare('SELECT id FROM taste_centroids WHERE orientation IS ?');
   const update = db.prepare(
     `UPDATE taste_centroids SET kept_centroid = @kept_centroid, discarded_centroid = @discarded_centroid,
        kept_count = @kept_count, discarded_count = @discarded_count, updated_at = datetime('now')
      WHERE id = @id`
   );
   const insert = db.prepare(
-    `INSERT INTO taste_centroids (category, kept_centroid, discarded_centroid, kept_count, discarded_count, updated_at)
-     VALUES (@category, @kept_centroid, @discarded_centroid, @kept_count, @discarded_count, datetime('now'))`
+    `INSERT INTO taste_centroids (orientation, kept_centroid, discarded_centroid, kept_count, discarded_count, updated_at)
+     VALUES (@orientation, @kept_centroid, @discarded_centroid, @kept_count, @discarded_count, datetime('now'))`
   );
 
   const counts = new Map();
   const writeAll = db.transaction(() => {
     for (const [orientation, pair] of centroidPairs) {
       const params = {
-        category: orientation,
+        orientation,
         kept_centroid: pair.kept ? vectorToBlob(pair.kept) : null,
         discarded_centroid: pair.discarded ? vectorToBlob(pair.discarded) : null,
         kept_count: pair.keptCount,
@@ -185,7 +185,7 @@ export function recomputeCentroids() {
 export function getCentroids(orientation = null) {
   const db = getDb();
   const row = db
-    .prepare('SELECT kept_centroid, discarded_centroid, kept_count, discarded_count FROM taste_centroids WHERE category IS ?')
+    .prepare('SELECT kept_centroid, discarded_centroid, kept_count, discarded_count FROM taste_centroids WHERE orientation IS ?')
     .get(orientation);
 
   if (!row) return { kept: null, discarded: null, keptCount: 0, discardedCount: 0 };
