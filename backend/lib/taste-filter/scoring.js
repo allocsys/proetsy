@@ -40,7 +40,7 @@ export function cosineSimilarity(a, b) {
 
 /**
  * Scores one candidate embedding against one centroid pair (either the global pair or one
- * orientation's pair — this function doesn't care which, per ARCHITECTURE.md -> Module 7:
+ * category's pair — this function doesn't care which, per ARCHITECTURE.md -> Module 7:
  * "A new candidate gets scored against both [...] using the same calculation"). Score is
  * similarity-to-kept minus similarity-to-discarded, so it's positive when the candidate
  * leans toward what's historically been kept, negative when it leans toward discarded.
@@ -104,7 +104,7 @@ export function isConfident(counts, minExamples = COLD_START_MIN_EXAMPLES) {
  * `isConfident`/`COLD_START_MIN_EXAMPLES` are unchanged and always checked first --
  * auto-compute only ever acts on centroid pairs that already clear the existing
  * cold-start bar, regardless of how extreme the score is.
- * @param {number | null} score - a single pair's score (global or orientation), as produced
+ * @param {number | null} score - a single pair's score (global or category), as produced
  *   by scoreAgainstCentroids()
  * @param {{ keptCount: number, discardedCount: number }} counts - that same pair's counts
  * @param {number} threshold - `taste_filter_auto_threshold`, an absolute score cutoff
@@ -120,36 +120,36 @@ export function autoDecision(score, counts, threshold) {
 }
 
 /**
- * The full per-candidate scoring result: both taste scores (global + orientation) plus a
+ * The full per-candidate scoring result: both taste scores (global + category) plus a
  * suggested label for each, per ARCHITECTURE.md -> Module 7 -> "Output": "each candidate
- * gets two taste scores [...] plus a suggested label". Orientation is optional — a candidate
- * with no assigned orientation (or an orientation with no centroid pair at all yet) still gets a
- * global score; `orientationScore`/`orientationLabel` are null in that case rather than the
+ * gets two taste scores [...] plus a suggested label". Category is optional — a candidate
+ * with no assigned category (or a category with no centroid pair at all yet) still gets a
+ * global score; `categoryScore`/`categoryLabel` are null in that case rather than the
  * whole result failing.
  * @param {Float32Array} embedding
  * @param {{ global: { kept: Float32Array | null, discarded: Float32Array | null, keptCount: number, discardedCount: number },
- *           orientation: { kept: Float32Array | null, discarded: Float32Array | null, keptCount: number, discardedCount: number } | null }} centroids
+ *           category: { kept: Float32Array | null, discarded: Float32Array | null, keptCount: number, discardedCount: number } | null }} centroids
  * @returns {{
  *   globalScore: number | null, globalLabel: string, globalConfident: boolean,
- *   orientationScore: number | null, orientationLabel: string | null, orientationConfident: boolean | null
+ *   categoryScore: number | null, categoryLabel: string | null, categoryConfident: boolean | null
  * }}
  */
-export function scoreCandidate(embedding, { global, orientation }) {
+export function scoreCandidate(embedding, { global, category }) {
   const globalScore = scoreAgainstCentroids(embedding, global);
   const result = {
     globalScore,
     globalLabel: labelFromScore(globalScore),
     globalConfident: isConfident(global),
-    orientationScore: null,
-    orientationLabel: null,
-    orientationConfident: null,
+    categoryScore: null,
+    categoryLabel: null,
+    categoryConfident: null,
   };
 
-  if (orientation) {
-    const orientationScore = scoreAgainstCentroids(embedding, orientation);
-    result.orientationScore = orientationScore;
-    result.orientationLabel = labelFromScore(orientationScore);
-    result.orientationConfident = isConfident(orientation);
+  if (category) {
+    const categoryScore = scoreAgainstCentroids(embedding, category);
+    result.categoryScore = categoryScore;
+    result.categoryLabel = labelFromScore(categoryScore);
+    result.categoryConfident = isConfident(category);
   }
 
   return result;
