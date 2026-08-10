@@ -46,7 +46,7 @@ Settings key `mj_aspectRatioByCategory` (backend/config/index.js) stays as-is re
 Backend expected `orientation` in the renamed modules while the frontend still sent `category`, causing every prompt-generate call to 422 on `main`. Frontend now sends/reads `orientation` to match — fixed pending merge of `rename-category-orientation-continue`.
 
 ## Housekeeping
-- [ ] Do the DB column rename per "Next up" above (frontend + remaining backend tests are done, so this is unblocked).
+- [ ] Delete local dev DB file(s) so they regenerate from the current schema (the DB column rename itself was already done, just never had its local dev-DB reset applied/tracked).
 
 ---
 ### Session log
@@ -54,3 +54,4 @@ Backend expected `orientation` in the renamed modules while the frontend still s
 |---|---|---|
 | 2026-08-10 | Merged PR #64 (backend core rename) | Commit `56e7fa6` on `main` |
 | 2026-08-10 | Closed remaining backend gap (scoring.js, prompt-routes, config-routes) + full frontend rename (PromptHelper, ShopConventions) | Commits through `826c11c` on `rename-category-orientation-continue`; ready for PR |
+| 2026-08-10 | Verified DB column rename was already done (schema.sql, store.js, prompt-helper/index.js); fixed leftover 'category' wording in ARCHITECTURE.md Module 4 + matching quotes in shop-conventions.js/test.js | Commits `e2e8ffc`, `21a9ab7`, `cdb57df`, `99772c6` on `rename-category-orientation-continue` |
