@@ -15,17 +15,21 @@ This is a multi-session task. Use this doc as the single source of truth for wha
 - `backend/lib/taste-filter/store.js`, `centroids.js` + `centroids.test.js`
 - DB columns intentionally left as `category` pending a future migration (by design, not a gap)
 
-## ❌ Outstanding — Backend
-- [ ] `backend/lib/pipeline-runner.direct.test.js:80`
-- [ ] `backend/lib/taste-filter/scoring.js` + `scoring.test.js:145`
-- [ ] `backend/server.prompt-routes.test.js:44,107`
-- [ ] `backend/server.config-routes.test.js:24`
+## ✅ Done (this branch, `rename-category-orientation-continue`)
+- [x] `backend/lib/pipeline-runner.direct.test.js:80` — already clean as merged in PR #64, no dangling refs found
+- [x] `backend/lib/taste-filter/scoring.js` + `scoring.test.js:145`
+- [x] `backend/server.prompt-routes.test.js:44,107`
+- [x] `backend/server.config-routes.test.js:24` — was still asserting `aspectRatioByCategory`, fixed to `aspectRatioByOrientation`
+- [x] `PromptHelper.jsx` — `CATEGORIES` → `ORIENTATIONS`, `category` state → `orientation`, "Category:" label → "Orientation:", `#prompt-category-select` → `#prompt-orientation-select` (trend's own `category` field left untouched — real, unrelated concept)
+- [x] `PromptHelper.test.jsx`
+- [x] `ShopConventions.jsx:49` — `aspectRatioByCategory` → `aspectRatioByOrientation` throughout (state, payload, labels, placeholders)
+- [x] `ShopConventions.test.jsx:23`
 
-## ❌ Outstanding — Frontend (entire surface still unrenamed)
-- [ ] `PromptHelper.jsx` — `CATEGORIES` const, `category` state, "Category:" label, `#prompt-category-select`
-- [ ] `PromptHelper.test.jsx`
-- [ ] `ShopConventions.jsx:49`
-- [ ] `ShopConventions.test.jsx:23`
+## ❌ Outstanding — Backend
+_(none — full sweep for `aspectRatioByCategory` / `prompt-category-select` across the repo came back clean)_
+
+## ❌ Outstanding — Frontend
+_(none — see Done above)_
 
 ## ⏸️ Deferred by design (not gaps — needs separate decision)
 - DB migration for `prompts`, `image_preferences`, `taste_centroids` tables (columns stay `category` until this happens)
