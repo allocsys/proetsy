@@ -128,7 +128,7 @@ CREATE TABLE IF NOT EXISTS image_preferences (
   image_path TEXT NOT NULL,
   embedding BLOB,
   label TEXT NOT NULL,
-  orientation TEXT,
+  category TEXT,
   prompt_id INTEGER REFERENCES prompts(id),
   promoted_artwork_id INTEGER REFERENCES artworks(id),
   -- Set when this row was written by the auto-compute decision rule (see
@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS image_preferences (
   auto_labeled INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now'))
 );
-CREATE INDEX IF NOT EXISTS idx_image_preferences_orientation ON image_preferences(orientation);
+CREATE INDEX IF NOT EXISTS idx_image_preferences_category ON image_preferences(category);
 -- idx_image_preferences_image_path (one row per image, so POST /api/taste-filter/label
 -- can upsert instead of ever inserting a second, potentially contradictory row -- see
 -- docs/fixes/taste-filter-duplicate-labels.md) is deliberately NOT created here.
