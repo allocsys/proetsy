@@ -76,7 +76,7 @@ export async function generatePromptsForTrend({ trendId = null, orientation }) {
 
   const styleHints = getStyleHints(db);
 
-  const prompt = buildPromptHelperPrompt({ trend, category: orientation, styleHints });
+  const prompt = buildPromptHelperPrompt({ trend, orientation, styleHints });
   const { text: rawResponse } = await generateText(prompt, { json: true });
   const rawPrompts = parseModelJson(rawResponse);
 
