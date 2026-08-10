@@ -31,14 +31,10 @@ function formatMB(bytes) {
 //   - A non-OK response whose body also isn't valid JSON (e.g. a proxy's own HTML error
 //     page for a 502/504) gets a message built from the status code instead of the same
 //     confusing exception.
-// Reads the body as text first (rather than res.json() directly) specifically so a
-// parse failure can be told apart from "the server sent a real {error: ...} JSON body",
-// which still takes priority when present.
 async function parseJsonResponse(res) {
-  const text = await res.text();
   let data;
   try {
-    data = text ? JSON.parse(text) : {};
+    data = await res.json();
   } catch {
     throw new Error(
       res.ok
