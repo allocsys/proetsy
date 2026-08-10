@@ -92,7 +92,7 @@ async function handleNewFile(sourcePath, candidatesDir, category) {
     const embedding = await embedImage(destPath);
     const globalCentroids = getCentroids(null);
     const categoryCentroids = category ? getCentroids(category) : null;
-    const scores = scoreCandidate(embedding, { global: globalCentroids, category: categoryCentroids });
+    const scores = scoreCandidate(embedding, { global: globalCentroids, orientation: categoryCentroids });
 
     const candidate = {
       imagePath: destPath,
