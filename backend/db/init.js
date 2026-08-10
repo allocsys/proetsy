@@ -58,15 +58,16 @@ function runDefensiveMigrations(db) {
     // Mockup categories (plan.md -> "Mockup categories") -- tags a product_sizes row as
     // "bedroom," "hallway," "mug," etc. See schema.sql's category comment.
     'ALTER TABLE product_sizes ADD COLUMN category TEXT',
-    // One row per image -- see the dedup cleanup run just above this array and
-    // docs/fixes/taste-filter-duplicate-labels.md. IF NOT EXISTS makes this idempotent
-    // across repeated startups the same way idx_jobs_batch_id above already is.
+    // One row per image -- see the dedup cleanup run just above this array (this index
+    // enforces the fix for a prior bug where relabeling could insert a duplicate,
+    // contradictory row instead of updating the existing one). IF NOT EXISTS makes this
+    // idempotent across repeated startups the same way idx_jobs_batch_id above already is.
     'CREATE UNIQUE INDEX IF NOT EXISTS idx_image_preferences_image_path ON image_preferences(image_path)',
   ];
 
-  // One-time cleanup ahead of the idx_image_preferences_image_path unique index below
-  // (see docs/fixes/taste-filter-duplicate-labels.md). A DB created before that index
-  // existed may already hold duplicate image_path rows -- e.g. a manual Keep/Discard
+  // One-time cleanup ahead of the idx_image_preferences_image_path unique index below.
+  // A DB created before that index existed may already hold duplicate image_path rows --
+  // e.g. a manual Keep/Discard
   // that "corrected" an auto-labeled candidate before this fix, which inserted a second,
   // contradictory row instead of updating the first. Creating the unique index below
   // would fail against any such DB, so duplicates must be resolved first. For each
