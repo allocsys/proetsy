@@ -54,6 +54,14 @@ test.describe('critical path: upload → generate listing → review → copy-to
     await expect(page.getByText('Backend:')).toContainText('ok', { timeout: 15000 });
 
     const artworkPath = writeTestArtwork();
+    // The direct-upload Pipeline lane (including #section-pipeline and its "Done."
+    // status text below) lives inside a <details> that's collapsed by default -- expand
+    // it first. setInputFiles doesn't require visibility, so skipping this click would
+    // let the upload silently succeed while the "Done." text stayed hidden inside the
+    // closed disclosure, timing out the later toBeVisible() assertion for the wrong
+    // reason.
+    await page.getByText('Direct upload (skips curation').click();
+
     // Drives the dropzone's plain file-input fallback (Module 6 -> "A drop zone (plus a
     // plain file input fallback)") — far more reliable from Playwright than simulating
     // an actual HTML5 drag-and-drop event sequence. Scoped to #section-pipeline: Module
