@@ -1015,7 +1015,7 @@ app.post('/api/taste-filter/import', uploadCandidate.array('files', 100), async 
   for (const file of files) {
     try {
       const embedding = await embedImage(file.path);
-      const scores = scoreCandidate(embedding, { global: globalCentroids, category: categoryCentroids });
+      const scores = scoreCandidate(embedding, { global: globalCentroids, orientation: categoryCentroids });
 
       // Step 2.4's decision rule, applied per-centroid-pair, only when auto mode is on
       // (`isConfident`/`COLD_START_MIN_EXAMPLES` inside autoDecision() are unchanged —
@@ -1032,7 +1032,7 @@ app.post('/api/taste-filter/import', uploadCandidate.array('files', 100), async 
       if (autoEnabled) {
         const globalDecision = autoDecision(scores.globalScore, globalCentroids, autoThreshold);
         if (category) {
-          const categoryDecision = autoDecision(scores.categoryScore, categoryCentroids, autoThreshold);
+          const categoryDecision = autoDecision(scores.orientationScore, categoryCentroids, autoThreshold);
           decision = globalDecision && globalDecision === categoryDecision ? globalDecision : null;
         } else {
           decision = globalDecision;
