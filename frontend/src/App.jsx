@@ -101,6 +101,8 @@ function App() {
   const [tagsCategory, setTagsCategory] = useState('');
   const [tagsSavedMessage, setTagsSavedMessage] = useState(null); // { text, ok }
   const [tagsCsvMessage, setTagsCsvMessage] = useState(null); // { text, ok }
+  const [tagsDeleteMessage, setTagsDeleteMessage] = useState(null); // { text, ok } | null
+  const [trendsDeleteMessage, setTrendsDeleteMessage] = useState(null); // { text, ok } | null
   const [tagsBackfillMessage, setTagsBackfillMessage] = useState(null); // { text, ok }
   const [tagsBackfillRunning, setTagsBackfillRunning] = useState(false);
   const [tagsBackfillPreview, setTagsBackfillPreview] = useState(null); // { checked, updates } | null
@@ -458,14 +460,39 @@ function App() {
 
   async function deleteTag(id, tagText) {
     requestConfirm(`Delete tag "${tagText}"? This can't be undone.`, async () => {
-      await fetch(`/api/tags/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/tags/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        // A 404/500 has a JSON { error } body per the route's contract, but guard the
+        // parse anyway in case something upstream (a proxy, a crash) returns a
+        // non-JSON error page instead.
+        let message = 'Failed to delete tag';
+        try {
+          message = (await res.json()).error || message;
+        } catch {
+          // no JSON body -- keep the generic message
+        }
+        setTagsDeleteMessage({ text: message, ok: false });
+        return;
+      }
+      setTagsDeleteMessage(null);
       refreshTags();
     });
   }
 
   async function deleteTrend(id, term) {
     requestConfirm(`Delete trend "${term}"? This can't be undone.`, async () => {
-      await fetch(`/api/trends/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/trends/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        let message = 'Failed to delete trend';
+        try {
+          message = (await res.json()).error || message;
+        } catch {
+          // no JSON body -- keep the generic message
+        }
+        setTrendsDeleteMessage({ text: message, ok: false });
+        return;
+      }
+      setTrendsDeleteMessage(null);
       refreshTrends();
     });
   }
@@ -906,6 +933,11 @@ function App() {
                   </div>
 
                   <h4 className="settings-sub-heading" style={{ marginTop: '1rem' }}>Current tags</h4>
+                  {tagsDeleteMessage && (
+                    <p className={`mono-sm ${tagsDeleteMessage.ok ? 'text-success' : 'text-danger'}`} style={{ marginTop: 0 }}>
+                      {tagsDeleteMessage.text}
+                    </p>
+                  )}
                   {tagsLoading ? (
                     <p className="empty-state">Loading…</p>
                   ) : tags.length ? (
@@ -993,6 +1025,11 @@ function App() {
 
                 <div className="settings-subsection" style={{ marginBottom: 0 }}>
                   <h4 className="settings-sub-heading">Trend list</h4>
+                  {trendsDeleteMessage && (
+                    <p className={`mono-sm ${trendsDeleteMessage.ok ? 'text-success' : 'text-danger'}`} style={{ marginTop: 0 }}>
+                      {trendsDeleteMessage.text}
+                    </p>
+                  )}
                   {trendsLoading ? (
                     <p className="empty-state">Loading…</p>
                   ) : trends.length ? (
