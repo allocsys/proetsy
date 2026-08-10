@@ -54,16 +54,16 @@ describe('computeCentroidPair', () => {
 });
 
 describe('computeAllCentroidPairs', () => {
-  it('computes a global pair across all categories plus one pair per category', () => {
+  it('computes a global pair across all orientations plus one pair per orientation', () => {
     const examples = [
-      { embedding: [1, 0], label: 'keep', category: 'portrait' },
-      { embedding: [0, 1], label: 'discard', category: 'portrait' },
-      { embedding: [5, 5], label: 'keep', category: 'landscape' },
+      { embedding: [1, 0], label: 'keep', orientation: 'portrait' },
+      { embedding: [0, 1], label: 'discard', orientation: 'portrait' },
+      { embedding: [5, 5], label: 'keep', orientation: 'landscape' },
     ];
     const result = computeAllCentroidPairs(examples);
 
     expect(result.has(null)).toBe(true); // global
-    expect(result.get(null).keptCount).toBe(2); // both keeps, across categories
+    expect(result.get(null).keptCount).toBe(2); // both keeps, across orientations
     expect(result.get(null).discardedCount).toBe(1);
 
     expect(result.get('portrait').keptCount).toBe(1);
@@ -73,11 +73,11 @@ describe('computeAllCentroidPairs', () => {
     expect(result.get('landscape').discardedCount).toBe(0);
   });
 
-  it('treats a null category as part of the global pair, not a separate category entry', () => {
-    const examples = [{ embedding: [1, 1], label: 'keep', category: null }];
+  it('treats a null orientation as part of the global pair, not a separate orientation entry', () => {
+    const examples = [{ embedding: [1, 1], label: 'keep', orientation: null }];
     const result = computeAllCentroidPairs(examples);
 
-    // Only the global (null-keyed) entry should exist — no duplicate null category.
+    // Only the global (null-keyed) entry should exist — no duplicate null orientation.
     expect(result.size).toBe(1);
     expect(result.get(null).keptCount).toBe(1);
   });
