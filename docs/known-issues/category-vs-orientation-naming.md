@@ -32,8 +32,16 @@ _(none — full sweep for `aspectRatioByCategory` / `prompt-category-select` acr
 _(none — see Done above)_
 
 ## ⏸️ Deferred by design (not gaps — needs separate decision)
-- DB migration for `prompts`, `image_preferences`, `taste_centroids` tables (columns stay `category` until this happens)
 - `TasteFilter.jsx` freeform "Curation name" field — needs a product decision before renaming
+
+## 🔜 Next up — DB column rename
+Not yet deployed anywhere, so no migration script needed — just edit the schema directly:
+- `schema.sql`: rename `category` → `orientation` on `prompts`, `image_preferences`, `taste_centroids` (NOT `product_sizes.category`, `tags.category`, or `trends.category` — those are unrelated concepts, leave as-is)
+- Rename `idx_image_preferences_category` → `idx_image_preferences_orientation`
+- Update the SQL strings in `backend/lib/taste-filter/store.js` and `backend/lib/prompt-helper/index.js` that still say `category`
+- Delete local dev DB file(s) so they regenerate from the updated schema
+- Remove the "kept as `category` in SQL pending a schema migration" comments in those files once done
+- Settings key `mj_aspectRatioByCategory` (backend/config/index.js) stays as-is regardless — that one's a stored dashboard-override key, not a schema column, and renaming it would orphan existing overrides
 
 ## ⚠️ Known risk after PR #64 merge (resolved on this branch)
 Backend expected `orientation` in the renamed modules while the frontend still sent `category`, causing every prompt-generate call to 422 on `main`. Frontend now sends/reads `orientation` to match — fixed pending merge of `rename-category-orientation-continue`.
