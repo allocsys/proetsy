@@ -909,9 +909,9 @@ app.post('/api/trends/csv', (req, res) => {
 // ARCHITECTURE.md's Partial Failure Handling — a failure here is just a 422, with no
 // job/job_modules state to update, since this route touches no job at all.
 app.post('/api/prompts/generate', async (req, res) => {
-  const { trend_id, category } = req.body || {};
+  const { trend_id, orientation } = req.body || {};
   try {
-    const prompts = await generatePromptsForTrend({ trendId: trend_id || null, category });
+    const prompts = await generatePromptsForTrend({ trendId: trend_id || null, orientation });
     res.status(201).json({ prompts });
   } catch (err) {
     res.status(422).json({ error: err.message });
@@ -922,8 +922,8 @@ app.post('/api/prompts/generate', async (req, res) => {
 // and/or category — see generatePromptsForTrend's doc comment on why each generation run
 // inserts new rows rather than upserting.
 app.get('/api/prompts', (req, res) => {
-  const { trend_id, category } = req.query;
-  const prompts = listPrompts({ trendId: trend_id ? Number(trend_id) : undefined, category: category || undefined });
+  const { trend_id, orientation } = req.query;
+  const prompts = listPrompts({ trendId: trend_id ? Number(trend_id) : undefined, orientation: orientation || undefined });
   res.json(prompts);
 });
 
