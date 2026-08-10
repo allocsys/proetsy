@@ -119,7 +119,7 @@ test.describe('critical path: upload → generate listing → review → copy-to
     // itself (by its heading text) since all three variation cards share the same
     // "Title" label, and page.getByDisplayValue() isn't a real Playwright API (it's a
     // Testing Library method, not one Playwright's Page/Locator ever exposed).
-    const fineArtCard = page.locator('div.dark-panel').filter({ hasText: 'fine art' });
+    const fineArtCard = page.locator('div.card.paper-card').filter({ hasText: 'fine art' });
     await expect(fineArtCard.getByLabel('Title')).toHaveValue('fine art fixture title');
 
     // Copy-to-clipboard: click the fine-art card's own "Copy for Etsy" button and confirm
