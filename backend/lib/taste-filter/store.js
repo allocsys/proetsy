@@ -36,8 +36,8 @@ function blobToVector(blob) {
 /**
  * Records one keep/discard decision — the training signal itself, per ARCHITECTURE.md ->
  * Module 7 -> "How the 'training' works". Upserts on `image_path` (one row per image,
- * enforced by the idx_image_preferences_image_path unique index — see
- * docs/fixes/taste-filter-duplicate-labels.md): unlike `prompts`, this is meant to hold
+ * enforced by the idx_image_preferences_image_path unique index): unlike `prompts`, this
+ * is meant to hold
  * the *current* judgment for each image, not a full history, so re-labeling the same
  * image — including a manual Keep/Discard that corrects an earlier auto-labeled row —
  * updates that one row in place rather than adding a second, potentially contradictory
@@ -202,9 +202,9 @@ export function getCentroids(category = null) {
 
 /**
  * Reads back an image's *current* label/prompt, before a new label overwrites it --
- * the "before" half of tallyPromptTermsForLabel()'s before/after diff (see
- * docs/fixes/prompt-terms-double-count.md). Must be called prior to addImagePreference()'s
- * upsert for the same image_path, since that upsert is what overwrites the row this reads.
+ * the "before" half of tallyPromptTermsForLabel()'s before/after diff. Must be called
+ * prior to addImagePreference()'s upsert for the same image_path, since that upsert is
+ * what overwrites the row this reads.
  * Returns null when the image has never been labeled before (first label, nothing to undo).
  * @param {string} imagePath
  * @returns {{ promptId: number | null, label: 'keep' | 'discard' } | null}
@@ -270,7 +270,7 @@ function adjustPromptTermCounts(db, promptId, label, delta) {
  *   - `previous` differs from the (promptId, label) being applied now: a real relabel --
  *     the prior state's contribution is undone first (-1, clamped at 0) before the new
  *     one is tallied (+1). Fixes prompt_terms drifting out of sync with the current
- *     labeled set on a relabel (see docs/fixes/prompt-terms-double-count.md).
+ *     labeled set on a relabel.
  *   - `previous` is identical to the (promptId, label) being applied now: a redundant
  *     re-label (nothing actually changed) -- a pure no-op, since it already contributed
  *     its +1 the first time.
@@ -304,7 +304,7 @@ export function tallyPromptTermsForLabel(promptId, label, previous = null) {
  * instead of embedding centroids.
  *
  * Why this exists alongside the incremental tally: it's the backfill/self-healing half
- * of the fix in docs/fixes/prompt-terms-double-count.md (issue #59, part 2) -- any
+ * of the fix for prompt_terms double-counting on relabel (issue #59, part 2) -- any
  * `prompt_terms` rows left inflated by relabeling *before* that fix shipped are not
  * corrected by the incremental fix alone (it only stops *new* drift). Reading every
  * image's current label directly here, instead of relying on a running delta, can never
