@@ -273,9 +273,9 @@ describe('POST /api/taste-filter/label -> prompt-feedback link (Module 7 -> Modu
   });
 
   it('relabeling the same image_path moves its prompt terms from one column to the other, not both', async () => {
-    // docs/fixes/prompt-terms-double-count.md: before the fix, tallyPromptTermsForLabel()
-    // was purely additive, so this sequence would leave kept_count at 1 AND
-    // discarded_count at 1 for the same term -- double-counted instead of moved.
+    // Before the fix, tallyPromptTermsForLabel() was purely additive, so this sequence
+    // would leave kept_count at 1 AND discarded_count at 1 for the same term --
+    // double-counted instead of moved.
     const { getDb } = await import('./db/init.js');
     const db = getDb();
     const { lastInsertRowid: promptId } = db
