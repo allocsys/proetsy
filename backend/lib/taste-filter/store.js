@@ -46,7 +46,10 @@ function blobToVector(blob) {
  * @param {string} params.imagePath
  * @param {Float32Array} params.embedding
  * @param {'keep' | 'discard'} params.label
- * @param {string | null} [params.orientation] - stored in the `image_preferences.orientation` DB column.
+ * @param {string | null} [params.category] - Module 7's own freeform curation grouping
+ *   (e.g. "square-canvas", "bedroom") — a distinct concept from Module 4's `orientation`
+ *   (portrait/landscape/square); see docs/known-issues/category-vs-orientation-naming.md.
+ *   Stored in the `image_preferences.category` DB column.
  * @param {number | null} [params.promptId] - links to the `prompts` row that generated this candidate, if any
  * @param {boolean} [params.autoLabeled] - true when this row was written by the auto-compute
  *   decision rule (plan.md Part 2) rather than a manual Keep/Discard click. Defaults to
@@ -58,7 +61,7 @@ export function addImagePreference({
   imagePath,
   embedding,
   label,
-  orientation = null,
+  category = null,
   promptId = null,
   autoLabeled = false,
 }) {
@@ -68,19 +71,19 @@ export function addImagePreference({
 
   const db = getDb();
   db.prepare(
-    `INSERT INTO image_preferences (image_path, embedding, label, orientation, prompt_id, auto_labeled)
-     VALUES (@image_path, @embedding, @label, @orientation, @prompt_id, @auto_labeled)
+    `INSERT INTO image_preferences (image_path, embedding, label, category, prompt_id, auto_labeled)
+     VALUES (@image_path, @embedding, @label, @category, @prompt_id, @auto_labeled)
      ON CONFLICT(image_path) DO UPDATE SET
        embedding = excluded.embedding,
        label = excluded.label,
-       orientation = excluded.orientation,
+       category = excluded.category,
        prompt_id = excluded.prompt_id,
        auto_labeled = excluded.auto_labeled`
   ).run({
     image_path: imagePath,
     embedding: vectorToBlob(embedding),
     label,
-    orientation,
+    category,
     prompt_id: promptId,
     auto_labeled: autoLabeled ? 1 : 0,
   });
@@ -95,7 +98,7 @@ export function addImagePreference({
 /**
  * Reads back every labeled example, with embeddings parsed to Float32Array — the raw
  * input computeAllCentroidPairs() (centroids.js) operates on.
- * @returns {Array<{ id: number, imagePath: string, embedding: Float32Array, label: string, orientation: string | null, promptId: number | null }>}
+ * @returns {Array<{ id: number, imagePath: string, embedding: Float32Array, label: string, category: string | null, promptId: number | null }>}
  */
 export function listImagePreferences() {
   const db = getDb();
@@ -105,7 +108,7 @@ export function listImagePreferences() {
     imagePath: row.image_path,
     embedding: blobToVector(row.embedding),
     label: row.label,
-    orientation: row.orientation,
+    category: row.category,
     promptId: row.prompt_id,
   }));
 }
@@ -124,47 +127,47 @@ export function listImagePreferences() {
  * distinguish "cold start, no data yet" from "row doesn't exist" without a separate
  * existence check.
  * @returns {Map<string | null, { keptCount: number, discardedCount: number }>} counts per
- *   orientation (null = global), for callers that want to surface cold-start state
+ *   category (null = global), for callers that want to surface cold-start state
  */
 export function recomputeCentroids() {
   const db = getDb();
   const examples = listImagePreferences();
   const centroidPairs = computeAllCentroidPairs(examples);
 
-  // Not a SQL-level `ON CONFLICT` upsert: `taste_centroids.orientation` has no UNIQUE
+  // Not a SQL-level `ON CONFLICT` upsert: `taste_centroids.category` has no UNIQUE
   // constraint in schema.sql, and even if it did, SQLite treats every NULL as distinct
   // for uniqueness purposes — which would defeat exactly the row we need it for most (the
-  // global pair, stored as `orientation IS NULL`). So this does a NULL-safe
+  // global pair, stored as `category IS NULL`). So this does a NULL-safe
   // select-then-update-or-insert instead, in one transaction so a recompute can't leave
-  // some orientations updated and others not if it fails partway through.
-  const findExisting = db.prepare('SELECT id FROM taste_centroids WHERE orientation IS ?');
+  // some categories updated and others not if it fails partway through.
+  const findExisting = db.prepare('SELECT id FROM taste_centroids WHERE category IS ?');
   const update = db.prepare(
     `UPDATE taste_centroids SET kept_centroid = @kept_centroid, discarded_centroid = @discarded_centroid,
        kept_count = @kept_count, discarded_count = @discarded_count, updated_at = datetime('now')
      WHERE id = @id`
   );
   const insert = db.prepare(
-    `INSERT INTO taste_centroids (orientation, kept_centroid, discarded_centroid, kept_count, discarded_count, updated_at)
-     VALUES (@orientation, @kept_centroid, @discarded_centroid, @kept_count, @discarded_count, datetime('now'))`
+    `INSERT INTO taste_centroids (category, kept_centroid, discarded_centroid, kept_count, discarded_count, updated_at)
+     VALUES (@category, @kept_centroid, @discarded_centroid, @kept_count, @discarded_count, datetime('now'))`
   );
 
   const counts = new Map();
   const writeAll = db.transaction(() => {
-    for (const [orientation, pair] of centroidPairs) {
+    for (const [category, pair] of centroidPairs) {
       const params = {
-        orientation,
+        category,
         kept_centroid: pair.kept ? vectorToBlob(pair.kept) : null,
         discarded_centroid: pair.discarded ? vectorToBlob(pair.discarded) : null,
         kept_count: pair.keptCount,
         discarded_count: pair.discardedCount,
       };
-      const existing = findExisting.get(orientation);
+      const existing = findExisting.get(category);
       if (existing) {
         update.run({ ...params, id: existing.id });
       } else {
         insert.run(params);
       }
-      counts.set(orientation, { keptCount: pair.keptCount, discardedCount: pair.discardedCount });
+      counts.set(category, { keptCount: pair.keptCount, discardedCount: pair.discardedCount });
     }
   });
   writeAll();
@@ -179,14 +182,14 @@ export function recomputeCentroids() {
  * yet for that category — cold start, per ARCHITECTURE.md -> Module 7's "Cold start" note;
  * the caller (step 3) is responsible for deciding how to handle that rather than this
  * function guessing at a default.
- * @param {string | null} orientation
+ * @param {string | null} category
  * @returns {{ kept: Float32Array | null, discarded: Float32Array | null } }
  */
-export function getCentroids(orientation = null) {
+export function getCentroids(category = null) {
   const db = getDb();
   const row = db
-    .prepare('SELECT kept_centroid, discarded_centroid, kept_count, discarded_count FROM taste_centroids WHERE orientation IS ?')
-    .get(orientation);
+    .prepare('SELECT kept_centroid, discarded_centroid, kept_count, discarded_count FROM taste_centroids WHERE category IS ?')
+    .get(category);
 
   if (!row) return { kept: null, discarded: null, keptCount: 0, discardedCount: 0 };
   return {
