@@ -46,7 +46,9 @@ Settings key `mj_aspectRatioByCategory` (backend/config/index.js) stays as-is re
 Backend expected `orientation` in the renamed modules while the frontend still sent `category`, causing every prompt-generate call to 422 on `main`. Frontend now sends/reads `orientation` to match — fixed pending merge of `rename-category-orientation-continue`.
 
 ## Housekeeping
-- [ ] Delete local dev DB file(s) so they regenerate from the current schema (the DB column rename itself was already done, just never had its local dev-DB reset applied/tracked).
+- [x] Delete local dev DB file(s) so they regenerate from the current schema — confirmed no local dev DB file exists, nothing to delete.
+
+**Rename is complete.** No remaining `category` references anywhere they shouldn't be (verified via full-repo sweep); branch is ready for PR.
 
 ---
 ### Session log
