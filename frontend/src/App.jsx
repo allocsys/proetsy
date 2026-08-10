@@ -1411,7 +1411,7 @@ function App() {
                     <polyline points="6 9 12 15 18 9" />
                   </svg>
                 </summary>
-                <div className="upload-lane">
+                <div className="upload-lane" id="section-pipeline">
                   <h3>Pipeline</h3>
                   <p className="text-muted" style={{ marginTop: 0 }}>
                     These toggles apply <strong>only to artwork uploaded next</strong> — they don&apos;t change your saved default.
