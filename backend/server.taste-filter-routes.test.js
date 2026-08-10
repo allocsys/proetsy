@@ -209,8 +209,8 @@ describe('POST /api/taste-filter/label + GET /api/taste-filter/centroids (Module
     // it should score as likely-keep against both the global and category centroids.
     expect(candidate.globalScore).not.toBeNull();
     expect(candidate.globalLabel).toBe('likely-keep');
-    expect(candidate.categoryScore).not.toBeNull();
-    expect(candidate.categoryLabel).toBe('likely-keep');
+    expect(candidate.orientationScore).not.toBeNull();
+    expect(candidate.orientationLabel).toBe('likely-keep');
   });
 
   it('400s for an invalid label value', async () => {
