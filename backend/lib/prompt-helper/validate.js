@@ -18,10 +18,10 @@ const STYLE_RAW_RE = /--style\s+raw/i;
  * --s value into [stylizeMin, stylizeMax] rather than dropping it.
  *
  * @param {string} promptText
- * @param {string} category - drives which --ar value gets appended if missing; no --ar is added for an unrecognized category (the shop's aspectRatioByCategory has no entry for it)
+ * @param {string} orientation - drives which --ar value gets appended if missing; no --ar is added for an unrecognized orientation (the shop's aspectRatioByOrientation has no entry for it)
  * @returns {{ text: string, warnings: string[] }}
  */
-export function enforceMidjourneyConventions(promptText, category) {
+export function enforceMidjourneyConventions(promptText, orientation) {
   const MIDJOURNEY_CONVENTIONS = getShopConventions().midjourney;
   const warnings = [];
   let text = (promptText || '').trim();
@@ -35,10 +35,10 @@ export function enforceMidjourneyConventions(promptText, category) {
     warnings.push(`Added missing ${MIDJOURNEY_CONVENTIONS.style} flag`);
   }
 
-  const aspectRatio = MIDJOURNEY_CONVENTIONS.aspectRatioByCategory[category];
+  const aspectRatio = MIDJOURNEY_CONVENTIONS.aspectRatioByOrientation[orientation];
   if (aspectRatio && !AR_RE.test(text)) {
     text += ` --ar ${aspectRatio}`;
-    warnings.push(`Added missing --ar ${aspectRatio} flag for category "${category}"`);
+    warnings.push(`Added missing --ar ${aspectRatio} flag for orientation "${orientation}"`);
   }
 
   const stylizeMatch = text.match(STYLIZE_RE);

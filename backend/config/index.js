@@ -185,7 +185,11 @@ const SHOP_CONVENTION_FIELDS = [
   { key: 'mj_stylizeMin', group: 'midjourney', field: 'stylizeMin', type: 'int' },
   { key: 'mj_stylizeMax', group: 'midjourney', field: 'stylizeMax', type: 'int' },
   { key: 'mj_defaultStylize', group: 'midjourney', field: 'defaultStylize', type: 'int' },
-  { key: 'mj_aspectRatioByCategory', group: 'midjourney', field: 'aspectRatioByCategory', type: 'object' },
+  // NOTE: `key` stays 'mj_aspectRatioByCategory' on purpose -- it's the settings-table
+  // storage key, and renaming it would orphan any dashboard override a shop already
+  // saved (see docs/known-issues/category-vs-orientation-naming.md). Only the in-memory
+  // `field` name changes to match MIDJOURNEY_CONVENTIONS.aspectRatioByOrientation.
+  { key: 'mj_aspectRatioByCategory', group: 'midjourney', field: 'aspectRatioByOrientation', type: 'object' },
 ];
 
 function defaultForField(def) {

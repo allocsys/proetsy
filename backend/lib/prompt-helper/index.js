@@ -50,17 +50,21 @@ function getStyleHints(db, limit = 5) {
 // fully isolated — it's not part of the main listing pipeline, so a failure there never
 // touches jobs in progress." Unlike Modules 1–3, this is NOT job-scoped at all — no
 // job_modules row, no jobId parameter. A generation run is keyed only by an optional
-// trend + a target category.
+// trend + a target orientation.
 //
 // Each call INSERTS new `prompts` rows rather than upserting one row per (trend,
-// category) the way listings/mockups upsert per (job, variation/size) — the point here
-// is to build up a browsable history of generated prompt batches (conceptually similar
-// to Module 6's "listing history log"), not to represent one current value for a given
-// key. Re-running with the same trend/category is expected to add a fresh batch, not
-// replace the last one.
-export async function generatePromptsForTrend({ trendId = null, category }) {
-  if (!category) {
-    throw new Error('category is required (e.g. "portrait", "landscape", "square")');
+// orientation) the way listings/mockups upsert per (job, variation/size) — the point
+// here is to build up a browsable history of generated prompt batches (conceptually
+// similar to Module 6's "listing history log"), not to represent one current value for
+// a given key. Re-running with the same trend/orientation is expected to add a fresh
+// batch, not replace the last one.
+//
+// NOTE: the `prompts.category` DB column actually stores this orientation value (see
+// docs/known-issues/category-vs-orientation-naming.md) — kept as `category` in SQL
+// below pending a schema migration; only the JS-level param/variable is renamed here.
+export async function generatePromptsForTrend({ trendId = null, orientation }) {
+  if (!orientation) {
+    throw new Error('orientation is required (e.g. "portrait", "landscape", "square")');
   }
 
   const db = getDb();
@@ -72,11 +76,11 @@ export async function generatePromptsForTrend({ trendId = null, category }) {
 
   const styleHints = getStyleHints(db);
 
-  const prompt = buildPromptHelperPrompt({ trend, category, styleHints });
+  const prompt = buildPromptHelperPrompt({ trend, orientation, styleHints });
   const { text: rawResponse } = await generateText(prompt, { json: true });
   const rawPrompts = parseModelJson(rawResponse);
 
-  const cleaned = rawPrompts.map((p) => enforceMidjourneyConventions(p, category));
+  const cleaned = rawPrompts.map((p) => enforceMidjourneyConventions(p, orientation));
 
   const insert = db.prepare(
     `INSERT INTO prompts (trend_id, category, prompt_text, created_at) VALUES (?, ?, ?, datetime('now'))`
@@ -84,7 +88,7 @@ export async function generatePromptsForTrend({ trendId = null, category }) {
   const insertAll = db.transaction((items) => {
     const ids = [];
     for (const item of items) {
-      const { lastInsertRowid } = insert.run(trendId || null, category, item.text);
+      const { lastInsertRowid } = insert.run(trendId || null, orientation, item.text);
       ids.push(lastInsertRowid);
     }
     return ids;
@@ -94,7 +98,7 @@ export async function generatePromptsForTrend({ trendId = null, category }) {
   return cleaned.map((c, i) => ({
     id: ids[i],
     trend_id: trendId || null,
-    category,
+    orientation,
     prompt_text: c.text,
     warnings: c.warnings,
   }));
@@ -102,11 +106,11 @@ export async function generatePromptsForTrend({ trendId = null, category }) {
 
 /**
  * Lists previously generated prompt batches, optionally filtered by trend and/or
- * category, newest first — backs the dashboard's browsable history for this module.
- * @param {{ trendId?: number, category?: string }} [filters]
+ * orientation, newest first — backs the dashboard's browsable history for this module.
+ * @param {{ trendId?: number, orientation?: string }} [filters]
  * @returns {object[]}
  */
-export function listPrompts({ trendId, category } = {}) {
+export function listPrompts({ trendId, orientation } = {}) {
   const db = getDb();
   const conditions = [];
   const params = [];
@@ -114,9 +118,9 @@ export function listPrompts({ trendId, category } = {}) {
     conditions.push('trend_id = ?');
     params.push(trendId);
   }
-  if (category) {
+  if (orientation) {
     conditions.push('category = ?');
-    params.push(category);
+    params.push(orientation);
   }
   const where = conditions.length ? ` WHERE ${conditions.join(' AND ')}` : '';
   return db.prepare(`SELECT * FROM prompts${where} ORDER BY created_at DESC`).all(...params);

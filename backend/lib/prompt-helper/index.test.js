@@ -47,17 +47,17 @@ afterAll(() => {
 });
 
 describe('generatePromptsForTrend', () => {
-  it('requires a category', async () => {
-    await expect(generatePromptsForTrend({ category: undefined })).rejects.toThrow(/category is required/);
+  it('requires an orientation', async () => {
+    await expect(generatePromptsForTrend({ orientation: undefined })).rejects.toThrow(/orientation is required/);
   });
 
   it('generates and persists a batch with trend_id null when no trend is selected', async () => {
-    const results = await generatePromptsForTrend({ category: 'square' });
+    const results = await generatePromptsForTrend({ orientation: 'square' });
 
     expect(results).toHaveLength(3);
     for (const r of results) {
       expect(r.trend_id).toBeNull();
-      expect(r.category).toBe('square');
+      expect(r.orientation).toBe('square');
       expect(r.id).toBeTruthy();
     }
 
@@ -67,14 +67,14 @@ describe('generatePromptsForTrend', () => {
   });
 
   it('applies the Midjourney-conventions backstop to the model output (e.g. adds a missing --v 7)', async () => {
-    const results = await generatePromptsForTrend({ category: 'portrait' });
+    const results = await generatePromptsForTrend({ orientation: 'portrait' });
     const withMissingFlag = results.find((r) => r.prompt_text.includes('a fox in a snowy field'));
     expect(withMissingFlag.prompt_text).toContain('--v 7');
     expect(withMissingFlag.warnings.some((w) => /--v 7/.test(w))).toBe(true);
   });
 
   it('throws for a trend_id that does not exist', async () => {
-    await expect(generatePromptsForTrend({ trendId: 999999, category: 'square' })).rejects.toThrow(/Trend 999999 not found/);
+    await expect(generatePromptsForTrend({ trendId: 999999, orientation: 'square' })).rejects.toThrow(/Trend 999999 not found/);
   });
 
   it('associates persisted prompts with a real trend_id when one is given', async () => {
@@ -83,7 +83,7 @@ describe('generatePromptsForTrend', () => {
       .prepare("INSERT INTO trends (term, category, source) VALUES (?, ?, 'manual')")
       .run('cottagecore botanical', 'home decor');
 
-    const results = await generatePromptsForTrend({ trendId, category: 'landscape' });
+    const results = await generatePromptsForTrend({ trendId, orientation: 'landscape' });
     expect(results.every((r) => r.trend_id === trendId)).toBe(true);
 
     // The prompt sent to the LLM should reference the selected trend's term.
@@ -95,11 +95,11 @@ describe('generatePromptsForTrend', () => {
     const db = getDb();
     const before = db.prepare('SELECT COUNT(*) AS n FROM prompts').get().n;
 
-    await generatePromptsForTrend({ category: 'square' });
+    await generatePromptsForTrend({ orientation: 'square' });
     const afterOne = db.prepare('SELECT COUNT(*) AS n FROM prompts').get().n;
     expect(afterOne).toBe(before + 3);
 
-    await generatePromptsForTrend({ category: 'square' });
+    await generatePromptsForTrend({ orientation: 'square' });
     const afterTwo = db.prepare('SELECT COUNT(*) AS n FROM prompts').get().n;
     expect(afterTwo).toBe(afterOne + 3);
   });
@@ -110,7 +110,7 @@ describe('generatePromptsForTrend', () => {
       "INSERT INTO prompt_terms (term, kept_count, discarded_count) VALUES ('gold leaf accents', 12, 2), ('muddy composition', 1, 9)"
     ).run();
 
-    await generatePromptsForTrend({ category: 'square' });
+    await generatePromptsForTrend({ orientation: 'square' });
 
     const promptArg = generateTextMock.mock.calls.at(-1)[0];
     // A term with more kept than discarded should surface as a hint...
@@ -121,9 +121,9 @@ describe('generatePromptsForTrend', () => {
 });
 
 describe('listPrompts', () => {
-  it('filters by category', async () => {
-    await generatePromptsForTrend({ category: 'landscape' });
-    const results = listPrompts({ category: 'landscape' });
+  it('filters by orientation', async () => {
+    await generatePromptsForTrend({ orientation: 'landscape' });
+    const results = listPrompts({ orientation: 'landscape' });
     expect(results.length).toBeGreaterThan(0);
     expect(results.every((r) => r.category === 'landscape')).toBe(true);
   });
@@ -134,7 +134,7 @@ describe('listPrompts', () => {
       .prepare("INSERT INTO trends (term, category, source) VALUES (?, NULL, 'manual')")
       .run('a uniquely filterable trend');
 
-    await generatePromptsForTrend({ trendId, category: 'square' });
+    await generatePromptsForTrend({ trendId, orientation: 'square' });
     const results = listPrompts({ trendId });
 
     expect(results.length).toBe(3);

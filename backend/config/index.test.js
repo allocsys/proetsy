@@ -163,7 +163,7 @@ describe('getShopConventions / setShopConventions (DB-backed)', () => {
       stylizeMin: 50,
       stylizeMax: 150,
       defaultStylize: 100,
-      aspectRatioByCategory: { portrait: '2:3', landscape: '3:2', square: '1:1' },
+      aspectRatioByOrientation: { portrait: '2:3', landscape: '3:2', square: '1:1' },
     });
   });
 
@@ -219,10 +219,10 @@ describe('getShopConventions / setShopConventions (DB-backed)', () => {
     );
   });
 
-  it('rejects an aspectRatioByCategory value not shaped like "W:H"', () => {
+  it('rejects an aspectRatioByOrientation value not shaped like "W:H"', () => {
     expect(() =>
-      setShopConventions({ midjourney: { aspectRatioByCategory: { portrait: 'tall' } } })
-    ).toThrow(/aspectRatioByCategory/);
+      setShopConventions({ midjourney: { aspectRatioByOrientation: { portrait: 'tall' } } })
+    ).toThrow(/aspectRatioByOrientation/);
   });
 
   it('rejects an inconsistent stylizeMin/defaultStylize/stylizeMax trio, even from a partial update', () => {

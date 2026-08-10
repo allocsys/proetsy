@@ -77,7 +77,7 @@ beforeAll(async () => {
         stylizeMin: 50,
         stylizeMax: 150,
         defaultStylize: 100,
-        aspectRatioByCategory: { portrait: '2:3', landscape: '3:2', square: '1:1' },
+        aspectRatioByOrientation: { portrait: '2:3', landscape: '3:2', square: '1:1' },
       },
     })),
   }));

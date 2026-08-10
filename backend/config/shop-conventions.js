@@ -46,10 +46,10 @@ export const MIDJOURNEY_CONVENTIONS = Object.freeze({
   stylizeMin: 50,
   stylizeMax: 150,
   defaultStylize: 100,
-  // Keyed by product orientation/category (matches product-sizes.json's `orientation`
-  // field, e.g. 'portrait'/'landscape'/'square') so a selected category maps directly to
-  // the --ar flag without a separate lookup table.
-  aspectRatioByCategory: Object.freeze({
+  // Keyed by product orientation (matches product-sizes.json's `orientation`
+  // field, e.g. 'portrait'/'landscape'/'square') so a selected orientation maps directly
+  // to the --ar flag without a separate lookup table.
+  aspectRatioByOrientation: Object.freeze({
     portrait: '2:3',
     landscape: '3:2',
     square: '1:1',
