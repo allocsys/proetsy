@@ -64,7 +64,7 @@ describe('MIDJOURNEY_CONVENTIONS', () => {
   });
 
   it('maps the three documented orientations to their --ar values', () => {
-    expect(MIDJOURNEY_CONVENTIONS.aspectRatioByCategory).toEqual({
+    expect(MIDJOURNEY_CONVENTIONS.aspectRatioByOrientation).toEqual({
       portrait: '2:3',
       landscape: '3:2',
       square: '1:1',
@@ -76,8 +76,8 @@ describe('MIDJOURNEY_CONVENTIONS', () => {
     expect(MIDJOURNEY_CONVENTIONS.defaultStylize).toBeLessThanOrEqual(MIDJOURNEY_CONVENTIONS.stylizeMax);
   });
 
-  it('is frozen, including the nested aspectRatioByCategory map', () => {
+  it('is frozen, including the nested aspectRatioByOrientation map', () => {
     expect(Object.isFrozen(MIDJOURNEY_CONVENTIONS)).toBe(true);
-    expect(Object.isFrozen(MIDJOURNEY_CONVENTIONS.aspectRatioByCategory)).toBe(true);
+    expect(Object.isFrozen(MIDJOURNEY_CONVENTIONS.aspectRatioByOrientation)).toBe(true);
   });
 });
