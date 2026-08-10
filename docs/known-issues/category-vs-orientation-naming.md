@@ -34,14 +34,13 @@ _(none — see Done above)_
 ## ⏸️ Deferred by design (not gaps — needs separate decision)
 - `TasteFilter.jsx` freeform "Curation name" field — needs a product decision before renaming
 
-## 🔜 Next up — DB column rename
-Not yet deployed anywhere, so no migration script needed — just edit the schema directly:
-- `schema.sql`: rename `category` → `orientation` on `prompts`, `image_preferences`, `taste_centroids` (NOT `product_sizes.category`, `tags.category`, or `trends.category` — those are unrelated concepts, leave as-is)
-- Rename `idx_image_preferences_category` → `idx_image_preferences_orientation`
-- Update the SQL strings in `backend/lib/taste-filter/store.js` and `backend/lib/prompt-helper/index.js` that still say `category`
-- Delete local dev DB file(s) so they regenerate from the updated schema
-- Remove the "kept as `category` in SQL pending a schema migration" comments in those files once done
-- Settings key `mj_aspectRatioByCategory` (backend/config/index.js) stays as-is regardless — that one's a stored dashboard-override key, not a schema column, and renaming it would orphan existing overrides
+## ✅ Done — DB column rename
+_(found already complete on this branch — `schema.sql`'s `prompts`, `image_preferences`, `taste_centroids` tables already use `orientation`, `idx_image_preferences_orientation` already exists, and `store.js`/`prompt-helper/index.js` already use `orientation` in their SQL with no leftover "pending migration" comments. `product_sizes.category`, `tags.category`, and `trends.category` correctly left as-is — unrelated concepts. Local dev DB file(s) still need deleting so they regenerate from the current schema, since this wasn't tracked as done until now.)_
+
+Settings key `mj_aspectRatioByCategory` (backend/config/index.js) stays as-is regardless — that one's a stored dashboard-override key, not a schema column, and renaming it would orphan existing overrides.
+
+## ✅ Done — Doc text fix
+- `ARCHITECTURE.md`'s Module 4 section still described the renamed concept using "category" (desired category / aspect ratio per category / target category / category selector / category-filtered history) — these referred to the actual orientation concept, not the unrelated product_sizes/tags/trends "category". Fixed to "orientation" throughout, plus the matching quoted comment in `shop-conventions.js` and quoted test title in `shop-conventions.test.js`.
 
 ## ⚠️ Known risk after PR #64 merge (resolved on this branch)
 Backend expected `orientation` in the renamed modules while the frontend still sent `category`, causing every prompt-generate call to 422 on `main`. Frontend now sends/reads `orientation` to match — fixed pending merge of `rename-category-orientation-continue`.
