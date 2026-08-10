@@ -46,13 +46,13 @@ describe('enforceMidjourneyConventions', () => {
     expect(warnings.some((w) => /--style raw/.test(w))).toBe(true);
   });
 
-  it('appends the correct --ar for the given category when missing', () => {
+  it('appends the correct --ar for the given orientation when missing', () => {
     const { text, warnings } = enforceMidjourneyConventions('a still life --v 7 --style raw --s 90', 'square');
     expect(text).toContain('--ar 1:1');
     expect(warnings.some((w) => /--ar 1:1/.test(w))).toBe(true);
   });
 
-  it('does not add an --ar flag for an unrecognized category', () => {
+  it('does not add an --ar flag for an unrecognized orientation', () => {
     const { text, warnings } = enforceMidjourneyConventions('a still life --v 7 --style raw --s 90', 'panoramic');
     expect(text).not.toMatch(/--ar \d+:\d+/);
     expect(warnings.some((w) => /--ar/.test(w))).toBe(false);
