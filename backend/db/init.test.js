@@ -180,8 +180,8 @@ describe('runDefensiveMigrations (via getDb — not exported separately)', () =>
   });
 
   it('dedupes existing image_preferences rows by image_path before creating the unique index, preferring a manual label over an auto-labeled one', async () => {
-    // See docs/fixes/taste-filter-duplicate-labels.md. Simulates a pre-existing DB
-    // (created before idx_image_preferences_image_path existed) that already has a
+    // Simulates a pre-existing DB (created before idx_image_preferences_image_path
+    // existed) that already has a
     // duplicate image_path -- the exact case the pre-migration cleanup exists for: an
     // older auto-labeled row (auto_labeled = 1) plus a newer manual correction
     // (auto_labeled = 0) for the same image. Built directly with better-sqlite3 rather
