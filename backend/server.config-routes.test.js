@@ -21,7 +21,7 @@ describe('GET /api/config/shop-conventions', () => {
     expect(res.body.listing.maxTitleLength).toBe(140);
     expect(res.body.listing.tagsPerListing).toBe(13);
     expect(res.body.midjourney.version).toBe('--v 7');
-    expect(res.body.midjourney.aspectRatioByCategory.portrait).toBe('2:3');
+    expect(res.body.midjourney.aspectRatioByOrientation.portrait).toBe('2:3');
   });
 });
 
