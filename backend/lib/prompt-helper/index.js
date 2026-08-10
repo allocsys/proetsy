@@ -59,9 +59,6 @@ function getStyleHints(db, limit = 5) {
 // a given key. Re-running with the same trend/orientation is expected to add a fresh
 // batch, not replace the last one.
 //
-// NOTE: the `prompts.category` DB column actually stores this orientation value (see
-// docs/known-issues/category-vs-orientation-naming.md) — kept as `category` in SQL
-// below pending a schema migration; only the JS-level param/variable is renamed here.
 export async function generatePromptsForTrend({ trendId = null, orientation }) {
   if (!orientation) {
     throw new Error('orientation is required (e.g. "portrait", "landscape", "square")');
@@ -83,7 +80,7 @@ export async function generatePromptsForTrend({ trendId = null, orientation }) {
   const cleaned = rawPrompts.map((p) => enforceMidjourneyConventions(p, orientation));
 
   const insert = db.prepare(
-    `INSERT INTO prompts (trend_id, category, prompt_text, created_at) VALUES (?, ?, ?, datetime('now'))`
+    `INSERT INTO prompts (trend_id, orientation, prompt_text, created_at) VALUES (?, ?, ?, datetime('now'))`
   );
   const insertAll = db.transaction((items) => {
     const ids = [];
@@ -119,7 +116,7 @@ export function listPrompts({ trendId, orientation } = {}) {
     params.push(trendId);
   }
   if (orientation) {
-    conditions.push('category = ?');
+    conditions.push('orientation = ?');
     params.push(orientation);
   }
   const where = conditions.length ? ` WHERE ${conditions.join(' AND ')}` : '';

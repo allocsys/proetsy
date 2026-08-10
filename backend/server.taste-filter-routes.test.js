@@ -245,7 +245,7 @@ describe('POST /api/taste-filter/label -> prompt-feedback link (Module 7 -> Modu
     const { getDb } = await import('./db/init.js');
     const db = getDb();
     const { lastInsertRowid: promptId } = db
-      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square-canvas', 'a serene lighthouse at dusk --ar 1:1')`)
+      .prepare(`INSERT INTO prompts (orientation, prompt_text) VALUES ('square-canvas', 'a serene lighthouse at dusk --ar 1:1')`)
       .run();
 
     const res = await request(app).post('/api/taste-filter/label').send({
@@ -279,7 +279,7 @@ describe('POST /api/taste-filter/label -> prompt-feedback link (Module 7 -> Modu
     const { getDb } = await import('./db/init.js');
     const db = getDb();
     const { lastInsertRowid: promptId } = db
-      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square-canvas', 'a golden meadow at sunrise --ar 1:1')`)
+      .prepare(`INSERT INTO prompts (orientation, prompt_text) VALUES ('square-canvas', 'a golden meadow at sunrise --ar 1:1')`)
       .run();
 
     const firstLabel = await request(app).post('/api/taste-filter/label').send({
@@ -657,7 +657,7 @@ describe('POST /api/taste-filter/import -> auto-compute decision rule (Step 2.6,
     const { getDb } = await import('./db/init.js');
     const db = getDb();
     const { lastInsertRowid: promptId } = db
-      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square-canvas', 'a radiant glacier at noon --ar 1:1')`)
+      .prepare(`INSERT INTO prompts (orientation, prompt_text) VALUES ('square-canvas', 'a radiant glacier at noon --ar 1:1')`)
       .run();
 
     await request(app).patch('/api/settings').send({

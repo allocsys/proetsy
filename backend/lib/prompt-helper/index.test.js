@@ -125,7 +125,7 @@ describe('listPrompts', () => {
     await generatePromptsForTrend({ orientation: 'landscape' });
     const results = listPrompts({ orientation: 'landscape' });
     expect(results.length).toBeGreaterThan(0);
-    expect(results.every((r) => r.category === 'landscape')).toBe(true);
+    expect(results.every((r) => r.orientation === 'landscape')).toBe(true);
   });
 
   it('filters by trendId', async () => {

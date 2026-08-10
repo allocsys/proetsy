@@ -37,7 +37,7 @@ export const SHOP_CONVENTIONS = Object.freeze({
 
 // Default Midjourney prompt conventions for Module 4 (Trend/Prompt Helper). See
 // ARCHITECTURE.md -> Module 4 -> "Output: ready-to-paste Midjourney prompts using shop
-// conventions (--v 7, --style raw, aspect ratio per category, --s 50–150)". Same
+// conventions (--v 7, --style raw, aspect ratio per orientation, --s 50–150)". Same
 // defaults-only status as SHOP_CONVENTIONS above -- read live values through
 // getShopConventions().midjourney, not this export directly.
 export const MIDJOURNEY_CONVENTIONS = Object.freeze({

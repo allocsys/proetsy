@@ -122,10 +122,6 @@ describe('GET /api/prompts', () => {
     const res = await request(app).get('/api/prompts').query({ orientation: 'square' });
     expect(res.status).toBe(200);
     expect(res.body.length).toBeGreaterThan(0);
-    // The `prompts.category` DB column still stores the orientation value pending a
-    // schema migration (see docs/known-issues/category-vs-orientation-naming.md) --
-    // only the JS-level param name changed, so raw rows from GET /api/prompts still
-    // come back keyed as `category`.
-    expect(res.body.every((p) => p.category === 'square')).toBe(true);
+    expect(res.body.every((p) => p.orientation === 'square')).toBe(true);
   });
 });

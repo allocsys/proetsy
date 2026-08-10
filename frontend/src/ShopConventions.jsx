@@ -46,9 +46,9 @@ function ShopConventions() {
           setStylizeMin(cfg.midjourney.stylizeMin ?? 0);
           setStylizeMax(cfg.midjourney.stylizeMax ?? 1000);
           setDefaultStylize(cfg.midjourney.defaultStylize ?? 250);
-          const arObj = cfg.midjourney.aspectRatioByCategory || {};
+          const arObj = cfg.midjourney.aspectRatioByOrientation || {};
           setAspectRatios(
-            Object.entries(arObj).map(([category, ratio]) => ({ category, ratio }))
+            Object.entries(arObj).map(([orientation, ratio]) => ({ orientation, ratio }))
           );
         }
       })
@@ -59,7 +59,7 @@ function ShopConventions() {
   }, []);
 
   function addAspectRatioRow() {
-    setAspectRatios((prev) => [...prev, { category: '', ratio: '1:1' }]);
+    setAspectRatios((prev) => [...prev, { orientation: '', ratio: '1:1' }]);
   }
 
   function updateAspectRatioRow(index, field, value) {
@@ -90,8 +90,8 @@ function ShopConventions() {
       deliveryDetailPhrases: deliveryDetailPhrasesText.split('\n').map((s) => s.trim()).filter(Boolean),
     };
 
-    const aspectRatioByCategory = Object.fromEntries(
-      aspectRatios.filter((r) => r.category.trim()).map((r) => [r.category.trim(), r.ratio.trim()])
+    const aspectRatioByOrientation = Object.fromEntries(
+      aspectRatios.filter((r) => r.orientation.trim()).map((r) => [r.orientation.trim(), r.ratio.trim()])
     );
 
     const midjourneyPayload = {
@@ -100,7 +100,7 @@ function ShopConventions() {
       stylizeMin: Number(stylizeMin),
       stylizeMax: Number(stylizeMax),
       defaultStylize: Number(defaultStylize),
-      aspectRatioByCategory,
+      aspectRatioByOrientation,
     };
 
     try {
@@ -299,15 +299,15 @@ function ShopConventions() {
         </div>
 
         <div className="settings-subsection" style={{ marginTop: '1rem', marginBottom: 0 }}>
-          <h5 className="settings-sub-heading" style={{ fontSize: '13px' }}>Aspect ratio by category</h5>
+          <h5 className="settings-sub-heading" style={{ fontSize: '13px' }}>Aspect ratio by orientation</h5>
           {aspectRatios.map((row, index) => (
             <div key={index} className="settings-field-row" style={{ alignItems: 'center', marginBottom: '0.5rem' }}>
               <div className="settings-field" style={{ flex: 1 }}>
                 <input
                   className="input"
-                  placeholder="Category (e.g. botanical)"
-                  value={row.category}
-                  onChange={(e) => updateAspectRatioRow(index, 'category', e.target.value)}
+                  placeholder="Orientation (e.g. portrait)"
+                  value={row.orientation}
+                  onChange={(e) => updateAspectRatioRow(index, 'orientation', e.target.value)}
                 />
               </div>
               <div className="settings-field" style={{ width: '120px' }}>
@@ -322,15 +322,15 @@ function ShopConventions() {
                 type="button"
                 className="btn-secondary btn-sm"
                 onClick={() => removeAspectRatioRow(index)}
-                title="Remove category ratio"
-                aria-label="Remove category ratio"
+                title="Remove orientation ratio"
+                aria-label="Remove orientation ratio"
               >
                 ×
               </button>
             </div>
           ))}
           <button type="button" className="btn-secondary btn-sm" onClick={addAspectRatioRow} style={{ marginTop: '0.5rem' }}>
-            + Add category aspect ratio
+            + Add orientation aspect ratio
           </button>
         </div>
       </div>

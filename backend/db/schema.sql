@@ -118,7 +118,7 @@ CREATE INDEX IF NOT EXISTS idx_trends_term ON trends(term);
 CREATE TABLE IF NOT EXISTS prompts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   trend_id INTEGER REFERENCES trends(id),
-  category TEXT,
+  orientation TEXT,
   prompt_text TEXT,
   created_at TEXT DEFAULT (datetime('now'))
 );

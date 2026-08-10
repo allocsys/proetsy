@@ -99,12 +99,12 @@ This is the single source of truth for both Module 2 (which sizes are sellable/m
 ### Module 4 — Trend/Prompt Helper (optional, manual-trend version)
 **What changed from the original plan:** no live Etsy trend-pulling API call — trends come from the **trends provider layer** (see below), backed by a manually maintained/dashboard-entered list.
 
-**Input:** selected trend + desired category
-**Output:** ready-to-paste Midjourney prompts using shop conventions (`--v 7`, `--style raw`, aspect ratio per category, `--s 50–150`)
+**Input:** selected trend + desired orientation
+**Output:** ready-to-paste Midjourney prompts using shop conventions (`--v 7`, `--style raw`, aspect ratio per orientation, `--s 50–150`)
 **Tech:** Gemini API via the LLM provider layer, no Etsy API dependency. This module only *writes* Midjourney-formatted prompt text — it never calls a Midjourney API.
-**Deliberately not job-scoped** — isolated from the main pipeline (see Partial Failure Handling): a generation run is keyed only by an optional `trend_id` + target `category`. Each call inserts a new batch of `prompts` rows (a browsable history), unlike listings/mockups' one-row-per-key upsert.
+**Deliberately not job-scoped** — isolated from the main pipeline (see Partial Failure Handling): a generation run is keyed only by an optional `trend_id` + target `orientation`. Each call inserts a new batch of `prompts` rows (a browsable history), unlike listings/mockups' one-row-per-key upsert.
 **Optional style hints:** pulls up to 5 terms from Module 7's `prompt_terms` where kept-count beats discarded-count, included as a non-overriding style hint — naturally a no-op until Module 7 has labeled data.
-**Dashboard:** `frontend/src/PromptHelper.jsx` (not job-scoped) — category selector, trend picker + inline add-a-trend form, Generate, copy-to-clipboard, category-filtered history.
+**Dashboard:** `frontend/src/PromptHelper.jsx` (not job-scoped) — orientation selector, trend picker + inline add-a-trend form, Generate, copy-to-clipboard, orientation-filtered history.
 
 ### Module 5 — Etsy Uploader
 **Removed.** Etsy publishing is manual — the user copies the approved listing text and mockups into Etsy themselves. No Etsy API v3 integration, no OAuth, no bulk-publish. This removes the biggest external-account risk from the whole build (developer approval, bulk-publish bugs, API changes).
@@ -123,7 +123,7 @@ React frontend (`frontend/src/App.jsx`) that:
 **What it does:** ranks a batch of raw Midjourney-generated candidates against a learned taste profile, so obvious "slop" gets flagged before it ever becomes a listing candidate.
 
 **Input:** a batch of candidate images (generated manually in Midjourney, dragged into the dashboard, or auto-picked up from a watched folder)
-**Output:** each candidate gets **two taste scores** — global and per-category — plus a suggested label (likely-keep / likely-discard / uncertain). By default every decision is a manual keep/discard confirmation, which is the training signal; an opt-in auto-compute mode (off by default — see below) can also apply a high-confidence decision automatically. Either way, nothing is ever auto-*deleted* — a discarded image's file always stays on disk.
+**Output:** each candidate gets **two taste scores** — global and per-orientation — plus a suggested label (likely-keep / likely-discard / uncertain). By default every decision is a manual keep/discard confirmation, which is the training signal; an opt-in auto-compute mode (off by default — see below) can also apply a high-confidence decision automatically. Either way, nothing is ever auto-*deleted* — a discarded image's file always stays on disk.
 **Tech:** local image embeddings via a **JS-only CLIP implementation** — `onnxruntime-web` (WASM) running the pre-converted `Xenova/clip-vit-base-patch32` ONNX model, called directly from the Node backend. No API key, no per-request cost, no network dependency, no second runtime to manage.
 
 **Why WASM over native (`onnxruntime-node`):** no prebuilt binary to match against a specific libc/ABI — runs on Termux/Android (whose Bionic libc breaks `onnxruntime-node`'s prebuilt binaries) and sidesteps Electron's native-module rebuild step entirely. Trade-off: WASM CPU inference is slower than native, acceptable for single-user, one-batch-at-a-time use.

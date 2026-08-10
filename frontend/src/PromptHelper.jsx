@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAsyncTask } from './hooks/useAsyncTask.js';
 
-const CATEGORIES = ['portrait', 'landscape', 'square'];
+const ORIENTATIONS = ['portrait', 'landscape', 'square'];
 
 function copyToClipboard(text) {
   if (navigator.clipboard?.writeText) {
@@ -14,7 +14,7 @@ const COPIED_FEEDBACK_MS = 1500;
 export default function PromptHelper() {
   const [trends, setTrends] = useState([]);
   const [selectedTrendId, setSelectedTrendId] = useState('');
-  const [category, setCategory] = useState(CATEGORIES[0]);
+  const [orientation, setOrientation] = useState(ORIENTATIONS[0]);
   const [newTrendTerm, setNewTrendTerm] = useState('');
   const [newTrendCategory, setNewTrendCategory] = useState('');
   const [generated, setGenerated] = useState([]);
@@ -41,8 +41,8 @@ export default function PromptHelper() {
     }
   }
 
-  async function loadHistory(forCategory) {
-    const res = await fetch(`/api/prompts?category=${encodeURIComponent(forCategory)}`);
+  async function loadHistory(forOrientation) {
+    const res = await fetch(`/api/prompts?orientation=${encodeURIComponent(forOrientation)}`);
     const data = await res.json();
     if (res.ok) setHistory(data);
   }
@@ -52,8 +52,8 @@ export default function PromptHelper() {
   }, []);
 
   useEffect(() => {
-    loadHistory(category);
-  }, [category]);
+    loadHistory(orientation);
+  }, [orientation]);
 
   function addTrend() {
     if (!newTrendTerm.trim()) return;
@@ -105,13 +105,13 @@ export default function PromptHelper() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           trend_id: selectedTrendId ? Number(selectedTrendId) : null,
-          category,
+          orientation,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Prompt generation failed');
       setGenerated(data.prompts);
-      await loadHistory(category);
+      await loadHistory(orientation);
     });
   }
 
@@ -123,14 +123,14 @@ export default function PromptHelper() {
         <h3 className="settings-section-title">Generate Prompts</h3>
         <div className="settings-field-row mb-3">
           <div className="settings-field flex-1">
-            <label className="settings-field-label" htmlFor="prompt-category-select">Category:</label>
+            <label className="settings-field-label" htmlFor="prompt-orientation-select">Orientation:</label>
             <select 
               className="input" 
-              id="prompt-category-select"
-              value={category} 
-              onChange={(e) => setCategory(e.target.value)}
+              id="prompt-orientation-select"
+              value={orientation} 
+              onChange={(e) => setOrientation(e.target.value)}
             >
-              {CATEGORIES.map((c) => (
+              {ORIENTATIONS.map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
@@ -218,7 +218,7 @@ export default function PromptHelper() {
 
       {history.length > 0 && (
         <div className="card settings-section-card">
-          <h3 className="settings-section-title">History: &quot;{category}&quot;</h3>
+          <h3 className="settings-section-title">History: &quot;{orientation}&quot;</h3>
           <ul className="prompt-history-list" style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {history.map((p) => (
               <li key={p.id} className="prompt-history-item flex-row items-center justify-between surface" style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
