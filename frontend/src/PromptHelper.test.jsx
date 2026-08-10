@@ -18,26 +18,26 @@ beforeEach(() => {
 });
 
 describe('PromptHelper', () => {
-  it('loads trends and category history on mount', async () => {
+  it('loads trends and orientation history on mount', async () => {
     mockInitialLoad({ trends: [TREND] });
     render(<PromptHelper />);
 
     expect(await screen.findByText('cottagecore (portrait)')).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith('/api/trends');
-    expect(fetch).toHaveBeenCalledWith('/api/prompts?category=portrait');
+    expect(fetch).toHaveBeenCalledWith('/api/prompts?orientation=portrait');
   });
 
-  it('re-fetches history when the category changes', async () => {
+  it('re-fetches history when the orientation changes', async () => {
     mockInitialLoad();
     const user = userEvent.setup();
     render(<PromptHelper />);
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
 
     fetch.mockResolvedValueOnce({ ok: true, json: async () => [] });
-    await user.selectOptions(screen.getByLabelText('Category:'), 'landscape');
+    await user.selectOptions(screen.getByLabelText('Orientation:'), 'landscape');
 
     await waitFor(() => {
-      expect(fetch).toHaveBeenLastCalledWith('/api/prompts?category=landscape');
+      expect(fetch).toHaveBeenLastCalledWith('/api/prompts?orientation=landscape');
     });
   });
 
