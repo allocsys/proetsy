@@ -35,8 +35,8 @@ _(none — see Done above)_
 - DB migration for `prompts`, `image_preferences`, `taste_centroids` tables (columns stay `category` until this happens)
 - `TasteFilter.jsx` freeform "Curation name" field — needs a product decision before renaming
 
-## ⚠️ Known risk after PR #64 merge
-Backend now expects `orientation` in the renamed modules while the frontend still sends `category`. **This is a live mismatch on `main` right now** — treat closing the frontend gap as high priority, not cleanup.
+## ⚠️ Known risk after PR #64 merge (resolved on this branch)
+Backend expected `orientation` in the renamed modules while the frontend still sent `category`, causing every prompt-generate call to 422 on `main`. Frontend now sends/reads `orientation` to match — fixed pending merge of `rename-category-orientation-continue`.
 
 ## Housekeeping
 - [ ] Once frontend + remaining backend tests are done, decide on and schedule the DB column migration.
@@ -46,3 +46,4 @@ Backend now expects `orientation` in the renamed modules while the frontend stil
 | Date | Session did | Result |
 |---|---|---|
 | 2026-08-10 | Merged PR #64 (backend core rename) | Commit `56e7fa6` on `main` |
+| 2026-08-10 | Closed remaining backend gap (scoring.js, prompt-routes, config-routes) + full frontend rename (PromptHelper, ShopConventions) | Commits through `826c11c` on `rename-category-orientation-continue`; ready for PR |
