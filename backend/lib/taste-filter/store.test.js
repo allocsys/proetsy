@@ -159,7 +159,7 @@ describe('tallyPromptTermsForLabel (Module 7 -> Module 4 prompt-feedback link, w
   it("bumps kept_count for each of a prompt's terms on a 'keep' label", () => {
     const db = getDb();
     const { lastInsertRowid: promptId } = db
-      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square', 'a lone fox in a snowy field --v 7 --ar 1:1')`)
+      .prepare(`INSERT INTO prompts (orientation, prompt_text) VALUES ('square', 'a lone fox in a snowy field --v 7 --ar 1:1')`)
       .run();
 
     tallyPromptTermsForLabel(promptId, 'keep');
@@ -174,7 +174,7 @@ describe('tallyPromptTermsForLabel (Module 7 -> Module 4 prompt-feedback link, w
   it("bumps discarded_count on a 'discard' label, accumulating across repeated calls", () => {
     const db = getDb();
     const { lastInsertRowid: promptId } = db
-      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square', 'a moody forest scene --ar 1:1')`)
+      .prepare(`INSERT INTO prompts (orientation, prompt_text) VALUES ('square', 'a moody forest scene --ar 1:1')`)
       .run();
 
     tallyPromptTermsForLabel(promptId, 'discard');
@@ -193,7 +193,7 @@ describe('tallyPromptTermsForLabel (Module 7 -> Module 4 prompt-feedback link, w
   it("the fed-back terms are exactly what Module 4's getStyleHints() query would surface", () => {
     const db = getDb();
     const { lastInsertRowid: promptId } = db
-      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square', 'a radiant sunrise over mountains --ar 1:1')`)
+      .prepare(`INSERT INTO prompts (orientation, prompt_text) VALUES ('square', 'a radiant sunrise over mountains --ar 1:1')`)
       .run();
 
     // Label it 'keep' five times so it clearly skews kept vs discarded (mirrors
@@ -214,7 +214,7 @@ describe('tallyPromptTermsForLabel (Module 7 -> Module 4 prompt-feedback link, w
   it('undoes the prior tally when the same image is relabeled to a different label on the same prompt', () => {
     const db = getDb();
     const { lastInsertRowid: promptId } = db
-      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square', 'a glowing lantern at dusk --ar 1:1')`)
+      .prepare(`INSERT INTO prompts (orientation, prompt_text) VALUES ('square', 'a glowing lantern at dusk --ar 1:1')`)
       .run();
 
     tallyPromptTermsForLabel(promptId, 'keep');
@@ -232,7 +232,7 @@ describe('tallyPromptTermsForLabel (Module 7 -> Module 4 prompt-feedback link, w
   it('is a pure no-op when the relabel is redundant (same promptId and label as before)', () => {
     const db = getDb();
     const { lastInsertRowid: promptId } = db
-      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square', 'a quiet harbor at dawn --ar 1:1')`)
+      .prepare(`INSERT INTO prompts (orientation, prompt_text) VALUES ('square', 'a quiet harbor at dawn --ar 1:1')`)
       .run();
 
     tallyPromptTermsForLabel(promptId, 'keep');
@@ -245,7 +245,7 @@ describe('tallyPromptTermsForLabel (Module 7 -> Module 4 prompt-feedback link, w
   it('never decrements a term below 0, even if the prior state predates this fix', () => {
     const db = getDb();
     const { lastInsertRowid: promptId } = db
-      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square', 'a solitary lighthouse --ar 1:1')`)
+      .prepare(`INSERT INTO prompts (orientation, prompt_text) VALUES ('square', 'a solitary lighthouse --ar 1:1')`)
       .run();
 
     // No prior tallyPromptTermsForLabel() call ever ran for this prompt's 'discard'
@@ -266,7 +266,7 @@ describe('getImagePreferenceState', () => {
   it("round-trips the image's current label and prompt_id after addImagePreference()", () => {
     const db = getDb();
     const { lastInsertRowid: promptId } = db
-      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square', 'a field of tulips --ar 1:1')`)
+      .prepare(`INSERT INTO prompts (orientation, prompt_text) VALUES ('square', 'a field of tulips --ar 1:1')`)
       .run();
     const embedding = new Float32Array([1, 2]);
 
@@ -280,7 +280,7 @@ describe('recomputePromptTerms (issue #59, part 2 -- full rebuild, self-heals dr
   it('rebuilds a term\'s counts to match the current image_preferences state, correcting stale/inflated counts', () => {
     const db = getDb();
     const { lastInsertRowid: promptId } = db
-      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square', 'a rusty anchor on the shore --ar 1:1')`)
+      .prepare(`INSERT INTO prompts (orientation, prompt_text) VALUES ('square', 'a rusty anchor on the shore --ar 1:1')`)
       .run();
 
     // Simulate pre-#58 drift directly: two increments to kept_count with no
@@ -309,7 +309,7 @@ describe('recomputePromptTerms (issue #59, part 2 -- full rebuild, self-heals dr
   it('reflects multiple images sharing a prompt, and ignores rows with no prompt_id', () => {
     const db = getDb();
     const { lastInsertRowid: promptId } = db
-      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square', 'a windswept dune at twilight --ar 1:1')`)
+      .prepare(`INSERT INTO prompts (orientation, prompt_text) VALUES ('square', 'a windswept dune at twilight --ar 1:1')`)
       .run();
 
     addImagePreference({ imagePath: '/tmp/dune1.png', embedding: new Float32Array([1, 0]), label: 'keep', promptId });
@@ -328,7 +328,7 @@ describe('recomputePromptTerms (issue #59, part 2 -- full rebuild, self-heals dr
   it('is idempotent -- running it twice in a row does not change the result', () => {
     const db = getDb();
     const { lastInsertRowid: promptId } = db
-      .prepare(`INSERT INTO prompts (category, prompt_text) VALUES ('square', 'a crumbling stone bridge --ar 1:1')`)
+      .prepare(`INSERT INTO prompts (orientation, prompt_text) VALUES ('square', 'a crumbling stone bridge --ar 1:1')`)
       .run();
     addImagePreference({ imagePath: '/tmp/bridge.png', embedding: new Float32Array([1, 0]), label: 'keep', promptId });
 
