@@ -69,14 +69,14 @@ describe('GET /api/trends', () => {
 });
 
 describe('POST /api/prompts/generate (ARCHITECTURE.md -> Module 4)', () => {
-  it('generates and persists a batch of ready-to-paste prompts for a category with no trend', async () => {
-    const res = await request(app).post('/api/prompts/generate').send({ category: 'portrait' });
+  it('generates and persists a batch of ready-to-paste prompts for an orientation with no trend', async () => {
+    const res = await request(app).post('/api/prompts/generate').send({ orientation: 'portrait' });
 
     expect(res.status).toBe(201);
     expect(res.body.prompts).toHaveLength(3);
     for (const p of res.body.prompts) {
       expect(p.trend_id).toBeNull();
-      expect(p.category).toBe('portrait');
+      expect(p.orientation).toBe('portrait');
       expect(p.prompt_text).toContain('--v 7');
     }
   });
@@ -85,27 +85,27 @@ describe('POST /api/prompts/generate (ARCHITECTURE.md -> Module 4)', () => {
     const trendRes = await request(app).post('/api/trends').send({ term: 'linked trend', category: 'square' });
     const trendId = trendRes.body.id;
 
-    const res = await request(app).post('/api/prompts/generate').send({ trend_id: trendId, category: 'square' });
+    const res = await request(app).post('/api/prompts/generate').send({ trend_id: trendId, orientation: 'square' });
 
     expect(res.status).toBe(201);
     expect(res.body.prompts.every((p) => p.trend_id === trendId)).toBe(true);
   });
 
-  it('422s with a clear error when category is missing', async () => {
+  it('422s with a clear error when orientation is missing', async () => {
     const res = await request(app).post('/api/prompts/generate').send({});
     expect(res.status).toBe(422);
-    expect(res.body.error).toMatch(/category is required/);
+    expect(res.body.error).toMatch(/orientation is required/);
   });
 
   it('422s for a trend_id that does not exist', async () => {
-    const res = await request(app).post('/api/prompts/generate').send({ trend_id: 999999, category: 'square' });
+    const res = await request(app).post('/api/prompts/generate').send({ trend_id: 999999, orientation: 'square' });
     expect(res.status).toBe(422);
     expect(res.body.error).toMatch(/not found/);
   });
 
-  it('a second generation call for the same category adds a new batch rather than replacing the first', async () => {
-    const first = await request(app).post('/api/prompts/generate').send({ category: 'landscape' });
-    const second = await request(app).post('/api/prompts/generate').send({ category: 'landscape' });
+  it('a second generation call for the same orientation adds a new batch rather than replacing the first', async () => {
+    const first = await request(app).post('/api/prompts/generate').send({ orientation: 'landscape' });
+    const second = await request(app).post('/api/prompts/generate').send({ orientation: 'landscape' });
 
     const firstIds = new Set(first.body.prompts.map((p) => p.id));
     const secondIds = new Set(second.body.prompts.map((p) => p.id));
@@ -116,12 +116,16 @@ describe('POST /api/prompts/generate (ARCHITECTURE.md -> Module 4)', () => {
 });
 
 describe('GET /api/prompts', () => {
-  it('returns generated prompts, filterable by category', async () => {
-    await request(app).post('/api/prompts/generate').send({ category: 'square' });
+  it('returns generated prompts, filterable by orientation', async () => {
+    await request(app).post('/api/prompts/generate').send({ orientation: 'square' });
 
-    const res = await request(app).get('/api/prompts').query({ category: 'square' });
+    const res = await request(app).get('/api/prompts').query({ orientation: 'square' });
     expect(res.status).toBe(200);
     expect(res.body.length).toBeGreaterThan(0);
+    // The `prompts.category` DB column still stores the orientation value pending a
+    // schema migration (see docs/known-issues/category-vs-orientation-naming.md) --
+    // only the JS-level param name changed, so raw rows from GET /api/prompts still
+    // come back keyed as `category`.
     expect(res.body.every((p) => p.category === 'square')).toBe(true);
   });
 });
