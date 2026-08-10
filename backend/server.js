@@ -1057,9 +1057,8 @@ app.post('/api/taste-filter/import', uploadCandidate.array('files', 100), async 
         // behavior, per Part 2's "Why" constraint.
         //
         // Captured before addImagePreference()'s upsert overwrites this image's row --
-        // same before/after-diff pattern the manual label route uses (see
-        // docs/fixes/prompt-terms-double-count.md), so an auto-decision landing on a
-        // path that was already labeled (e.g. a watched-folder re-import) still tallies
+        // same before/after-diff pattern the manual label route uses, so an auto-decision
+        // landing on a path that was already labeled (e.g. a watched-folder re-import) still tallies
         // correctly instead of double-counting. An auto-decision is itself a real
         // training signal, same as a manual click — it was previously never tallied at
         // all (issue #59, part 1).
@@ -1116,7 +1115,7 @@ app.post('/api/taste-filter/label', (req, res) => {
     // Captured before addImagePreference()'s upsert below overwrites this image's row --
     // the "before" half of tallyPromptTermsForLabel()'s before/after diff, so a relabel
     // (e.g. correcting an auto-sorted candidate) undoes its old term tally instead of
-    // only ever adding to it. See docs/fixes/prompt-terms-double-count.md.
+    // only ever adding to it.
     const previousState = getImagePreferenceState(image_path);
     const id = addImagePreference({
       imagePath: image_path,
@@ -1251,8 +1250,8 @@ app.post('/api/taste-filter/recompute', (req, res) => {
   // Also rebuilds prompt_terms from scratch off the current image_preferences table
   // (issue #59, part 2) -- unlike the incremental tally, this can't drift regardless of
   // relabeling history, so running it here self-heals any prompt_terms rows left
-  // inflated by relabeling that happened before docs/fixes/prompt-terms-double-count.md's
-  // fix shipped. Cheap to run unconditionally alongside the existing centroid recompute,
+  // inflated by relabeling that happened before the double-counting fix shipped. Cheap
+  // to run unconditionally alongside the existing centroid recompute,
   // same "manual trigger, no partial-state risk" contract this route already has.
   recomputePromptTerms();
   res.json({
