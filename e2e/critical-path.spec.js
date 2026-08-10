@@ -91,10 +91,18 @@ test.describe('critical path: upload → generate listing → review → copy-to
     const historyRow = page.locator('table.data-table tbody tr').first();
     await expect(historyRow).not.toContainText('failed');
 
-    // Exactly one artwork was uploaded, so App.jsx auto-selects it as the active job
-    // (handleFiles: "if (jobIds.length === 1) setActiveJobId(...)") — the review section
-    // should already be showing, no need to type a job id in manually.
-    await expect(page.getByRole('heading', { name: 'Listings' })).toBeVisible();
+    // Navigate back to the review workspace via the history row's own "Review" button —
+    // this calls App.jsx's openJob(), which sets activeJobId and switches activeView to
+    // 'review'. Clicking into "Listing History" above does NOT do this automatically, so
+    // without this click the review workspace never mounts at all.
+    await historyRow.getByRole('button', { name: 'Review' }).click();
+
+    // The review workspace defaults to the "Image Analysis" tab; the Listings panel
+    // (JobListingReview.jsx) is mounted but display:none until its tab is selected.
+    // Note: "Listings" is a workspace-tab-btn label, never an actual heading anywhere in
+    // the app, so asserting getByRole('heading', { name: 'Listings' }) here (as before)
+    // could never have matched even with the navigation fixed.
+    await page.getByRole('button', { name: 'Listings' }).click();
 
     // JobListingReview.jsx loads listings on demand via its own button.
     await page.getByRole('button', { name: 'Load listings' }).click();
