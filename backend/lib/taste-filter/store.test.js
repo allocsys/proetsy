@@ -57,10 +57,9 @@ describe('addImagePreference / listImagePreferences', () => {
   });
 
   it('updates the existing row when the same image_path is labeled again, rather than inserting a duplicate', () => {
-    // See docs/fixes/taste-filter-duplicate-labels.md: image_preferences holds the
-    // *current* judgment per image, not a full history (unlike `prompts`, which is
-    // append-only) -- a relabel must upsert, not accumulate rows that would double-count
-    // in recomputeCentroids().
+    // image_preferences holds the *current* judgment per image, not a full history
+    // (unlike `prompts`, which is append-only) -- a relabel must upsert, not accumulate
+    // rows that would double-count in recomputeCentroids().
     const before = listImagePreferences().length;
     const firstEmbedding = new Float32Array([1, 1]);
     const secondEmbedding = new Float32Array([2, 2]);
@@ -77,8 +76,7 @@ describe('addImagePreference / listImagePreferences', () => {
 
   it('clears auto_labeled back to 0 when a manual label corrects an earlier auto-labeled row for the same image', () => {
     // The schema.sql comment on the auto_labeled column has always promised this; this
-    // is the behavior that makes it true (previously nothing did -- see
-    // docs/fixes/taste-filter-duplicate-labels.md).
+    // is the behavior that makes it true (previously nothing did).
     const db = getDb();
     const embedding = new Float32Array([3, 3]);
 
@@ -208,9 +206,8 @@ describe('tallyPromptTermsForLabel (Module 7 -> Module 4 prompt-feedback link, w
     expect(top).toContain('sunrise');
   });
 
-  // docs/fixes/prompt-terms-double-count.md: a relabel must undo the prior tally, not
-  // just add the new one, or kept_count/discarded_count drift out of sync with the
-  // current set of labeled images.
+  // A relabel must undo the prior tally, not just add the new one, or
+  // kept_count/discarded_count drift out of sync with the current set of labeled images.
   it('undoes the prior tally when the same image is relabeled to a different label on the same prompt', () => {
     const db = getDb();
     const { lastInsertRowid: promptId } = db
