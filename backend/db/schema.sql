@@ -152,7 +152,7 @@ CREATE INDEX IF NOT EXISTS idx_image_preferences_orientation ON image_preference
 
 CREATE TABLE IF NOT EXISTS taste_centroids (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  category TEXT,
+  orientation TEXT,
   kept_centroid BLOB,
   discarded_centroid BLOB,
   -- How many labeled examples went into each side of this pair at the last recompute.
