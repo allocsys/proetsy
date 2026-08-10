@@ -281,10 +281,14 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
 
   async function handleRecompute() {
     setStatus('Recomputing centroids…');
-    const res = await fetch('/api/taste-filter/recompute', { method: 'POST' });
-    const data = await res.json();
-    const global = data.counts.global || { keptCount: 0, discardedCount: 0 };
-    setStatus(`Recomputed. Global: ${global.keptCount} kept / ${global.discardedCount} discarded.`);
+    try {
+      const res = await fetch('/api/taste-filter/recompute', { method: 'POST' });
+      const data = await parseJsonResponse(res);
+      const global = data.counts.global || { keptCount: 0, discardedCount: 0 };
+      setStatus(`Recomputed. Global: ${global.keptCount} kept / ${global.discardedCount} discarded.`);
+    } catch (err) {
+      setStatus(`Recompute failed: ${friendlyErrorMessage(err)}`);
+    }
   }
 
   const mainCandidates = candidates.filter((c) => c.autoDecision == null);
