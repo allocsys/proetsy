@@ -266,8 +266,7 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image_path: candidate.imagePath }),
       });
-      const promoteData = await promoteRes.json();
-      if (!promoteRes.ok) throw new Error(promoteData.error || 'Promote failed');
+      const promoteData = await parseJsonResponse(promoteRes);
 
       await fetch('/api/jobs', {
         method: 'POST',
@@ -276,7 +275,7 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
       });
       if (refreshJobs) refreshJobs();
     } catch (err) {
-      setStatus(`Kept, but failed to send to pipeline: ${err.message}`);
+      setStatus(`Kept, but failed to send to pipeline: ${friendlyErrorMessage(err)}`);
     }
   }
 
