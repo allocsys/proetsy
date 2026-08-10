@@ -80,6 +80,14 @@ test.describe('critical path: upload → generate listing → review → copy-to
     // Module 1 or the optional Module 3 (no real mockup templates exist in this test
     // environment, so it's expected to fail) had any trouble, the job's overall_status
     // should never be 'failed' for this run.
+    //
+    // The Listing History table only mounts once the sidebar's "Listing History" nav
+    // item switches App.jsx's activeView to 'history' -- it isn't in the DOM before
+    // that, so this has to navigate there rather than just waiting on the locator.
+    // Scoped to .sidebar-nav-item: the same label also appears in .mobile-nav-strip
+    // (both render at once in this test's default viewport), so the bare text/role
+    // selector would match twice.
+    await page.locator('.sidebar-nav-item', { hasText: 'Listing History' }).click();
     const historyRow = page.locator('table.data-table tbody tr').first();
     await expect(historyRow).not.toContainText('failed');
 
