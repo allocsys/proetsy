@@ -50,7 +50,7 @@ function getStyleHints(db, limit = 5) {
 // fully isolated — it's not part of the main listing pipeline, so a failure there never
 // touches jobs in progress." Unlike Modules 1–3, this is NOT job-scoped at all — no
 // job_modules row, no jobId parameter. A generation run is keyed only by an optional
-// trend + a target category.
+// trend + a target orientation.
 //
 // Each call INSERTS new `prompts` rows rather than upserting one row per (trend,
 // orientation) the way listings/mockups upsert per (job, variation/size) — the point
@@ -76,11 +76,11 @@ export async function generatePromptsForTrend({ trendId = null, orientation }) {
 
   const styleHints = getStyleHints(db);
 
-  const prompt = buildPromptHelperPrompt({ trend, category, styleHints });
+  const prompt = buildPromptHelperPrompt({ trend, category: orientation, styleHints });
   const { text: rawResponse } = await generateText(prompt, { json: true });
   const rawPrompts = parseModelJson(rawResponse);
 
-  const cleaned = rawPrompts.map((p) => enforceMidjourneyConventions(p, category));
+  const cleaned = rawPrompts.map((p) => enforceMidjourneyConventions(p, orientation));
 
   const insert = db.prepare(
     `INSERT INTO prompts (trend_id, category, prompt_text, created_at) VALUES (?, ?, ?, datetime('now'))`
@@ -88,7 +88,7 @@ export async function generatePromptsForTrend({ trendId = null, orientation }) {
   const insertAll = db.transaction((items) => {
     const ids = [];
     for (const item of items) {
-      const { lastInsertRowid } = insert.run(trendId || null, category, item.text);
+      const { lastInsertRowid } = insert.run(trendId || null, orientation, item.text);
       ids.push(lastInsertRowid);
     }
     return ids;
@@ -98,7 +98,7 @@ export async function generatePromptsForTrend({ trendId = null, orientation }) {
   return cleaned.map((c, i) => ({
     id: ids[i],
     trend_id: trendId || null,
-    category,
+    orientation,
     prompt_text: c.text,
     warnings: c.warnings,
   }));
