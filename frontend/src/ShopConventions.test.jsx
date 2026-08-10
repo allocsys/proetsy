@@ -20,7 +20,7 @@ const CONVENTIONS = {
     stylizeMin: 50,
     stylizeMax: 150,
     defaultStylize: 100,
-    aspectRatioByCategory: { botanical: '3:4' },
+    aspectRatioByOrientation: { portrait: '3:4' },
   },
 };
 
