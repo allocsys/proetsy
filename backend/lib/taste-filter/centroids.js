@@ -26,8 +26,8 @@ export function computeCentroid(vectors) {
 
 /**
  * Splits a set of labeled examples into kept/discarded centroids in one pass. This is the
- * core of both the global centroid pair (all examples) and each per-orientation pair (pre-
- * filtered to one orientation by the caller) — the split-by-label logic doesn't care which.
+ * core of both the global centroid pair (all examples) and each per-category pair (pre-
+ * filtered to one category by the caller) — the split-by-label logic doesn't care which.
  * @param {Array<{ embedding: Float32Array | number[], label: 'keep' | 'discard' }>} examples
  * @returns {{ kept: Float32Array | null, discarded: Float32Array | null, keptCount: number, discardedCount: number }}
  */
@@ -51,28 +51,28 @@ export function computeCentroidPair(examples) {
 }
 
 /**
- * Groups labeled examples by orientation and computes a centroid pair for each group, plus
- * one global pair across everything regardless of orientation. Matches ARCHITECTURE.md ->
+ * Groups labeled examples by category and computes a centroid pair for each group, plus
+ * one global pair across everything regardless of category. Matches ARCHITECTURE.md ->
  * Module 7's "Two sets of centroids are maintained" design — this is the pure aggregation
  * step; persisting the result to the `taste_centroids` table is recomputeCentroids() in
  * store.js.
- * @param {Array<{ embedding: Float32Array | number[], label: 'keep' | 'discard', orientation: string | null }>} examples
+ * @param {Array<{ embedding: Float32Array | number[], label: 'keep' | 'discard', category: string | null }>} examples
  * @returns {Map<string | null, { kept: Float32Array | null, discarded: Float32Array | null, keptCount: number, discardedCount: number }>}
- *   keyed by orientation, with `null` holding the global (all-orientations) pair
+ *   keyed by category, with `null` holding the global (all-categories) pair
  */
 export function computeAllCentroidPairs(examples) {
-  const byOrientation = new Map();
+  const byCategory = new Map();
   for (const example of examples) {
-    const key = example.orientation ?? null;
-    if (!byOrientation.has(key)) byOrientation.set(key, []);
-    byOrientation.get(key).push(example);
+    const key = example.category ?? null;
+    if (!byCategory.has(key)) byCategory.set(key, []);
+    byCategory.get(key).push(example);
   }
 
   const result = new Map();
-  result.set(null, computeCentroidPair(examples)); // global — every example, orientation ignored
-  for (const [orientation, orientationExamples] of byOrientation) {
-    if (orientation === null) continue; // already covered by the global pair above
-    result.set(orientation, computeCentroidPair(orientationExamples));
+  result.set(null, computeCentroidPair(examples)); // global — every example, category ignored
+  for (const [category, categoryExamples] of byCategory) {
+    if (category === null) continue; // already covered by the global pair above
+    result.set(category, computeCentroidPair(categoryExamples));
   }
   return result;
 }
