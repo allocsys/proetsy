@@ -99,12 +99,12 @@ This is the single source of truth for both Module 2 (which sizes are sellable/m
 ### Module 4 — Trend/Prompt Helper (optional, manual-trend version)
 **What changed from the original plan:** no live Etsy trend-pulling API call — trends come from the **trends provider layer** (see below), backed by a manually maintained/dashboard-entered list.
 
-**Input:** selected trend + desired category
-**Output:** ready-to-paste Midjourney prompts using shop conventions (`--v 7`, `--style raw`, aspect ratio per category, `--s 50–150`)
+**Input:** selected trend + desired orientation
+**Output:** ready-to-paste Midjourney prompts using shop conventions (`--v 7`, `--style raw`, aspect ratio per orientation, `--s 50–150`)
 **Tech:** Gemini API via the LLM provider layer, no Etsy API dependency. This module only *writes* Midjourney-formatted prompt text — it never calls a Midjourney API.
-**Deliberately not job-scoped** — isolated from the main pipeline (see Partial Failure Handling): a generation run is keyed only by an optional `trend_id` + target `category`. Each call inserts a new batch of `prompts` rows (a browsable history), unlike listings/mockups' one-row-per-key upsert.
+**Deliberately not job-scoped** — isolated from the main pipeline (see Partial Failure Handling): a generation run is keyed only by an optional `trend_id` + target `orientation`. Each call inserts a new batch of `prompts` rows (a browsable history), unlike listings/mockups' one-row-per-key upsert.
 **Optional style hints:** pulls up to 5 terms from Module 7's `prompt_terms` where kept-count beats discarded-count, included as a non-overriding style hint — naturally a no-op until Module 7 has labeled data.
-**Dashboard:** `frontend/src/PromptHelper.jsx` (not job-scoped) — category selector, trend picker + inline add-a-trend form, Generate, copy-to-clipboard, category-filtered history.
+**Dashboard:** `frontend/src/PromptHelper.jsx` (not job-scoped) — orientation selector, trend picker + inline add-a-trend form, Generate, copy-to-clipboard, orientation-filtered history.
 
 ### Module 5 — Etsy Uploader
 **Removed.** Etsy publishing is manual — the user copies the approved listing text and mockups into Etsy themselves. No Etsy API v3 integration, no OAuth, no bulk-publish. This removes the biggest external-account risk from the whole build (developer approval, bulk-publish bugs, API changes).
