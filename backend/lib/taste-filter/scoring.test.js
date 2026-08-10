@@ -142,24 +142,24 @@ describe('autoDecision', () => {
 });
 
 describe('scoreCandidate', () => {
-  it('always returns a global score, and a category score only when a category pair is given', () => {
+  it('always returns a global score, and an orientation score only when an orientation pair is given', () => {
     const global = { kept: [1, 0], discarded: [0, 1], keptCount: 40, discardedCount: 40 };
-    const result = scoreCandidate([1, 0], { global, category: null });
+    const result = scoreCandidate([1, 0], { global, orientation: null });
 
     expect(result.globalScore).not.toBeNull();
     expect(result.globalLabel).toBe('likely-keep');
     expect(result.globalConfident).toBe(true);
-    expect(result.categoryScore).toBeNull();
-    expect(result.categoryLabel).toBeNull();
-    expect(result.categoryConfident).toBeNull();
+    expect(result.orientationScore).toBeNull();
+    expect(result.orientationLabel).toBeNull();
+    expect(result.orientationConfident).toBeNull();
   });
 
-  it('flags low confidence for a category with too few labeled examples (cold start)', () => {
+  it('flags low confidence for an orientation with too few labeled examples (cold start)', () => {
     const global = { kept: [1, 0], discarded: [0, 1], keptCount: 40, discardedCount: 40 };
-    const category = { kept: [1, 0], discarded: null, keptCount: 2, discardedCount: 0 };
-    const result = scoreCandidate([1, 0], { global, category });
+    const orientation = { kept: [1, 0], discarded: null, keptCount: 2, discardedCount: 0 };
+    const result = scoreCandidate([1, 0], { global, orientation });
 
-    expect(result.categoryScore).not.toBeNull();
-    expect(result.categoryConfident).toBe(false);
+    expect(result.orientationScore).not.toBeNull();
+    expect(result.orientationConfident).toBe(false);
   });
 });
