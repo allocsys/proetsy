@@ -47,7 +47,7 @@ Not yet deployed anywhere, so no migration script needed — just edit the schem
 Backend expected `orientation` in the renamed modules while the frontend still sent `category`, causing every prompt-generate call to 422 on `main`. Frontend now sends/reads `orientation` to match — fixed pending merge of `rename-category-orientation-continue`.
 
 ## Housekeeping
-- [ ] Once frontend + remaining backend tests are done, decide on and schedule the DB column migration.
+- [ ] Do the DB column rename per "Next up" above (frontend + remaining backend tests are done, so this is unblocked).
 
 ---
 ### Session log
