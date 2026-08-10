@@ -55,7 +55,7 @@ describe('SHOP_CONVENTIONS', () => {
 });
 
 describe('MIDJOURNEY_CONVENTIONS', () => {
-  it('matches ARCHITECTURE.md -> Module 4 -> "--v 7, --style raw, aspect ratio per category, --s 50–150"', () => {
+  it('matches ARCHITECTURE.md -> Module 4 -> "--v 7, --style raw, aspect ratio per orientation, --s 50–150"', () => {
     expect(MIDJOURNEY_CONVENTIONS.version).toBe('--v 7');
     expect(MIDJOURNEY_CONVENTIONS.style).toBe('--style raw');
     expect(MIDJOURNEY_CONVENTIONS.stylizeMin).toBe(50);
