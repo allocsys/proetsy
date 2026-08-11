@@ -193,10 +193,15 @@ jobs:
         with:
           # latest.yml is the update-feed manifest electron-updater's GitHub provider
           # polls to detect new versions -- it must be attached alongside the
-          # installer or auto-update silently never finds anything newer.
+          # installer or auto-update silently never finds anything newer. *.blockmap is
+          # what lets it attempt a differential (delta) download instead of re-fetching
+          # the full ~250MB installer on every update -- electron-builder generates one
+          # automatically per NSIS build, it just needs to be published alongside the
+          # other two files for electron-updater to find and use it.
           files: |
             release-builds/*.exe
             release-builds/latest.yml
+            release-builds/*.blockmap
           generate_release_notes: true
           body: |
             Windows installer for ${{ github.ref_name }}. Run the installer, then launch
