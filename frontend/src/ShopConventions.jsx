@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
+import { useToast } from './components/Toast.jsx';
 
 function ShopConventions() {
+  const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
 
   const [titleSeparator, setTitleSeparator] = useState('|');
   const [maxTitleLength, setMaxTitleLength] = useState(140);
@@ -77,7 +78,6 @@ function ShopConventions() {
   async function handleSave() {
     setSaving(true);
     setErrorMessage('');
-    setSuccessMessage('');
 
     const listingPayload = {
       titleSeparator,
@@ -118,7 +118,7 @@ function ShopConventions() {
       if (!res.ok) {
         throw new Error(result.error || 'Failed to save shop conventions');
       }
-      setSuccessMessage('Shop conventions saved successfully.');
+      showToast('Shop conventions saved successfully.', 'success');
     } catch (err) {
       setErrorMessage(err.message);
     }
@@ -137,13 +137,6 @@ function ShopConventions() {
         <div className="backend-banner" role="alert" style={{ marginBottom: '1rem', background: 'rgba(239, 68, 68, 0.1)', borderColor: 'var(--state-danger)' }}>
           <span className="text-danger">Error: {errorMessage}</span>
           <button className="btn-secondary btn-sm" onClick={() => setErrorMessage('')}>Dismiss</button>
-        </div>
-      )}
-
-      {successMessage && (
-        <div className="backend-banner" role="alert" style={{ marginBottom: '1rem', background: 'rgba(34, 197, 94, 0.1)', borderColor: 'var(--state-success)' }}>
-          <span className="text-success">{successMessage}</span>
-          <button className="btn-secondary btn-sm" onClick={() => setSuccessMessage('')}>Dismiss</button>
         </div>
       )}
 
