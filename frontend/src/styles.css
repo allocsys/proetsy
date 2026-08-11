@@ -61,6 +61,61 @@
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.6);
   --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.7);
+
+  --studio-sidebar-bg: #0f1013;
+  --scrollbar-thumb: #2a2e38;
+  --scrollbar-thumb-hover: #3e4452;
+  --code-bg: rgba(0, 0, 0, 0.4);
+  --code-ink: #ffd8b5;
+  --overlay-weak: rgba(255, 255, 255, 0.02);
+  --overlay-soft: rgba(255, 255, 255, 0.03);
+  --overlay-mid: rgba(255, 255, 255, 0.04);
+  --overlay-strong: rgba(255, 255, 255, 0.06);
+  --overlay-border: rgba(255, 255, 255, 0.15);
+  --overlay-sunken: rgba(0, 0, 0, 0.25);
+}
+
+/* plan.md Step 6: light theme -- overrides the same custom-property names so no
+   component or other CSS rule needs to change; toggled via a data-theme="light"
+   attribute on <html>, set from the theme-toggle button in App.jsx and persisted
+   to localStorage (see index.html for the pre-paint flash-avoidance script). */
+[data-theme='light'] {
+  --studio-canvas: #f4f5f7;
+  --studio-surface: #ffffff;
+  --studio-raised: #eef0f3;
+  --studio-sunken: #e8eaed;
+  --studio-overlay: #dde1e6;
+
+  --studio-accent: #d97f1e;
+  --studio-accent-hover: #c96f13;
+  --studio-accent-dim: rgba(217, 127, 30, 0.1);
+  --studio-accent-border: rgba(217, 127, 30, 0.35);
+
+  --studio-ink: #1b1d21;
+  --studio-ink-soft: #5c6270;
+  --studio-ink-dim: #8e95a2;
+
+  --studio-hairline: rgba(0, 0, 0, 0.1);
+  --studio-hairline-subtle: rgba(0, 0, 0, 0.05);
+
+  --studio-sidebar-bg: #edeff2;
+
+  --scrollbar-thumb: #c7cbd1;
+  --scrollbar-thumb-hover: #aab0b9;
+
+  --code-bg: rgba(0, 0, 0, 0.05);
+  --code-ink: #9a4b0a;
+
+  --overlay-weak: rgba(0, 0, 0, 0.02);
+  --overlay-soft: rgba(0, 0, 0, 0.03);
+  --overlay-mid: rgba(0, 0, 0, 0.05);
+  --overlay-strong: rgba(0, 0, 0, 0.08);
+  --overlay-border: rgba(0, 0, 0, 0.15);
+  --overlay-sunken: rgba(0, 0, 0, 0.04);
+
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.1);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.14);
 }
 
 *, *::before, *::after {
@@ -96,11 +151,11 @@ body {
   background: var(--studio-canvas);
 }
 ::-webkit-scrollbar-thumb {
-  background: #2a2e38;
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3e4452;
+  background: var(--scrollbar-thumb-hover);
 }
 
 .toast-stack {
@@ -191,7 +246,7 @@ body {
 }
 
 .sidebar-shell {
-  background: #0f1013;
+  background: var(--studio-sidebar-bg);
   border-right: var(--border-light);
 }
 
@@ -227,11 +282,11 @@ h3 { font-size: 11.5px; margin-bottom: var(--space-3); text-transform: uppercase
 code, pre, .mono {
   font-family: var(--font-mono);
   font-size: 12px;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--code-bg);
   border: var(--border-subtle);
   padding: 0.15em 0.45em;
   border-radius: var(--radius-sm);
-  color: #ffd8b5;
+  color: var(--code-ink);
 }
 
 a:focus-visible,
@@ -325,7 +380,7 @@ textarea:focus-visible {
 .sidebar {
   width: 220px;
   flex-shrink: 0;
-  background-color: #0f1013;
+  background-color: var(--studio-sidebar-bg);
   border-right: var(--border-light);
   padding: var(--space-4) var(--space-3);
   display: flex;
@@ -363,7 +418,7 @@ textarea:focus-visible {
 .sidebar-toggle-btn:hover {
   color: var(--studio-ink);
   background-color: var(--studio-overlay);
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: var(--overlay-border);
 }
 
 .sidebar-toggle-btn:active {
@@ -443,7 +498,7 @@ textarea:focus-visible {
 
 .sidebar-nav-item:hover {
   color: var(--studio-ink);
-  background-color: rgba(255, 255, 255, 0.04);
+  background-color: var(--overlay-mid);
 }
 
 .sidebar-nav-item.active {
@@ -621,7 +676,7 @@ textarea:focus-visible {
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--overlay-weak);
   border: var(--border-light);
   color: var(--studio-ink-soft);
   border-radius: var(--radius-sm);
@@ -759,7 +814,7 @@ textarea:focus-visible {
   padding: var(--space-1) var(--space-2);
 }
 .btn-ghost:hover:not(:disabled) {
-  background-color: rgba(255, 255, 255, 0.04);
+  background-color: var(--overlay-mid);
   color: var(--studio-ink);
 }
 
@@ -785,7 +840,7 @@ button {
 }
 button:hover:not(:disabled) {
   background-color: var(--studio-overlay);
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: var(--overlay-border);
 }
 button:active {
 }
@@ -805,11 +860,11 @@ button:active {
 button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .btn-secondary {
-  background-color: rgba(255, 255, 255, 0.02);
+  background-color: var(--overlay-weak);
   border: var(--border-light);
   color: var(--studio-ink);
 }
-.btn-secondary:hover:not(:disabled) { background-color: rgba(255, 255, 255, 0.06); }
+.btn-secondary:hover:not(:disabled) { background-color: var(--overlay-strong); }
 
 .btn-sm { padding: 0.35rem var(--space-3); font-size: 11px; }
 .btn-xs { padding: 0.3rem 0.55rem; font-size: 10px; min-height: 24px; min-width: 24px; }
@@ -1015,7 +1070,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .dropzone {
-  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border: 1px dashed var(--overlay-border);
   background-color: var(--studio-raised);
   border-radius: var(--radius-md);
   padding: var(--space-6) var(--space-4);
@@ -1119,7 +1174,7 @@ input:focus, select:focus, textarea:focus {
 .prompt-csv-container { margin-bottom: var(--space-4); }
 .prompt-csv-label { font-size: 12.5px; color: var(--studio-ink-soft); }
 .prompt-csv-message { margin-left: var(--space-3); font-size: 12.5px; color: var(--studio-ink-soft); }
-.prompt-item-card { margin-bottom: var(--space-3); padding: var(--space-2); background: rgba(0, 0, 0, 0.25); border-radius: var(--radius-sm); }
+.prompt-item-card { margin-bottom: var(--space-3); padding: var(--space-2); background: var(--overlay-sunken); border-radius: var(--radius-sm); }
 .prompt-code-block { font-size: 12px; display: block; margin-bottom: var(--space-2); }
 .prompt-warnings-list { color: var(--state-pending); font-size: 11px; margin-top: var(--space-2); padding-left: 1.25rem; }
 .prompt-history-list { font-size: 12.5px; color: var(--studio-ink-soft); padding-left: 1.25rem; }
@@ -1361,7 +1416,7 @@ input:focus, select:focus, textarea:focus {
   aspect-ratio: 1;
   border-radius: var(--radius-sm);
   background: var(--studio-sunken);
-  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border: 1px dashed var(--overlay-border);
   margin-bottom: var(--space-2);
 }
 
@@ -1407,7 +1462,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .workspace-tab-btn:hover {
-  background-color: rgba(255, 255, 255, 0.03);
+  background-color: var(--overlay-soft);
   color: var(--studio-ink);
 }
 
@@ -1541,11 +1596,29 @@ input:focus, select:focus, textarea:focus {
 .modal-btn-danger {
   background-color: var(--state-danger);
   color: #fff;
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: var(--overlay-border);
 }
 
 .modal-btn-danger:hover:not(:disabled) {
   filter: brightness(1.1);
+}
+
+/* plan.md Step 6: keyboard shortcuts help modal list */
+.shortcuts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: 13px;
+  color: var(--studio-ink);
+}
+
+.shortcuts-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 /* plan.md step 2: loading skeletons + real empty states */
