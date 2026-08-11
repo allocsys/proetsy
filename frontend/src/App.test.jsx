@@ -796,7 +796,12 @@ describe('App', () => {
 
     expect(jobIdField).toHaveValue('gh');
     // Still on the Review view -- "gh" typed into the field didn't navigate to History.
-    expect(screen.queryByText(/No jobs yet — drop some artwork/)).not.toBeInTheDocument();
+    // (Not checking for the absence of the "No jobs yet" empty-state text here: Review's
+    // own no-active-job fallback uses that exact same copy as History's empty state, so
+    // with the empty jobs list this mock uses, that text is present on Review regardless
+    // of navigation and can't distinguish the two views. The h2 heading can.)
+    expect(screen.getByRole('heading', { name: 'Job Workspace', level: 2 })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Listing History', level: 2 })).not.toBeInTheDocument();
   });
 
   it('toggles the light/dark theme, applies it to <html>, and persists the choice (plan.md Step 6)', async () => {
