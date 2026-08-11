@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import StatusPill from './components/StatusPill.jsx';
+import { useToast } from './components/Toast.jsx';
 
 const LABEL_CLASS = {
   'likely-keep': 'success',
@@ -108,6 +109,7 @@ function ModelDownloadBar({ modelStatus }) {
 }
 
 function TasteFilter({ overrides, refreshJobs } = {}) {
+  const { showToast } = useToast();
   const [category, setCategory] = useState('');
   const [promptId, setPromptId] = useState('');
   const [categoryOptions, setCategoryOptions] = useState([]);
@@ -198,14 +200,16 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
       const data = await parseJsonResponse(res);
       data.candidates.forEach((c) => seenPathsRef.current.add(c.imagePath));
       setCandidates((prev) => [...data.candidates, ...prev]);
-      setStatus(`Scored ${data.candidates.length} image${data.candidates.length > 1 ? 's' : ''}.`);
+      showToast(`Scored ${data.candidates.length} image${data.candidates.length > 1 ? 's' : ''}.`, 'success');
       // Makes a just-used new category immediately selectable for the next batch in this
       // same session, without waiting for a fresh /api/taste-filter/centroids fetch.
       if (category && !categoryOptions.includes(category)) {
         setCategoryOptions((prev) => [...prev, category].sort());
       }
     } catch (err) {
-      setStatus(`Import failed: ${friendlyErrorMessage(err)}`);
+      showToast(`Import failed: ${friendlyErrorMessage(err)}`, 'error');
+    } finally {
+      setStatus('');
     }
   }
 
@@ -250,7 +254,7 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
       });
       setCandidates((prev) => prev.filter((c) => c.imagePath !== candidate.imagePath));
     } catch {
-      setStatus('Failed to save label — try again.');
+      showToast('Failed to save label — try again.', 'error');
     }
   }
 
@@ -271,7 +275,7 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
       });
       if (refreshJobs) refreshJobs();
     } catch (err) {
-      setStatus(`Kept, but failed to send to pipeline: ${friendlyErrorMessage(err)}`);
+      showToast(`Kept, but failed to send to pipeline: ${friendlyErrorMessage(err)}`, 'error');
     }
   }
 
@@ -281,9 +285,11 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
       const res = await fetch('/api/taste-filter/recompute', { method: 'POST' });
       const data = await parseJsonResponse(res);
       const global = data.counts.global || { keptCount: 0, discardedCount: 0 };
-      setStatus(`Recomputed. Global: ${global.keptCount} kept / ${global.discardedCount} discarded.`);
+      showToast(`Recomputed. Global: ${global.keptCount} kept / ${global.discardedCount} discarded.`, 'success');
     } catch (err) {
-      setStatus(`Recompute failed: ${friendlyErrorMessage(err)}`);
+      showToast(`Recompute failed: ${friendlyErrorMessage(err)}`, 'error');
+    } finally {
+      setStatus('');
     }
   }
 
