@@ -1,16 +1,15 @@
 import { useCallback, useMemo, useState } from 'react';
+import { useToast } from '../components/Toast.jsx';
 
 // plan.md Step 4: tag library + trend list state, both driven by the same
 // Settings > Tags & Trends tab, extracted together since they share the
 // refreshSetupStatus/requestConfirm dependencies and a lot of the same shape.
 export function useTagsAndTrends(reportFetchError, requestConfirm, refreshSetupStatus) {
+  const { showToast } = useToast();
+
   const [tags, setTags] = useState([]);
   const [tagsText, setTagsText] = useState('');
   const [tagsCategory, setTagsCategory] = useState('');
-  const [tagsSavedMessage, setTagsSavedMessage] = useState(null);
-  const [tagsCsvMessage, setTagsCsvMessage] = useState(null);
-  const [tagsDeleteMessage, setTagsDeleteMessage] = useState(null);
-  const [tagsBackfillMessage, setTagsBackfillMessage] = useState(null);
   const [tagsBackfillRunning, setTagsBackfillRunning] = useState(false);
   const [tagsBackfillPreview, setTagsBackfillPreview] = useState(null);
   const [tagsBackfillPreviewLoading, setTagsBackfillPreviewLoading] = useState(false);
@@ -19,7 +18,6 @@ export function useTagsAndTrends(reportFetchError, requestConfirm, refreshSetupS
   const [trends, setTrends] = useState([]);
   const [newTrendTerm, setNewTrendTerm] = useState('');
   const [newTrendCategory, setNewTrendCategory] = useState('');
-  const [trendsDeleteMessage, setTrendsDeleteMessage] = useState(null);
   const [trendsLoading, setTrendsLoading] = useState(true);
 
   const refreshTags = useCallback(() => {
@@ -53,10 +51,10 @@ export function useTagsAndTrends(reportFetchError, requestConfirm, refreshSetupS
       body: JSON.stringify({ tags: tagsText, category: tagsCategory.trim() || null }),
     });
     const data = await res.json();
-    setTagsSavedMessage({
-      text: res.ok ? `Saved. ${data.inserted} new tag(s), ${data.total} total.` : (data.error || 'Failed to save tags'),
-      ok: res.ok,
-    });
+    showToast(
+      res.ok ? `Saved. ${data.inserted} new tag(s), ${data.total} total.` : (data.error || 'Failed to save tags'),
+      res.ok ? 'success' : 'error'
+    );
     if (res.ok) {
       setTagsText('');
     }
@@ -74,10 +72,10 @@ export function useTagsAndTrends(reportFetchError, requestConfirm, refreshSetupS
         } catch {
           // no JSON body -- keep the generic message
         }
-        setTagsDeleteMessage({ text: message, ok: false });
+        showToast(message, 'error');
         return;
       }
-      setTagsDeleteMessage(null);
+      showToast(`Deleted tag "${tagText}".`, 'success');
       refreshTags();
     });
   }
@@ -92,17 +90,16 @@ export function useTagsAndTrends(reportFetchError, requestConfirm, refreshSetupS
         } catch {
           // no JSON body -- keep the generic message
         }
-        setTrendsDeleteMessage({ text: message, ok: false });
+        showToast(message, 'error');
         return;
       }
-      setTrendsDeleteMessage(null);
+      showToast(`Deleted trend "${term}".`, 'success');
       refreshTrends();
     });
   }
 
   async function importTagsCsv(file) {
     if (!file) return;
-    setTagsCsvMessage({ text: `Importing ${file.name}…`, ok: true });
     try {
       const csv = await file.text();
       const res = await fetch('/api/tags/csv', {
@@ -111,12 +108,12 @@ export function useTagsAndTrends(reportFetchError, requestConfirm, refreshSetupS
         body: JSON.stringify({ csv }),
       });
       const data = await res.json();
-      setTagsCsvMessage({
-        text: res.ok ? `Imported ${data.inserted} new tag(s) from ${file.name}.` : (data.error || 'Import failed'),
-        ok: res.ok,
-      });
+      showToast(
+        res.ok ? `Imported ${data.inserted} new tag(s) from ${file.name}.` : (data.error || 'Import failed'),
+        res.ok ? 'success' : 'error'
+      );
     } catch (err) {
-      setTagsCsvMessage({ text: `Import failed: ${err.message}`, ok: false });
+      showToast(`Import failed: ${err.message}`, 'error');
     }
     refreshSetupStatus();
     refreshTags();
@@ -126,7 +123,6 @@ export function useTagsAndTrends(reportFetchError, requestConfirm, refreshSetupS
   // so the user can see exactly what would change before committing to it.
   async function previewBackfillTagCategories() {
     setTagsBackfillPreviewLoading(true);
-    setTagsBackfillMessage(null);
     try {
       const res = await fetch('/api/tags/backfill-categories?dry_run=true', { method: 'POST' });
       let data;
@@ -138,7 +134,7 @@ export function useTagsAndTrends(reportFetchError, requestConfirm, refreshSetupS
       if (!res.ok) throw new Error(data.error || 'Preview failed');
       setTagsBackfillPreview({ checked: data.checked, updates: data.updates });
     } catch (err) {
-      setTagsBackfillMessage({ text: `Preview failed: ${err.message}`, ok: false });
+      showToast(`Preview failed: ${err.message}`, 'error');
     }
     setTagsBackfillPreviewLoading(false);
   }
@@ -147,7 +143,6 @@ export function useTagsAndTrends(reportFetchError, requestConfirm, refreshSetupS
   // matches that were just shown (the matching logic is deterministic).
   async function applyBackfillTagCategories() {
     setTagsBackfillRunning(true);
-    setTagsBackfillMessage({ text: 'Applying…', ok: true });
     try {
       const res = await fetch('/api/tags/backfill-categories', { method: 'POST' });
       let data;
@@ -156,12 +151,12 @@ export function useTagsAndTrends(reportFetchError, requestConfirm, refreshSetupS
       } catch {
         throw new Error(`No response from backend (status ${res.status}). Is the backend server running?`);
       }
-      setTagsBackfillMessage({
-        text: res.ok ? `Backfilled ${data.updated} of ${data.checked} uncategorized tag(s).` : (data.error || 'Backfill failed'),
-        ok: res.ok,
-      });
+      showToast(
+        res.ok ? `Backfilled ${data.updated} of ${data.checked} uncategorized tag(s).` : (data.error || 'Backfill failed'),
+        res.ok ? 'success' : 'error'
+      );
     } catch (err) {
-      setTagsBackfillMessage({ text: `Backfill failed: ${err.message}`, ok: false });
+      showToast(`Backfill failed: ${err.message}`, 'error');
     }
     setTagsBackfillRunning(false);
     setTagsBackfillPreview(null);
@@ -186,10 +181,6 @@ export function useTagsAndTrends(reportFetchError, requestConfirm, refreshSetupS
     setTagsText,
     tagsCategory,
     setTagsCategory,
-    tagsSavedMessage,
-    tagsCsvMessage,
-    tagsDeleteMessage,
-    tagsBackfillMessage,
     tagsBackfillRunning,
     tagsBackfillPreview,
     setTagsBackfillPreview,
@@ -207,7 +198,6 @@ export function useTagsAndTrends(reportFetchError, requestConfirm, refreshSetupS
     setNewTrendTerm,
     newTrendCategory,
     setNewTrendCategory,
-    trendsDeleteMessage,
     trendsLoading,
     refreshTrends,
     trendCategories,
