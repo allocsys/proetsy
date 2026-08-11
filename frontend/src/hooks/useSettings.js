@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useToast } from '../components/Toast.jsx';
 
 // plan.md Step 4: shop settings, pipeline config/overrides, watch-folder
 // automation, rate-limit diagnostics, and config backup/import -- everything
@@ -6,6 +7,7 @@ import { useCallback, useState } from 'react';
 // overrides UploadView needs for its per-upload toggles.
 export function useSettings(reportFetchError, dependentRefreshers = {}) {
   const { refreshApiKeys, refreshTags } = dependentRefreshers;
+  const { showToast } = useToast();
 
   const [settings, setSettings] = useState({});
   const [savedFlashes, setSavedFlashes] = useState({});
@@ -16,8 +18,6 @@ export function useSettings(reportFetchError, dependentRefreshers = {}) {
   const [rateLimits, setRateLimits] = useState([]);
   const [rateLimitsLoading, setRateLimitsLoading] = useState(true);
   const [rateLimitsUpdatedAt, setRateLimitsUpdatedAt] = useState(null);
-  const [configBackupMessage, setConfigBackupMessage] = useState('');
-  const [configImportMessage, setConfigImportMessage] = useState(null);
   const [configImporting, setConfigImporting] = useState(false);
 
   function flashSaved(field) {
@@ -106,7 +106,6 @@ export function useSettings(reportFetchError, dependentRefreshers = {}) {
   // Downloads a full config backup (settings, product sizes/mockup templates, tag
   // library, API keys) as a JSON file via the browser's normal download flow.
   async function downloadConfigBackup() {
-    setConfigBackupMessage('Preparing backup…');
     try {
       const res = await fetch('/api/config/export');
       const data = await res.json();
@@ -121,9 +120,9 @@ export function useSettings(reportFetchError, dependentRefreshers = {}) {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      setConfigBackupMessage(`Backup downloaded (${data.settings.length} setting(s), ${data.productSizes.length} product size(s), ${data.tags.length} tag(s), ${data.apiKeys.length} API key(s)).`);
+      showToast(`Backup downloaded (${data.settings.length} setting(s), ${data.productSizes.length} product size(s), ${data.tags.length} tag(s), ${data.apiKeys.length} API key(s)).`, 'success');
     } catch (err) {
-      setConfigBackupMessage(`Backup failed: ${err.message}`);
+      showToast(`Backup failed: ${err.message}`, 'error');
     }
   }
 
@@ -132,7 +131,6 @@ export function useSettings(reportFetchError, dependentRefreshers = {}) {
   async function importConfigBackup(file) {
     if (!file) return;
     setConfigImporting(true);
-    setConfigImportMessage({ text: `Importing ${file.name}…`, ok: true });
     try {
       const text = await file.text();
       let bundle;
@@ -149,12 +147,9 @@ export function useSettings(reportFetchError, dependentRefreshers = {}) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Import failed');
       const c = data.imported;
-      setConfigImportMessage({
-        text: `Imported: ${c.settings} setting(s), ${c.productSizes} product size(s), ${c.tags} new tag(s), ${c.apiKeys} new API key(s).`,
-        ok: true,
-      });
+      showToast(`Imported: ${c.settings} setting(s), ${c.productSizes} product size(s), ${c.tags} new tag(s), ${c.apiKeys} new API key(s).`, 'success');
     } catch (err) {
-      setConfigImportMessage({ text: `Import failed: ${err.message}`, ok: false });
+      showToast(`Import failed: ${err.message}`, 'error');
     }
     setConfigImporting(false);
     // Refresh every panel a restored bundle could have touched.
@@ -186,8 +181,6 @@ export function useSettings(reportFetchError, dependentRefreshers = {}) {
     rateLimitsLoading,
     rateLimitsUpdatedAt,
     refreshRateLimits,
-    configBackupMessage,
-    configImportMessage,
     configImporting,
     downloadConfigBackup,
     importConfigBackup,
