@@ -34,7 +34,8 @@ describe('PromptHelper', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
 
     fetch.mockResolvedValueOnce({ ok: true, json: async () => [] });
-    await user.selectOptions(screen.getByLabelText('Orientation:'), 'landscape');
+    // The History section has its own tabs (role="tab"); click the Landscape tab.
+    await user.click(screen.getByRole('tab', { name: 'Landscape' }));
 
     await waitFor(() => {
       expect(fetch).toHaveBeenLastCalledWith('/api/prompts?orientation=landscape');
@@ -51,7 +52,7 @@ describe('PromptHelper', () => {
     fetch.mockResolvedValueOnce({ ok: true, json: async () => [TREND, { id: 9, term: 'cozy autumn' }] });
 
     await user.type(screen.getByPlaceholderText('Add a new trend'), 'cozy autumn');
-    await user.click(screen.getByText('Add trend'));
+    await user.click(screen.getByRole('button', { name: 'Add trend' }));
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
@@ -75,7 +76,7 @@ describe('PromptHelper', () => {
     });
     fetch.mockResolvedValueOnce({ ok: true, json: async () => [] });
 
-    await user.click(screen.getByText('Generate prompts'));
+    await user.click(screen.getByRole('button', { name: 'Generate prompts' }));
 
     expect(await screen.findByText('a cozy cottage, warm light --v 7 --style raw')).toBeInTheDocument();
     expect(screen.getByText('stylize value adjusted to fit range')).toBeInTheDocument();
@@ -88,7 +89,7 @@ describe('PromptHelper', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
 
     fetch.mockResolvedValueOnce({ ok: false, json: async () => ({ error: 'All Gemini keys/models rate-limited' }) });
-    await user.click(screen.getByText('Generate prompts'));
+    await user.click(screen.getByRole('button', { name: 'Generate prompts' }));
 
     expect(await screen.findByText('All Gemini keys/models rate-limited')).toBeInTheDocument();
   });
@@ -96,10 +97,14 @@ describe('PromptHelper', () => {
   it('copies a prompt to the clipboard', async () => {
     mockInitialLoad({ history: [{ id: 2, prompt_text: 'existing prompt text' }] });
     render(<PromptHelper />);
-    await screen.findByText('existing prompt text');
+    // The mock Tabs render all panels, so the text appears multiple times.
+    await waitFor(() => {
+      expect(screen.getAllByText('existing prompt text').length).toBeGreaterThan(0);
+    });
 
     const user = userEvent.setup();
-    await user.click(screen.getByText('Copy'));
+    // Click the first Copy button.
+    await user.click(screen.getAllByRole('button', { name: 'Copy' })[0]);
 
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('existing prompt text');
   });

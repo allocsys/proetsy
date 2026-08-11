@@ -96,19 +96,26 @@ export default function PromptHelper() {
   const generateTask = useAsyncTask();
   const historyTasks = { portrait: useAsyncTask(), landscape: useAsyncTask(), square: useAsyncTask() };
 
+  // Destructure stable run references for dependency arrays.
+  // useAsyncTask() returns a new object each render, but .run is a stable useCallback.
+  const runTrends = trendsTask.run;
+  const runAddTrend = addTrendTask.run;
+  const runGenerate = generateTask.run;
+
   const loadTrends = useCallback(() => {
-    trendsTask.run(async () => {
+    runTrends(async () => {
       const data = await api.trends.list();
       setTrends(Array.isArray(data) ? data : []);
     });
-  }, [trendsTask]);
+  }, [runTrends]);
 
   const loadHistory = useCallback((o) => {
     historyTasks[o].run(async () => {
       const data = await api.prompts.list(o);
       setHistory(Array.isArray(data) ? data : []);
     });
-  }, [historyTasks]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => { loadTrends(); }, [loadTrends]);
   useEffect(() => { loadHistory(historyTab); }, [historyTab, loadHistory]);
@@ -118,7 +125,7 @@ export default function PromptHelper() {
       toast.error('Enter a trend term');
       return;
     }
-    addTrendTask.run(async () => {
+    runAddTrend(async () => {
       const data = await api.trends.add({
         term: newTrendTerm,
         category: newTrendCategory || undefined,
@@ -144,11 +151,12 @@ export default function PromptHelper() {
   }
 
   function handleGenerate() {
-    generateTask.run(async () => {
+    runGenerate(async () => {
       const data = await api.prompts.generate({
         trend_id: selectedTrendId ? Number(selectedTrendId) : null,
         orientation,
       });
+      if (data.error) throw new Error(data.error);
       setGenerated(data.prompts || []);
       toast.success(`Generated ${(data.prompts || []).length} prompt${(data.prompts || []).length === 1 ? '' : 's'}`);
       await loadHistory(orientation);

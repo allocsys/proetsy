@@ -37,13 +37,22 @@ vi.mock('@/components/ui/textarea.jsx', () => {
   };
 });
 
-vi.mock('@/components/ui/select.jsx', () => ({
-  Select: ({ children, value, onValueChange }) => <div>{children}</div>,
-  SelectContent: ({ children }) => <div>{children}</div>,
-  SelectItem: ({ children, value }) => <div data-value={value}>{children}</div>,
-  SelectTrigger: ({ children, ...props }) => <button {...props}>{children}</button>,
-  SelectValue: ({ placeholder }) => <span>{placeholder}</span>,
-}));
+vi.mock('@/components/ui/select.jsx', () => {
+  const React = require('react');
+  const Ctx = React.createContext(() => {});
+  return {
+    Select: ({ children, value, onValueChange }) => (
+      <Ctx.Provider value={onValueChange}>{children}</Ctx.Provider>
+    ),
+    SelectContent: ({ children }) => <div>{children}</div>,
+    SelectItem: ({ children, value }) => {
+      const onChange = React.useContext(Ctx);
+      return <button type="button" data-value={value} onClick={() => onChange(value)}>{children}</button>;
+    },
+    SelectTrigger: ({ children, ...props }) => <button {...props}>{children}</button>,
+    SelectValue: ({ placeholder }) => <span>{placeholder}</span>,
+  };
+});
 
 vi.mock('@/components/ui/switch.jsx', () => ({
   Switch: ({ checked, onCheckedChange, disabled, ...props }) => (
@@ -72,12 +81,21 @@ vi.mock('@/components/ui/card.jsx', () => ({
   CardFooter: ({ children, ...props }) => <div {...props}>{children}</div>,
 }));
 
-vi.mock('@/components/ui/tabs.jsx', () => ({
-  Tabs: ({ children, defaultValue, value, onValueChange }) => <div>{children}</div>,
-  TabsList: ({ children, ...props }) => <div role="tablist" {...props}>{children}</div>,
-  TabsTrigger: ({ children, value, ...props }) => <button role="tab" data-value={value} {...props}>{children}</button>,
-  TabsContent: ({ children, value, ...props }) => <div role="tabpanel" data-value={value} {...props}>{children}</div>,
-}));
+vi.mock('@/components/ui/tabs.jsx', () => {
+  const React = require('react');
+  const Ctx = React.createContext(() => {});
+  return {
+    Tabs: ({ children, value, onValueChange }) => (
+      <Ctx.Provider value={onValueChange}>{children}</Ctx.Provider>
+    ),
+    TabsList: ({ children, ...props }) => <div role="tablist" {...props}>{children}</div>,
+    TabsTrigger: ({ children, value, ...props }) => {
+      const onChange = React.useContext(Ctx);
+      return <button type="button" role="tab" data-value={value} aria-selected={value === props?.['data-state'] || undefined} onClick={() => onChange(value)} {...props}>{children}</button>;
+    },
+    TabsContent: ({ children, value, ...props }) => <div role="tabpanel" data-value={value} {...props}>{children}</div>,
+  };
+});
 
 vi.mock('@/components/ui/tooltip.jsx', () => ({
   TooltipProvider: ({ children }) => <>{children}</>,

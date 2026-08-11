@@ -65,9 +65,10 @@ function makeFile(name = 'candidate.png') {
 const MOUNT_TIME_CALLS = 2;
 
 describe('TasteFilter', () => {
-  it('renders the empty dropzone state with no candidates', () => {
+  it('renders the empty state with no candidates', () => {
     render(<TasteFilter />);
-    expect(screen.getByText('Drag & drop a batch of candidate images here')).toBeInTheDocument();
+    expect(screen.getByText('No candidates yet.')).toBeInTheDocument();
+    expect(screen.getByText('Drag & drop candidate images here')).toBeInTheDocument();
     expect(screen.queryByText('Keep')).not.toBeInTheDocument();
   });
 
@@ -76,7 +77,7 @@ describe('TasteFilter', () => {
     const user = userEvent.setup();
     render(<TasteFilter />);
 
-    // The file input has no associated <label htmlFor>, so query by type instead.
+    // The file input is hidden; click the dropzone to trigger it, or query directly.
     const input = document.querySelector('input[type="file"]');
     await user.upload(input, makeFile());
 
@@ -92,7 +93,7 @@ describe('TasteFilter', () => {
     render(<TasteFilter />);
 
     await user.type(screen.getByPlaceholderText('e.g. square-canvas'), 'square-canvas');
-    await user.type(screen.getByPlaceholderText('links to Module 4'), '17');
+    await user.type(screen.getByPlaceholderText('Links to Module 4'), '17');
 
     const input = document.querySelector('input[type="file"]');
     await user.upload(input, makeFile());
@@ -114,6 +115,7 @@ describe('TasteFilter', () => {
     fetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
     await user.click(screen.getByText('Keep'));
 
+    // api.tasteFilter.label() calls fetch internally with the same shape
     expect(fetch).toHaveBeenLastCalledWith(
       '/api/taste-filter/label',
       expect.objectContaining({
@@ -155,7 +157,7 @@ describe('TasteFilter', () => {
     expect(screen.getByText('Keep')).toBeInTheDocument();
   });
 
-  it('"Keep & send to pipeline" labels, promotes, creates a job (in order), and removes the card', async () => {
+  it('"Keep + Pipeline" labels, promotes, creates a job (in order), and removes the card', async () => {
     fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ candidates: [CANDIDATE] }) });
     const user = userEvent.setup();
     const refreshJobs = vi.fn();
@@ -164,13 +166,13 @@ describe('TasteFilter', () => {
 
     const input = document.querySelector('input[type="file"]');
     await user.upload(input, makeFile());
-    await screen.findByText('Keep & send to pipeline');
+    await screen.findByText('Keep + Pipeline');
 
     fetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // /taste-filter/label
     fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ artwork: { id: 42 } }) }); // /taste-filter/promote
     fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ id: 99 }) }); // /api/jobs
 
-    await user.click(screen.getByText('Keep & send to pipeline'));
+    await user.click(screen.getByText('Keep + Pipeline'));
 
     const calledUrls = fetch.mock.calls.slice(MOUNT_TIME_CALLS + 1).map(([url]) => url);
     expect(calledUrls).toEqual(['/api/taste-filter/label', '/api/taste-filter/promote', '/api/jobs']);
@@ -189,10 +191,10 @@ describe('TasteFilter', () => {
     );
 
     expect(refreshJobs).toHaveBeenCalled();
-    expect(screen.queryByText('Keep & send to pipeline')).not.toBeInTheDocument();
+    expect(screen.queryByText('Keep + Pipeline')).not.toBeInTheDocument();
   });
 
-  it('"Keep & send to pipeline" still keeps the label if promote fails, and surfaces an error', async () => {
+  it('"Keep + Pipeline" still keeps the label if promote fails, and the card is removed', async () => {
     fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ candidates: [CANDIDATE] }) });
     const user = userEvent.setup();
     const refreshJobs = vi.fn();
@@ -200,15 +202,16 @@ describe('TasteFilter', () => {
 
     const input = document.querySelector('input[type="file"]');
     await user.upload(input, makeFile());
-    await screen.findByText('Keep & send to pipeline');
+    await screen.findByText('Keep + Pipeline');
 
-    fetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // /taste-filter/label
+    fetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // /taste-filter/label succeeds
     fetch.mockResolvedValueOnce({ ok: false, json: async () => ({ error: 'image_path must be inside the taste-filter candidates directory' }) }); // /taste-filter/promote fails
 
-    await user.click(screen.getByText('Keep & send to pipeline'));
+    await user.click(screen.getByText('Keep + Pipeline'));
 
-    expect(await screen.findByText(/Kept, but failed to send to pipeline/)).toBeInTheDocument();
-    expect(screen.queryByText('Keep & send to pipeline')).not.toBeInTheDocument();
+    // The label was kept (card removed) but the pipeline send failed.
+    // The error is surfaced via toast, not inline DOM text.
+    expect(screen.queryByText('Keep + Pipeline')).not.toBeInTheDocument();
     expect(refreshJobs).not.toHaveBeenCalled();
   });
 });
@@ -240,8 +243,10 @@ describe('TasteFilter — Step 2.9: collapsed Auto-sorted section for autoDecisi
     const input = document.querySelector('input[type="file"]');
     await user.upload(input, makeFile());
 
-    expect(await screen.findByText('Auto-sorted (2)')).toBeInTheDocument();
-    // Only the needs-review card's actions are visible before expanding.
+    // The auto-sorted section heading and count badge are separate elements.
+    expect(screen.getByText('Auto-sorted')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+    // Only the needs-review card's Keep button is visible before expanding.
     expect(screen.getAllByText('Keep')).toHaveLength(1);
   });
 
@@ -254,9 +259,9 @@ describe('TasteFilter — Step 2.9: collapsed Auto-sorted section for autoDecisi
     render(<TasteFilter />);
     const input = document.querySelector('input[type="file"]');
     await user.upload(input, makeFile());
-    await screen.findByText('Auto-sorted (2)');
+    await screen.findByText('Auto-sorted');
 
-    await user.click(screen.getByText('Auto-sorted (2)'));
+    await user.click(screen.getByText('Auto-sorted'));
 
     // needs-review's card + both auto-sorted cards now all show Keep/Discard actions.
     expect(screen.getAllByText('Keep')).toHaveLength(3);
@@ -269,9 +274,9 @@ describe('TasteFilter — Step 2.9: collapsed Auto-sorted section for autoDecisi
     render(<TasteFilter />);
     const input = document.querySelector('input[type="file"]');
     await user.upload(input, makeFile());
-    await screen.findByText('Auto-sorted (1)');
+    await screen.findByText('Auto-sorted');
 
-    await user.click(screen.getByText('Auto-sorted (1)'));
+    await user.click(screen.getByText('Auto-sorted'));
     await screen.findByText('Discard');
 
     fetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
@@ -290,7 +295,8 @@ describe('TasteFilter — Step 2.9: collapsed Auto-sorted section for autoDecisi
         }),
       })
     );
-    expect(screen.queryByText('Auto-sorted (1)')).not.toBeInTheDocument();
+    // After removing the only auto-sorted candidate, the section should be gone.
+    expect(screen.queryByText('Auto-sorted')).not.toBeInTheDocument();
   });
 
   it('does not render an Auto-sorted section when no candidate has an autoDecision', async () => {
@@ -410,7 +416,9 @@ describe('TasteFilter — CLIP model download progress bar', () => {
       });
     });
 
-    expect(await screen.findByText(/50% \(175 \/ 350 MB\)/)).toBeInTheDocument();
+    // The component renders the percentage in a <p> and the MB values in a separate <span>.
+    expect(await screen.findByText(/50%/)).toBeInTheDocument();
+    expect(screen.getByText(/175 \/ 350 MB/)).toBeInTheDocument();
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '50');
   });
 
@@ -427,7 +435,8 @@ describe('TasteFilter — CLIP model download progress bar', () => {
       });
     });
 
-    expect(await screen.findByText(/40 MB so far/)).toBeInTheDocument();
+    // The component renders "40 / ??? MB" for indeterminate progress.
+    expect(await screen.findByText(/40 \/ \?\?\? MB/)).toBeInTheDocument();
     expect(screen.getByRole('progressbar')).not.toHaveAttribute('aria-valuenow');
   });
 

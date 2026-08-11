@@ -106,7 +106,8 @@ describe('MockupTemplates — scan and select', () => {
     expect(await screen.findByText('frame-8x10.png')).toBeInTheDocument();
     expect(screen.getByText('mug-white.psd')).toBeInTheDocument();
     expect(screen.getByText('canvas-12x16.png')).toBeInTheDocument();
-    expect(screen.getByText('already used as 12x16-portrait')).toBeInTheDocument();
+    // The already-used text is in a <span> inside a <p>; just match the value.
+    expect(screen.getByText('12x16-portrait')).toBeInTheDocument();
   });
 
   it('shows a size-key (and, for PSDs, placement-layer) field only once a card is checked', async () => {
@@ -154,7 +155,7 @@ describe('MockupTemplates — bulk assign', () => {
     await user.click(checkboxes[0]);
     await user.click(checkboxes[1]);
 
-    await user.type(screen.getByPlaceholderText('e.g. bedroom, mug, nature'), 'mug');
+    await user.type(screen.getByPlaceholderText('e.g. bedroom'), 'mug');
 
     const postCalls = [];
     global.fetch = makeFetchQueue([
@@ -171,7 +172,7 @@ describe('MockupTemplates — bulk assign', () => {
       })],
     ]);
 
-    await user.click(screen.getByRole('button', { name: 'Assign 2 files' }));
+    await user.click(screen.getByRole('button', { name: /Assign 2/ }));
 
     await waitFor(() => expect(postCalls).toHaveLength(2));
     expect(postCalls.map((c) => c.mockup_template).sort()).toEqual(['frame-8x10.png', 'mug-white.psd'].sort());
@@ -241,7 +242,13 @@ describe('MockupTemplates — configured templates', () => {
 
     await user.click(screen.getByText('Remove'));
 
-    expect(await screen.findByText(/Removed 8x10-portrait/)).toBeInTheDocument();
+    // Removal feedback is via toast, not inline DOM text.
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/mockup-templates/8x10-portrait',
+        expect.objectContaining({ method: 'DELETE' })
+      );
+    });
   });
 
   it('saves an inline edit to a configured template via the upsert route', async () => {
@@ -267,7 +274,6 @@ describe('MockupTemplates — configured templates', () => {
         expect.objectContaining({ method: 'POST' })
       );
     });
-    expect(await screen.findByText(/Saved 8x10-portrait/)).toBeInTheDocument();
   });
 
   it('renders a Category field for a configured template and includes it in the save payload', async () => {

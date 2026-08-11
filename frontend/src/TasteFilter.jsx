@@ -2,8 +2,6 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import { RefreshCw, Upload, ChevronDown, ChevronRight, ThumbsUp, ThumbsDown, Send, ImageOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, parseJsonResponse, friendlyErrorMessage } from '@/hooks/useApi';
-import { useConfirm } from '@/contexts/ConfirmContext';
-import StatusBadge from '@/components/layout/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,10 +10,10 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
-const LABEL_VARIANT = {
-  'likely-keep': 'completed',
-  'likely-discard': 'failed',
-  uncertain: 'pending',
+const SCORE_STYLES = {
+  'likely-keep': 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25',
+  'likely-discard': 'bg-red-500/15 text-red-400 border-red-500/25',
+  uncertain: 'bg-amber-500/15 text-amber-400 border-amber-500/25',
 };
 
 function formatMB(bytes) {
@@ -24,11 +22,15 @@ function formatMB(bytes) {
 
 function ScoreBadge({ label, score, confident, prefix }) {
   if (score === null || score === undefined) return null;
-  const status = LABEL_VARIANT[label] || 'pending';
   return (
-    <StatusBadge status={status} className="text-[10px]">
-      {prefix}{score.toFixed(3)}{confident === false ? ' · cold' : ''}
-    </StatusBadge>
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium',
+        SCORE_STYLES[label] || SCORE_STYLES.uncertain
+      )}
+    >
+      {label} ({score.toFixed(3)}){confident === false ? ' · cold start' : ''}
+    </span>
   );
 }
 
@@ -298,7 +300,6 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
       if (refreshJobs) refreshJobs();
     } catch (err) {
       toast.error(`Pipeline send failed: ${friendlyErrorMessage(err)}`);
-      throw err;
     }
   }
 
