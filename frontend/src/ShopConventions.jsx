@@ -1,4 +1,30 @@
 import { useEffect, useState } from 'react';
+import { Loader2, Plus, Trash2, Save, X } from 'lucide-react';
+import { api } from '@/hooks/useApi';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
+
+function FieldRow({ children, className }) {
+  return (
+    <div className={`grid gap-3 sm:grid-cols-3 ${className || ''}`}>
+      {children}
+    </div>
+  );
+}
+
+function Field({ label, id, children }) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id} className="text-xs text-muted-foreground">{label}</Label>
+      {children}
+    </div>
+  );
+}
 
 function ShopConventions() {
   const [loading, setLoading] = useState(true);
@@ -23,11 +49,8 @@ function ShopConventions() {
   const [aspectRatios, setAspectRatios] = useState([]);
 
   useEffect(() => {
-    fetch('/api/config/shop-conventions')
-      .then((r) => {
-        if (!r.ok) throw new Error(`Server returned status ${r.status}`);
-        return r.json();
-      })
+    api.shopConventions
+      .get()
       .then((cfg) => {
         setLoading(false);
         if (cfg.listing) {
@@ -104,21 +127,9 @@ function ShopConventions() {
     };
 
     try {
-      const res = await fetch('/api/config/shop-conventions', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ listing: listingPayload, midjourney: midjourneyPayload }),
-      });
-      let result;
-      try {
-        result = await res.json();
-      } catch {
-        throw new Error(`Server returned status ${res.status}`);
-      }
-      if (!res.ok) {
-        throw new Error(result.error || 'Failed to save shop conventions');
-      }
+      await api.shopConventions.patch({ listing: listingPayload, midjourney: midjourneyPayload });
       setSuccessMessage('Shop conventions saved successfully.');
+      toast.success('Shop conventions saved');
     } catch (err) {
       setErrorMessage(err.message);
     }
@@ -126,219 +137,214 @@ function ShopConventions() {
   }
 
   if (loading) {
-    return <p className="empty-state">Loading shop conventions…</p>;
+    return (
+      <div className="space-y-4">
+        <FieldRow>
+          <div className="space-y-1.5"><Skeleton className="h-8 w-full" /></div>
+          <div className="space-y-1.5"><Skeleton className="h-8 w-full" /></div>
+          <div className="space-y-1.5"><Skeleton className="h-8 w-full" /></div>
+        </FieldRow>
+        <FieldRow>
+          <div className="space-y-1.5"><Skeleton className="h-8 w-full" /></div>
+          <div className="space-y-1.5"><Skeleton className="h-8 w-full" /></div>
+          <div className="space-y-1.5"><Skeleton className="h-8 w-full" /></div>
+        </FieldRow>
+        <Skeleton className="h-20 w-full" />
+      </div>
+    );
   }
 
   return (
-    <div className="settings-section-card card settings-full-width-card">
-      <h3 className="settings-section-title">Shop Conventions & Midjourney Settings</h3>
-
+    <div className="space-y-5">
+      {/* Error / Success banners */}
       {errorMessage && (
-        <div className="backend-banner" role="alert" style={{ marginBottom: '1rem', background: 'rgba(239, 68, 68, 0.1)', borderColor: 'var(--state-danger)' }}>
-          <span className="text-danger">Error: {errorMessage}</span>
-          <button className="btn-secondary btn-sm" onClick={() => setErrorMessage('')}>Dismiss</button>
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/50 bg-destructive/5 px-4 py-2.5">
+          <p className="text-sm text-destructive">{errorMessage}</p>
+          <Button variant="ghost" size="icon-xs" onClick={() => setErrorMessage('')} aria-label="Dismiss">
+            <X className="size-3" />
+          </Button>
         </div>
       )}
-
       {successMessage && (
-        <div className="backend-banner" role="alert" style={{ marginBottom: '1rem', background: 'rgba(34, 197, 94, 0.1)', borderColor: 'var(--state-success)' }}>
-          <span className="text-success">{successMessage}</span>
-          <button className="btn-secondary btn-sm" onClick={() => setSuccessMessage('')}>Dismiss</button>
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-emerald-500/50 bg-emerald-500/5 px-4 py-2.5">
+          <p className="text-sm text-emerald-400">{successMessage}</p>
+          <Button variant="ghost" size="icon-xs" onClick={() => setSuccessMessage('')} aria-label="Dismiss">
+            <X className="size-3" />
+          </Button>
         </div>
       )}
 
-      <div className="settings-subsection">
-        <h4 className="settings-sub-heading">Listing conventions</h4>
-        <div className="settings-field-row">
-          <div className="settings-field">
-            <label htmlFor="shop-conv-title-separator" className="settings-field-label">Title separator</label>
-            <input
+      {/* Listing Conventions */}
+      <div className="space-y-4">
+        <h4 className="text-sm font-semibold text-foreground">Listing conventions</h4>
+        <FieldRow>
+          <Field label="Title separator" id="shop-conv-title-separator">
+            <Input
               id="shop-conv-title-separator"
-              className="input"
               value={titleSeparator}
               onChange={(e) => setTitleSeparator(e.target.value)}
             />
-          </div>
-          <div className="settings-field">
-            <label htmlFor="shop-conv-max-title-length" className="settings-field-label">Max title length</label>
-            <input
+          </Field>
+          <Field label="Max title length" id="shop-conv-max-title-length">
+            <Input
               id="shop-conv-max-title-length"
               type="number"
-              className="input"
               value={maxTitleLength}
               onChange={(e) => setMaxTitleLength(e.target.value)}
             />
-          </div>
-          <div className="settings-field">
-            <label htmlFor="shop-conv-tags-per-listing" className="settings-field-label">Tags per listing</label>
-            <input
+          </Field>
+          <Field label="Tags per listing" id="shop-conv-tags-per-listing">
+            <Input
               id="shop-conv-tags-per-listing"
               type="number"
-              className="input"
               value={tagsPerListing}
               onChange={(e) => setTagsPerListing(e.target.value)}
             />
-          </div>
-        </div>
+          </Field>
+        </FieldRow>
 
-        <div className="settings-field-row" style={{ marginTop: '1rem' }}>
-          <div className="settings-field">
-            <label htmlFor="shop-conv-tag-alternates" className="settings-field-label">Tag alternates</label>
-            <input
+        <FieldRow className="sm:grid-cols-2">
+          <Field label="Tag alternates" id="shop-conv-tag-alternates">
+            <Input
               id="shop-conv-tag-alternates"
               type="number"
-              className="input"
               value={tagAlternates}
               onChange={(e) => setTagAlternates(e.target.value)}
             />
-          </div>
-          <div className="settings-field">
-            <label htmlFor="shop-conv-max-tag-length" className="settings-field-label">Max tag length</label>
-            <input
+          </Field>
+          <Field label="Max tag length" id="shop-conv-max-tag-length">
+            <Input
               id="shop-conv-max-tag-length"
               type="number"
-              className="input"
               value={maxTagLength}
               onChange={(e) => setMaxTagLength(e.target.value)}
             />
-          </div>
-        </div>
+          </Field>
+        </FieldRow>
 
-        <div className="settings-field-row" style={{ marginTop: '1rem', alignItems: 'stretch' }}>
-          <div className="settings-field" style={{ flex: 1 }}>
-            <label htmlFor="shop-conv-forbidden-words" className="settings-field-label">Forbidden title words (one per line)</label>
-            <textarea
+        <FieldRow className="sm:grid-cols-2">
+          <Field label="Forbidden title words (one per line)" id="shop-conv-forbidden-words">
+            <Textarea
               id="shop-conv-forbidden-words"
               rows={4}
-              className="mono input"
-              style={{ width: '100%' }}
+              className="font-mono text-xs"
               value={forbiddenTitleWordsText}
               onChange={(e) => setForbiddenTitleWordsText(e.target.value)}
             />
-          </div>
-          <div className="settings-field" style={{ flex: 1 }}>
-            <label htmlFor="shop-conv-ai-disclosure" className="settings-field-label">AI disclosure phrases (one per line)</label>
-            <textarea
+          </Field>
+          <Field label="AI disclosure phrases (one per line)" id="shop-conv-ai-disclosure">
+            <Textarea
               id="shop-conv-ai-disclosure"
               rows={4}
-              className="mono input"
-              style={{ width: '100%' }}
+              className="font-mono text-xs"
               value={aiDisclosurePhrasesText}
               onChange={(e) => setAiDisclosurePhrasesText(e.target.value)}
             />
-          </div>
-        </div>
+          </Field>
+        </FieldRow>
 
-        <div className="settings-field" style={{ marginTop: '1rem' }}>
-          <label htmlFor="shop-conv-delivery-phrases" className="settings-field-label">Delivery detail phrases (one per line)</label>
-          <textarea
+        <Field label="Delivery detail phrases (one per line)" id="shop-conv-delivery-phrases">
+          <Textarea
             id="shop-conv-delivery-phrases"
             rows={3}
-            className="mono input"
-            style={{ width: '100%' }}
+            className="font-mono text-xs"
             value={deliveryDetailPhrasesText}
             onChange={(e) => setDeliveryDetailPhrasesText(e.target.value)}
           />
-        </div>
+        </Field>
       </div>
 
-      <div className="settings-subsection">
-        <h4 className="settings-sub-heading">Midjourney conventions</h4>
-        <div className="settings-field-row">
-          <div className="settings-field">
-            <label htmlFor="shop-conv-mj-version" className="settings-field-label">Version</label>
-            <input
+      <Separator />
+
+      {/* Midjourney Conventions */}
+      <div className="space-y-4">
+        <h4 className="text-sm font-semibold text-foreground">Midjourney conventions</h4>
+        <FieldRow>
+          <Field label="Version" id="shop-conv-mj-version">
+            <Input
               id="shop-conv-mj-version"
-              className="input"
               value={mjVersion}
               onChange={(e) => setMjVersion(e.target.value)}
             />
-          </div>
-          <div className="settings-field">
-            <label htmlFor="shop-conv-mj-style" className="settings-field-label">Style</label>
-            <input
+          </Field>
+          <Field label="Style" id="shop-conv-mj-style">
+            <Input
               id="shop-conv-mj-style"
-              className="input"
               value={mjStyle}
               onChange={(e) => setMjStyle(e.target.value)}
             />
-          </div>
-          <div className="settings-field">
-            <label htmlFor="shop-conv-default-stylize" className="settings-field-label">Default stylize</label>
-            <input
+          </Field>
+          <Field label="Default stylize" id="shop-conv-default-stylize">
+            <Input
               id="shop-conv-default-stylize"
               type="number"
-              className="input"
               value={defaultStylize}
               onChange={(e) => setDefaultStylize(e.target.value)}
             />
-          </div>
-        </div>
+          </Field>
+        </FieldRow>
 
-        <div className="settings-field-row" style={{ marginTop: '1rem' }}>
-          <div className="settings-field">
-            <label htmlFor="shop-conv-stylize-min" className="settings-field-label">Stylize min</label>
-            <input
+        <FieldRow className="sm:grid-cols-2">
+          <Field label="Stylize min" id="shop-conv-stylize-min">
+            <Input
               id="shop-conv-stylize-min"
               type="number"
-              className="input"
               value={stylizeMin}
               onChange={(e) => setStylizeMin(e.target.value)}
             />
-          </div>
-          <div className="settings-field">
-            <label htmlFor="shop-conv-stylize-max" className="settings-field-label">Stylize max</label>
-            <input
+          </Field>
+          <Field label="Stylize max" id="shop-conv-stylize-max">
+            <Input
               id="shop-conv-stylize-max"
               type="number"
-              className="input"
               value={stylizeMax}
               onChange={(e) => setStylizeMax(e.target.value)}
             />
-          </div>
-        </div>
+          </Field>
+        </FieldRow>
 
-        <div className="settings-subsection" style={{ marginTop: '1rem', marginBottom: 0 }}>
-          <h5 className="settings-sub-heading" style={{ fontSize: '13px' }}>Aspect ratio by orientation</h5>
-          {aspectRatios.map((row, index) => (
-            <div key={index} className="settings-field-row" style={{ alignItems: 'center', marginBottom: '0.5rem' }}>
-              <div className="settings-field" style={{ flex: 1 }}>
-                <input
-                  className="input"
+        {/* Aspect Ratios */}
+        <div className="space-y-3">
+          <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Aspect ratio by orientation</h5>
+          <div className="space-y-2">
+            {aspectRatios.map((row, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <Input
                   placeholder="Orientation (e.g. portrait)"
                   value={row.orientation}
                   onChange={(e) => updateAspectRatioRow(index, 'orientation', e.target.value)}
+                  className="flex-1 h-8"
                 />
-              </div>
-              <div className="settings-field" style={{ width: '120px' }}>
-                <input
-                  className="input"
+                <Input
                   placeholder="Ratio (e.g. 3:4)"
                   value={row.ratio}
                   onChange={(e) => updateAspectRatioRow(index, 'ratio', e.target.value)}
+                  className="w-28 h-8"
                 />
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={() => removeAspectRatioRow(index)}
+                  aria-label="Remove orientation ratio"
+                >
+                  <Trash2 className="size-3" />
+                </Button>
               </div>
-              <button
-                type="button"
-                className="btn-secondary btn-sm"
-                onClick={() => removeAspectRatioRow(index)}
-                title="Remove orientation ratio"
-                aria-label="Remove orientation ratio"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-          <button type="button" className="btn-secondary btn-sm" onClick={addAspectRatioRow} style={{ marginTop: '0.5rem' }}>
-            + Add orientation aspect ratio
-          </button>
+            ))}
+          </div>
+          <Button variant="outline" size="xs" onClick={addAspectRatioRow} className="gap-1">
+            <Plus className="size-3" />
+            Add orientation aspect ratio
+          </Button>
         </div>
       </div>
 
-      <div className="flex-row" style={{ marginTop: '1.5rem', gap: '1rem' }}>
-        <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
-          {saving ? 'Saving…' : 'Save shop conventions'}
-        </button>
+      {/* Save button */}
+      <div className="flex gap-2 pt-2">
+        <Button onClick={handleSave} disabled={saving} size="sm" className="gap-1.5">
+          {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+          Save shop conventions
+        </Button>
       </div>
     </div>
   );

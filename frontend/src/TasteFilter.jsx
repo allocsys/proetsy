@@ -1,61 +1,35 @@
-import { useEffect, useRef, useState } from 'react';
-import StatusPill from './components/StatusPill.jsx';
+import { useEffect, useRef, useState, useMemo } from 'react';
+import { RefreshCw, Upload, ChevronDown, ChevronRight, ThumbsUp, ThumbsDown, Send, ImageOff } from 'lucide-react';
+import { toast } from 'sonner';
+import { api, parseJsonResponse, friendlyErrorMessage } from '@/hooks/useApi';
+import { useConfirm } from '@/contexts/ConfirmContext';
+import StatusBadge from '@/components/layout/StatusBadge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
-const LABEL_CLASS = {
-  'likely-keep': 'success',
-  'likely-discard': 'danger',
+const LABEL_VARIANT = {
+  'likely-keep': 'completed',
+  'likely-discard': 'failed',
   uncertain: 'pending',
 };
-
-function ScoreBadge({ label, score, confident }) {
-  if (score === null || score === undefined) return <span className="text-muted mono">—</span>;
-  const text = `${label} (${score.toFixed(3)})${confident === false ? ' · cold start' : ''}`;
-  return (
-    <StatusPill variant={LABEL_CLASS[label] || 'skipped'} ariaLabel={`Score: ${text}`}>
-      {text}
-    </StatusPill>
-  );
-}
 
 function formatMB(bytes) {
   return (bytes / (1024 * 1024)).toFixed(0);
 }
 
-// Reads a fetch Response as JSON, but with two failure modes turned into a message a
-// user can actually act on instead of a raw browser exception string:
-//   - A response that ends early (e.g. the connection dropped, or the backend process
-//     restarted mid-request -- res.ok but the body isn't valid JSON) would otherwise
-//     surface as `res.json()`'s own "Failed to execute 'json' on 'Response': Unexpected
-//     end of JSON input", which reads like an internal error even though "try again" is
-//     the correct and sufficient fix.
-//   - A non-OK response whose body also isn't valid JSON (e.g. a proxy's own HTML error
-//     page for a 502/504) gets a message built from the status code instead of the same
-//     confusing exception.
-async function parseJsonResponse(res) {
-  let data;
-  try {
-    data = await res.json();
-  } catch {
-    throw new Error(
-      res.ok
-        ? 'The connection dropped before the server finished responding (this can happen during a deploy). Please try again.'
-        : `Server error (HTTP ${res.status}). Please try again.`
-    );
-  }
-  if (!res.ok) throw new Error(data.error || `Request failed (HTTP ${res.status})`);
-  return data;
-}
-
-// Same idea as above, one level earlier: fetch() itself rejects (rather than resolving
-// with a Response) when the request never made it to/from the server at all -- offline,
-// DNS failure, CORS, etc. -- and that rejection is a TypeError with a terse, browser-
-// specific message ('Failed to fetch' in Chrome/Samsung Internet, 'NetworkError when
-// attempting to fetch resource' in Firefox). Centralized here so every call site's catch
-// block can show one consistent, actionable message instead of whatever string this
-// particular browser happened to choose.
-function friendlyErrorMessage(err) {
-  if (err instanceof TypeError) return 'Could not reach the server — check your connection and try again.';
-  return err.message;
+function ScoreBadge({ label, score, confident, prefix }) {
+  if (score === null || score === undefined) return null;
+  const status = LABEL_VARIANT[label] || 'pending';
+  return (
+    <StatusBadge status={status} className="text-[10px]">
+      {prefix}{score.toFixed(3)}{confident === false ? ' · cold' : ''}
+    </StatusBadge>
+  );
 }
 
 function ModelDownloadBar({ modelStatus }) {
@@ -63,10 +37,12 @@ function ModelDownloadBar({ modelStatus }) {
 
   if (modelStatus.status === 'error') {
     return (
-      <div className="card p-3 mb-4" role="alert">
-        <p className="text-danger mb-1">Taste Filter model download failed: {modelStatus.error}</p>
-        <p className="text-muted mono-sm">Will retry automatically the next time you import images.</p>
-      </div>
+      <Card className="border-destructive/40">
+        <CardContent className="p-4">
+          <p className="text-sm text-destructive font-medium">Model download failed: {modelStatus.error}</p>
+          <p className="text-xs text-muted-foreground mt-1">Will retry automatically the next time you import images.</p>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -74,36 +50,109 @@ function ModelDownloadBar({ modelStatus }) {
   const pct = totalBytes ? Math.min(100, Math.round((bytesDownloaded / totalBytes) * 100)) : null;
 
   return (
-    <div className="card p-3 mb-4" role="status" aria-live="polite">
-      <p className="mb-2">
-        Downloading Taste Filter&rsquo;s image model (one-time, ~350MB)
-        {pct !== null ? ` — ${pct}% (${formatMB(bytesDownloaded)} / ${formatMB(totalBytes)} MB)` : ` — ${formatMB(bytesDownloaded)} MB so far`}
-      </p>
-      <div
-        style={{
-          width: '100%',
-          height: '8px',
-          borderRadius: '999px',
-          background: 'var(--surface-2, #222)',
-          overflow: 'hidden',
-        }}
-      >
-        <div
-          role="progressbar"
-          aria-valuenow={pct ?? undefined}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          style={{
-            height: '100%',
-            borderRadius: '999px',
-            background: 'var(--accent, #e07a3f)',
-            width: pct !== null ? `${pct}%` : '35%',
-            transition: 'width 0.2s ease',
-          }}
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-medium">
+            Downloading taste model
+            {pct !== null && <span className="text-muted-foreground"> — {pct}%</span>}
+          </p>
+          <span className="text-xs text-muted-foreground font-mono">
+            {formatMB(bytesDownloaded)} / {totalBytes ? formatMB(totalBytes) : '???'} MB
+          </span>
+        </div>
+        <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+          <div
+            role="progressbar"
+            aria-valuenow={pct ?? undefined}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            className="h-full rounded-full bg-amber-500 transition-all duration-200"
+            style={{ width: pct !== null ? `${pct}%` : '35%' }}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">You can keep using the dashboard while this finishes.</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CandidateCard({ candidate, onLabel, onKeepAndPipeline }) {
+  const [busy, setBusy] = useState(null);
+
+  async function handleKeep() {
+    setBusy('keep');
+    try {
+      await onLabel(candidate, 'keep');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleDiscard() {
+    setBusy('discard');
+    try {
+      await onLabel(candidate, 'discard');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handlePipeline() {
+    setBusy('pipeline');
+    try {
+      await onKeepAndPipeline(candidate);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (candidate.error) {
+    return (
+      <Card className="gap-0 border-destructive/30">
+        <CardContent className="p-4">
+          <p className="text-sm text-destructive">{candidate.error}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="gap-0">
+      <div className="overflow-hidden rounded-t-xl bg-black">
+        <img
+          src={candidate.imageUrl}
+          alt=""
+          className="w-full aspect-square object-contain"
         />
       </div>
-      <p className="text-muted mono-sm mt-2">You can keep using the rest of the dashboard while this finishes.</p>
-    </div>
+      <CardContent className="flex flex-col gap-2.5 p-3">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">Global:</span>
+          <ScoreBadge label={candidate.globalLabel} score={candidate.globalScore} confident={candidate.globalConfident} />
+        </div>
+        {candidate.category && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">{candidate.category}:</span>
+            <ScoreBadge label={candidate.categoryLabel} score={candidate.categoryScore} confident={candidate.categoryConfident} prefix={`${candidate.category} `} />
+          </div>
+        )}
+        <div className="flex flex-col gap-1.5 mt-1">
+          <Button size="xs" onClick={handleKeep} disabled={busy} className="w-full">
+            <ThumbsUp className="size-3" />
+            Keep
+          </Button>
+          <Button variant="destructive" size="xs" onClick={handleDiscard} disabled={busy} className="w-full">
+            <ThumbsDown className="size-3" />
+            Discard
+          </Button>
+          <Button variant="outline" size="xs" onClick={handlePipeline} disabled={busy} className="w-full">
+            <Send className="size-3" />
+            Keep + Pipeline
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -118,38 +167,25 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
   const [selectedFileName, setSelectedFileName] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [modelStatus, setModelStatus] = useState(null);
+  const [importing, setImporting] = useState(false);
   const fileInputRef = useRef(null);
   const seenPathsRef = useRef(new Set());
 
+  // Load datalist options
   useEffect(() => {
-    // Populates the Category and Prompt ID datalists so previously-used values are
-    // selectable instead of needing to be retyped exactly. Categories come from taste
-    // centroids (every category a batch has actually been scored against, minus the
-    // null/global row); prompt IDs come from the full Module 4 prompt history.
-    fetch('/api/taste-filter/centroids')
-      .then((r) => r.json())
+    api.tasteFilter.centroids()
       .then((rows) => {
         const cats = Array.from(new Set(rows.map((r) => r.category).filter((c) => c && c !== 'global'))).sort();
         setCategoryOptions(cats);
       })
       .catch(() => {});
-    fetch('/api/prompts')
-      .then((r) => r.json())
+    api.prompts.list('portrait')
       .then((prompts) => setPromptOptions(Array.isArray(prompts) ? prompts : []))
       .catch(() => {});
   }, []);
 
+  // SSE: pending candidates stream
   useEffect(() => {
-    // Module 7 -> "Auto-import via watched folder" (step 7): a live push connection
-    // instead of polling GET /api/taste-filter/pending on a timer. The backend's
-    // chokidar watcher (watcher.js) already reacts to a new file the instant it lands;
-    // this closes the last remaining gap, where the dashboard used to wait for the next
-    // poll tick to notice. The stream sends one `data:` event per candidate -- whatever
-    // was already pending when the connection opened, then one more per newly-detected
-    // file for as long as the connection stays open -- so the merge/dedupe logic below
-    // is unchanged from the old poll handler, just triggered by a push instead of a
-    // timer. EventSource reconnects automatically on a transient network drop, so
-    // there's no manual retry loop to write here.
     const source = new EventSource('/api/taste-filter/pending/stream');
     source.onmessage = (event) => {
       let candidate;
@@ -165,19 +201,14 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
     return () => source.close();
   }, []);
 
+  // SSE: model status stream
   useEffect(() => {
-    // Live progress for the CLIP model download (see backend/lib/taste-filter/
-    // embeddings.js's downloadState + server.js's GET /api/taste-filter/model-status/
-    // stream). Same EventSource pattern as the pending-candidates stream just above --
-    // sends the current snapshot immediately on connect, then one more event per state
-    // change, so this renders correctly whether the download is already underway, already
-    // finished, or hasn't started yet by the time this component mounts.
     const source = new EventSource('/api/taste-filter/model-status/stream');
     source.onmessage = (event) => {
       try {
         setModelStatus(JSON.parse(event.data));
       } catch {
-        // Malformed event -- keep whatever state we already have rather than clearing it.
+        // keep existing state
       }
     };
     return () => source.close();
@@ -186,6 +217,7 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
   async function handleImport(fileList) {
     const files = Array.from(fileList || []);
     if (!files.length) return;
+    setImporting(true);
     setStatus(`Scoring ${files.length} image${files.length > 1 ? 's' : ''}…`);
 
     const formData = new FormData();
@@ -199,25 +231,25 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
       data.candidates.forEach((c) => seenPathsRef.current.add(c.imagePath));
       setCandidates((prev) => [...data.candidates, ...prev]);
       setStatus(`Scored ${data.candidates.length} image${data.candidates.length > 1 ? 's' : ''}.`);
-      // Makes a just-used new category immediately selectable for the next batch in this
-      // same session, without waiting for a fresh /api/taste-filter/centroids fetch.
+      toast.success(`Scored ${data.candidates.length} image${data.candidates.length > 1 ? 's' : ''}`);
       if (category && !categoryOptions.includes(category)) {
         setCategoryOptions((prev) => [...prev, category].sort());
       }
     } catch (err) {
-      setStatus(`Import failed: ${friendlyErrorMessage(err)}`);
+      const msg = friendlyErrorMessage(err);
+      setStatus(`Import failed: ${msg}`);
+      toast.error(msg);
+    } finally {
+      setImporting(false);
     }
   }
 
   function handleFileChange(e) {
     const files = e.target.files;
     if (files && files.length > 0) {
-      if (files.length === 1) {
-        setSelectedFileName(files[0].name);
-      } else {
-        setSelectedFileName(`${files.length} files selected`);
-      }
+      setSelectedFileName(files.length === 1 ? files[0].name : `${files.length} files selected`);
       handleImport(files);
+      e.target.value = '';
     }
   }
 
@@ -226,37 +258,31 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
     setDragActive(false);
     const files = e.dataTransfer.files;
     if (files && files.length > 0) {
-      if (files.length === 1) {
-        setSelectedFileName(files[0].name);
-      } else {
-        setSelectedFileName(`${files.length} files selected`);
-      }
+      setSelectedFileName(files.length === 1 ? files[0].name : `${files.length} files selected`);
       handleImport(files);
     }
   }
 
   async function handleLabel(candidate, label) {
     try {
-      await fetch('/api/taste-filter/label', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image_path: candidate.imagePath,
-          embedding: candidate.embedding,
-          label,
-          category: candidate.category,
-          prompt_id: candidate.promptId,
-        }),
+      await api.tasteFilter.label({
+        image_path: candidate.imagePath,
+        embedding: candidate.embedding,
+        label,
+        category: candidate.category,
+        prompt_id: candidate.promptId,
       });
       setCandidates((prev) => prev.filter((c) => c.imagePath !== candidate.imagePath));
-    } catch {
-      setStatus('Failed to save label — try again.');
+      toast.success(label === 'keep' ? 'Kept' : 'Discarded');
+    } catch (err) {
+      toast.error(`Failed to save label: ${friendlyErrorMessage(err)}`);
+      throw err;
     }
   }
 
-  async function handleKeepAndSendToPipeline(candidate) {
-    await handleLabel(candidate, 'keep');
+  async function handleKeepAndPipeline(candidate) {
     try {
+      await handleLabel(candidate, 'keep');
       const promoteRes = await fetch('/api/taste-filter/promote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -264,14 +290,15 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
       });
       const promoteData = await parseJsonResponse(promoteRes);
 
-      await fetch('/api/jobs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ artwork_id: promoteData.artwork.id, pipeline_overrides: overrides }),
+      await api.jobs.create({
+        artwork_id: promoteData.artwork.id,
+        pipeline_overrides: overrides,
       });
+      toast.success('Sent to pipeline');
       if (refreshJobs) refreshJobs();
     } catch (err) {
-      setStatus(`Kept, but failed to send to pipeline: ${friendlyErrorMessage(err)}`);
+      toast.error(`Pipeline send failed: ${friendlyErrorMessage(err)}`);
+      throw err;
     }
   }
 
@@ -280,53 +307,42 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
     try {
       const res = await fetch('/api/taste-filter/recompute', { method: 'POST' });
       const data = await parseJsonResponse(res);
-      const global = data.counts.global || { keptCount: 0, discardedCount: 0 };
+      const global = data.counts?.global || { keptCount: 0, discardedCount: 0 };
       setStatus(`Recomputed. Global: ${global.keptCount} kept / ${global.discardedCount} discarded.`);
+      toast.success(`Recomputed: ${global.keptCount} kept / ${global.discardedCount} discarded`);
     } catch (err) {
-      setStatus(`Recompute failed: ${friendlyErrorMessage(err)}`);
+      const msg = friendlyErrorMessage(err);
+      setStatus(`Recompute failed: ${msg}`);
+      toast.error(msg);
     }
   }
 
-  const mainCandidates = candidates.filter((c) => c.autoDecision == null);
-  const autoSortedCandidates = candidates.filter((c) => c.autoDecision != null);
-
-  function renderCandidateCard(c) {
-    return (
-      <div key={c.imagePath} className="card p-4">
-        {c.error ? (
-          <p className="text-danger">{c.error}</p>
-        ) : (
-          <>
-            <div className="taste-card-img-frame mb-2" style={{ aspectRatio: '1/1', background: '#000', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
-              <img src={c.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-            </div>
-            <div className="mb-2">
-              <span className="text-muted mr-1">Global:</span> <ScoreBadge label={c.globalLabel} score={c.globalScore} confident={c.globalConfident} />
-            </div>
-            {c.category && (
-              <div className="mb-2">
-                <span className="text-muted mr-1">{c.category}:</span> <ScoreBadge label={c.categoryLabel} score={c.categoryScore} confident={c.categoryConfident} />
-              </div>
-            )}
-            <div className="flex-row" style={{ gap: '0.5rem' }}>
-              <button onClick={() => handleLabel(c, 'keep')} className="btn-primary flex-1">Keep</button>
-              <button onClick={() => handleLabel(c, 'discard')} className="btn-secondary flex-1">Discard</button>
-              <button onClick={() => handleKeepAndSendToPipeline(c)} className="btn-secondary flex-1">Keep & send to pipeline</button>
-            </div>
-          </>
-        )}
-      </div>
-    );
-  }
+  const mainCandidates = useMemo(
+    () => candidates.filter((c) => c.autoDecision == null),
+    [candidates]
+  );
+  const autoSortedCandidates = useMemo(
+    () => candidates.filter((c) => c.autoDecision != null),
+    [candidates]
+  );
 
   return (
-    <div className="panel p-5">
-      <div className="control-row mb-4" style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        <div className="taste-input-field" style={{ flex: '1', minWidth: '160px' }}>
-          <label htmlFor="taste-category-input" className="sr-only">Category</label>
-          <input
-            id="taste-category-input"
-            className="input"
+    <div className="flex flex-col gap-6">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight">Taste Filter</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Score and curate candidate artwork with CLIP-based taste filtering.
+        </p>
+      </div>
+
+      {/* Controls Row */}
+      <div className="flex flex-col sm:flex-row gap-3 items-end">
+        <div className="flex-1 w-full min-w-0">
+          <Label htmlFor="taste-category" className="text-xs text-muted-foreground mb-1.5">
+            Category
+          </Label>
+          <Input
+            id="taste-category"
             list="taste-category-options"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
@@ -337,87 +353,142 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
               <option key={c} value={c} />
             ))}
           </datalist>
-          <span className="input-helper-text">Curation name (optional)</span>
         </div>
-        <div className="taste-input-field" style={{ flex: '1', minWidth: '160px' }}>
-          <label htmlFor="taste-prompt-id-input" className="sr-only">Prompt ID</label>
-          <input
-            id="taste-prompt-id-input"
-            className="input"
+        <div className="flex-1 w-full min-w-0">
+          <Label htmlFor="taste-prompt-id" className="text-xs text-muted-foreground mb-1.5">
+            Prompt ID
+          </Label>
+          <Input
+            id="taste-prompt-id"
             list="taste-prompt-id-options"
             value={promptId}
             onChange={(e) => setPromptId(e.target.value)}
-            placeholder="links to Module 4"
+            placeholder="Links to Module 4"
           />
           <datalist id="taste-prompt-id-options">
             {promptOptions.map((p) => (
               <option key={p.id} value={p.id} label={p.prompt_text ? p.prompt_text.slice(0, 60) : undefined} />
             ))}
           </datalist>
-          <span className="input-helper-text">Module link (optional)</span>
         </div>
-        <button className="btn-primary recompute-btn" onClick={handleRecompute} type="button">
-          <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M23 4v6h-6M1 20v-6h6" />
-            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
-          </svg>
+        <Button
+          variant="outline"
+          onClick={handleRecompute}
+          className="shrink-0"
+        >
+          <RefreshCw className="size-3.5" />
           Recompute now
-        </button>
+        </Button>
       </div>
 
+      {/* Model Download Progress */}
       <ModelDownloadBar modelStatus={modelStatus} />
 
+      {/* Drag-and-Drop Zone */}
       <div
-        className={`dropzone taste-dropzone ${dragActive ? 'active' : ''}`}
+        className={cn(
+          'relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 transition-colors cursor-pointer',
+          dragActive
+            ? 'border-amber-500 bg-amber-500/5'
+            : 'border-border hover:border-amber-500/50 hover:bg-muted/30'
+        )}
         onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
         onDragLeave={() => setDragActive(false)}
         onDrop={handleDrop}
+        onClick={() => !importing && fileInputRef.current?.click()}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click(); }}
       >
-        <div className="dropzone-icon-badge">
-          <svg className="upload-cloud-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M16 16l-4-4m0 0l-4 4m4-4v12" />
-            <path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3" />
-          </svg>
-        </div>
-        <p className="dropzone-title">Drag & drop a batch of candidate images here</p>
-        <p className="dropzone-subtitle">Supports JPG, PNG, WEBP • Max 50MB per file</p>
-        <div className="dropzone-file-control">
-          <button
-            type="button"
-            className="btn-secondary btn-sm"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            Choose Files
-          </button>
-          <span className="dropzone-file-name">{selectedFileName || 'No file chosen'}</span>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept="image/*"
-            aria-label="Upload candidate images"
-            style={{ display: 'none' }}
-            onChange={handleFileChange}
-          />
-        </div>
+        {importing ? (
+          <>
+            <Skeleton className="size-10 rounded-full mb-3" />
+            <Skeleton className="h-4 w-48 mb-1" />
+            <Skeleton className="h-3 w-32" />
+          </>
+        ) : (
+          <>
+            <div className="flex items-center justify-center size-10 rounded-full bg-amber-500/10 mb-3">
+              <Upload className="size-5 text-amber-400" />
+            </div>
+            <p className="text-sm font-medium">Drag & drop candidate images here</p>
+            <p className="text-xs text-muted-foreground mt-1">JPG, PNG, WEBP · Max 50MB per file</p>
+            <Button variant="ghost" size="xs" className="mt-3">
+              Choose Files
+            </Button>
+            {selectedFileName && (
+              <p className="text-xs text-muted-foreground mt-1.5">{selectedFileName}</p>
+            )}
+          </>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/*"
+          aria-label="Upload candidate images"
+          className="hidden"
+          onChange={handleFileChange}
+        />
       </div>
-      {status && <p className="text-muted mono-sm mb-2 mt-2">{status}</p>}
 
+      {status && !importing && (
+        <p className="text-xs text-muted-foreground font-mono">{status}</p>
+      )}
+
+      {/* Main Candidates Grid */}
       {mainCandidates.length > 0 && (
-        <div className="card-grid">
-          {mainCandidates.map((c) => renderCandidateCard(c))}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <h3 className="text-sm font-medium">Candidates</h3>
+            <Badge variant="secondary">{mainCandidates.length}</Badge>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {mainCandidates.map((c) => (
+              <CandidateCard
+                key={c.imagePath}
+                candidate={c}
+                onLabel={handleLabel}
+                onKeepAndPipeline={handleKeepAndPipeline}
+              />
+            ))}
+          </div>
         </div>
       )}
 
+      {/* Empty State */}
+      {candidates.length === 0 && !importing && (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <ImageOff className="size-10 text-muted-foreground/30 mb-3" />
+          <p className="text-sm text-muted-foreground">No candidates yet.</p>
+          <p className="text-xs text-muted-foreground mt-1">Drop images above or they will stream in from the watch folder.</p>
+        </div>
+      )}
+
+      {/* Auto-Sorted Collapsible Section */}
       {autoSortedCandidates.length > 0 && (
-        <div className="mt-4">
-          <button className="btn-ghost" onClick={() => setAutoSortedExpanded(!autoSortedExpanded)}>
-            <span aria-hidden="true">{autoSortedExpanded ? '▾' : '▸'}</span>{' '}
-            <span>Auto-sorted ({autoSortedCandidates.length})</span>
+        <div>
+          <button
+            onClick={() => setAutoSortedExpanded(!autoSortedExpanded)}
+            className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-2"
+          >
+            {autoSortedExpanded
+              ? <ChevronDown className="size-4" />
+              : <ChevronRight className="size-4" />
+            }
+            Auto-sorted
+            <Badge variant="outline" className="ml-1">{autoSortedCandidates.length}</Badge>
           </button>
           {autoSortedExpanded && (
-            <div className="card-grid mt-2">
-              {autoSortedCandidates.map((c) => renderCandidateCard(c))}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 mt-2">
+              {autoSortedCandidates.map((c) => (
+                <CandidateCard
+                  key={c.imagePath}
+                  candidate={c}
+                  onLabel={handleLabel}
+                  onKeepAndPipeline={handleKeepAndPipeline}
+                />
+              ))}
             </div>
           )}
         </div>

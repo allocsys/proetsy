@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-
-// plan.md -> "Frontend changes" -> new component `frontend/src/MockupTemplates.jsx`.
-// Not job-scoped -- mirrors TasteFilter.jsx/PromptHelper.jsx's shape, not
-// JobListingReview.jsx's. Rollout step 4 built the folder field + scan/select grid +
-// bulk-assign + configured-templates grid with a plain text input only. Rollout step 5
-// (this pass) adds the Electron native "Browse…" button: window.mockupTemplatesAPI only
-// exists when the preload bridge has actually run (electron/preload.js), so it's
-// feature-detected here rather than assumed -- dev-in-browser (no Electron) simply never
-// renders the button and the plain text field keeps working exactly as it did in step 4.
+import { FolderSearch, FolderOpen, Plus, Trash2, Save, ImageOff } from 'lucide-react';
+import { toast } from 'sonner';
+import { api } from '@/hooks/useApi';
+import { useAsyncTask } from '@/hooks/useAsyncTask';
+import { useConfirm } from '@/contexts/ConfirmContext';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 function slugify(filename) {
   const base = filename.replace(/\.[^/.]+$/, '');
@@ -17,130 +20,189 @@ function slugify(filename) {
     .replace(/^-+|-+$/g, '');
 }
 
-function TemplateThumb({ url, alt }) {
-  if (!url) return <div className="mockup-template-thumb-placeholder" aria-hidden="true" />;
+function FormField({ label, value, onChange, placeholder, list, className }) {
   return (
-    <div className="mockup-template-thumb-frame">
-      <img src={url} alt={alt} className="mockup-template-thumb" />
-    </div>
-  );
-}
-
-// Shared label+input block used by both the bulk-assign row and the configured-templates
-// row -- same `settings-field` wrapper, `settings-field-label` span, and `input` markup
-// either section used inline before. onChange here takes the raw string value (not the
-// event) so call sites can pass a plain setter or a partial-update closure directly.
-function FormField({ label, value, onChange, placeholder, list, style }) {
-  return (
-    <div className="settings-field" style={style}>
-      <span className="settings-field-label">{label}</span>
-      <input
-        className="input"
+    <div className={cn('flex flex-col gap-1.5', className)}>
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Input
         list={list}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        className="h-8"
       />
     </div>
   );
 }
 
-function MockupTemplates() {
+function TemplatePreview({ url, alt }) {
+  if (!url) {
+    return (
+      <div className="flex items-center justify-center aspect-[4/3] rounded-lg bg-muted">
+        <ImageOff className="size-8 text-muted-foreground/40" />
+      </div>
+    );
+  }
+  return (
+    <div className="overflow-hidden rounded-lg bg-black">
+      <img
+        src={url}
+        alt={alt}
+        className="w-full aspect-[4/3] object-contain"
+      />
+    </div>
+  );
+}
+
+function ConfiguredTemplateCard({ row, categoryOptions, onSave, onRemove }) {
+  const [edits, setEdits] = useState({});
+  const isPsd = row.mockup_template_path?.toLowerCase().endsWith('.psd');
+
+  function getValue(field) {
+    if (field in edits) return edits[field];
+    if (field === 'dpi') return row.dpi ?? '';
+    return row[field] ?? '';
+  }
+
+  function updateField(field, value) {
+    setEdits((prev) => ({ ...prev, [field]: value }));
+  }
+
+  return (
+    <Card className="gap-0">
+      <TemplatePreview url={row.preview_url} alt={row.size_key} />
+      <CardContent className="flex flex-col gap-3 p-4">
+        <p className="text-sm font-medium truncate">{row.size_key}</p>
+        <div className="grid grid-cols-2 gap-2">
+          <FormField
+            label="Dimensions"
+            value={getValue('dimensions')}
+            onChange={(v) => updateField('dimensions', v)}
+            placeholder="8x10"
+          />
+          <FormField
+            label="DPI"
+            value={getValue('dpi')}
+            onChange={(v) => updateField('dpi', v)}
+            placeholder="300"
+          />
+          <FormField
+            label="Orientation"
+            value={getValue('orientation')}
+            onChange={(v) => updateField('orientation', v)}
+            placeholder="portrait"
+          />
+          <FormField
+            label="Category"
+            value={getValue('category')}
+            onChange={(v) => updateField('category', v)}
+            placeholder="e.g. bedroom"
+            list="mockup-category-options"
+          />
+        </div>
+        {isPsd && (
+          <FormField
+            label="Placement Layer"
+            value={getValue('placement_layer')}
+            onChange={(v) => updateField('placement_layer', v)}
+            placeholder="e.g. artwork"
+          />
+        )}
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            onClick={() => onSave(row, getValue('dimensions'), getValue('dpi'), getValue('orientation'), getValue('category'), getValue('placement_layer'))}
+          >
+            <Save className="size-3.5" />
+            Save
+          </Button>
+          <Button variant="destructive" size="sm" onClick={() => onRemove(row.size_key)}>
+            <Trash2 className="size-3.5" />
+            Remove
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function MockupTemplates() {
   const [folder, setFolder] = useState('');
-  const [folderSavedMessage, setFolderSavedMessage] = useState('');
-  const [scanStatus, setScanStatus] = useState('');
   const [scanFiles, setScanFiles] = useState([]);
-  const [selected, setSelected] = useState({}); // path -> boolean
+  const [selected, setSelected] = useState({});
   const [bulkDimensions, setBulkDimensions] = useState('');
   const [bulkDpi, setBulkDpi] = useState('');
   const [bulkOrientation, setBulkOrientation] = useState('');
   const [bulkCategory, setBulkCategory] = useState('');
   const [categoryOptions, setCategoryOptions] = useState([]);
-  const [perFileSizeKey, setPerFileSizeKey] = useState({}); // path -> string
-  const [perFilePlacementLayer, setPerFilePlacementLayer] = useState({}); // path -> string
-  const [assignStatus, setAssignStatus] = useState('');
-  const [assigning, setAssigning] = useState(false);
-
+  const [perFileSizeKey, setPerFileSizeKey] = useState({});
+  const [perFilePlacementLayer, setPerFilePlacementLayer] = useState({});
   const [configured, setConfigured] = useState([]);
-  const [configuredEdits, setConfiguredEdits] = useState({}); // size_key -> partial fields
-  const [configuredStatus, setConfiguredStatus] = useState('');
+  const [configuredKey, setConfiguredKey] = useState(0);
 
-  // Single source of truth for whether the Electron preload bridge is present, instead of
-  // checking `window.mockupTemplatesAPI` separately in handleBrowse and in the JSX render
-  // condition below.
+  const listTask = useAsyncTask();
+  const scanTask = useAsyncTask();
+  const assignTask = useAsyncTask();
+  const confirm = useConfirm();
+
   const hasFolderPicker = typeof window !== 'undefined' && !!window.mockupTemplatesAPI;
 
   function refreshConfigured() {
-    fetch('/api/mockup-templates')
-      .then((r) => r.json())
+    api.mockups.templates
+      .list()
       .then(setConfigured)
       .catch(() => {});
   }
 
   useEffect(() => {
-    fetch('/api/settings')
-      .then((r) => r.json())
-      .then((s) => setFolder(s.mockup_templates_dir || ''))
-      .catch(() => {});
+    listTask.run(async () => {
+      const [settings, cats] = await Promise.all([
+        api.settings.get(),
+        api.mockups.templates.categories(),
+      ]);
+      setFolder(settings.mockup_templates_dir || '');
+      const defaults = ['bedroom', 'hallway', 'mug', 'nature', 'green space', 'white space'];
+      const merged = Array.from(new Set([...defaults, ...cats])).sort();
+      setCategoryOptions(merged);
+    });
     refreshConfigured();
-    // Merge a small set of common suggestions with whatever's already configured, so the
-    // datalist is useful before any template has been categorized yet -- same "suggest,
-    // don't force an enum" convention as tag-category-options in App.jsx.
-    fetch('/api/mockup-templates/categories')
-      .then((r) => r.json())
-      .then((configuredCategories) => {
-        const defaults = ['bedroom', 'hallway', 'mug', 'nature', 'green space', 'white space'];
-        const merged = Array.from(new Set([...defaults, ...configuredCategories])).sort();
-        setCategoryOptions(merged);
-      })
-      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function saveFolder(value) {
-    await fetch('/api/settings', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mockup_templates_dir: value }),
-    }).catch(() => {});
-    setFolderSavedMessage('Saved.');
+    try {
+      await api.settings.patch({ mockup_templates_dir: value });
+      toast.success('Folder path saved');
+    } catch {
+      toast.error('Failed to save folder path');
+    }
   }
 
-  // Rollout step 5: calls the native OS folder picker via the preload bridge
-  // (electron/main.js's 'select-folder' IPC handler), fills the field, and saves it the
-  // same way a manual edit's onBlur would -- a cancelled dialog (selectFolder() resolves
-  // null) leaves the field untouched.
   async function handleBrowse() {
     if (!hasFolderPicker) return;
     const picked = await window.mockupTemplatesAPI.selectFolder();
     if (!picked) return;
     setFolder(picked);
-    setFolderSavedMessage('');
     await saveFolder(picked);
   }
 
-  async function handleScan() {
+  function handleScan() {
     if (!folder.trim()) {
-      setScanStatus('Enter a folder path first.');
+      toast.error('Enter a folder path first');
       return;
     }
-    setScanStatus('Scanning…');
-    setSelected({});
-    try {
-      const res = await fetch(`/api/mockup-templates/scan?folder=${encodeURIComponent(folder.trim())}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Scan failed');
-      setScanFiles(data.files);
-      setScanStatus(`Found ${data.files.length} file${data.files.length === 1 ? '' : 's'}.`);
-      // Seed default size_key per file (slugified filename), editable below.
+    scanTask.run(async () => {
+      const data = await api.mockups.templates.scan(folder.trim());
+      setScanFiles(data.files || []);
+      setSelected({});
       const defaults = {};
-      data.files.forEach((f) => {
+      (data.files || []).forEach((f) => {
         defaults[f.path] = slugify(f.filename);
       });
       setPerFileSizeKey(defaults);
-    } catch (err) {
-      setScanStatus(`Scan failed: ${err.message}`);
-      setScanFiles([]);
-    }
+      setPerFilePlacementLayer({});
+      toast.success(`Found ${(data.files || []).length} file${(data.files || []).length === 1 ? '' : 's'}`);
+    });
   }
 
   function toggleSelected(path) {
@@ -152,24 +214,19 @@ function MockupTemplates() {
     [scanFiles, selected]
   );
 
-  async function handleBulkAssign() {
+  function handleBulkAssign() {
     if (!selectedFiles.length) return;
-    setAssigning(true);
-    setAssignStatus(`Assigning ${selectedFiles.length} file${selectedFiles.length === 1 ? '' : 's'}…`);
-
-    let succeeded = 0;
-    const errors = [];
-    for (const file of selectedFiles) {
-      const sizeKey = (perFileSizeKey[file.path] || '').trim();
-      if (!sizeKey) {
-        errors.push(`${file.filename}: size key is required`);
-        continue;
-      }
-      try {
-        const res = await fetch('/api/mockup-templates', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+    assignTask.run(async () => {
+      let succeeded = 0;
+      const errors = [];
+      for (const file of selectedFiles) {
+        const sizeKey = (perFileSizeKey[file.path] || '').trim();
+        if (!sizeKey) {
+          errors.push(`${file.filename}: size key is required`);
+          continue;
+        }
+        try {
+          await api.mockups.templates.add({
             size_key: sizeKey,
             dimensions: bulkDimensions || null,
             dpi: bulkDpi ? Number(bulkDpi) : null,
@@ -177,229 +234,298 @@ function MockupTemplates() {
             mockup_template: file.filename,
             placement_layer: file.kind === 'psd' ? perFilePlacementLayer[file.path] || null : null,
             category: bulkCategory || null,
-          }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Assign failed');
-        succeeded += 1;
-      } catch (err) {
-        errors.push(`${file.filename}: ${err.message}`);
+          });
+          succeeded += 1;
+        } catch (err) {
+          errors.push(`${file.filename}: ${err.message}`);
+        }
       }
-    }
 
-    setAssignStatus(
-      errors.length
-        ? `Assigned ${succeeded} of ${selectedFiles.length}. Errors: ${errors.join('; ')}`
-        : `Assigned ${succeeded} file${succeeded === 1 ? '' : 's'}.`
-    );
-    setAssigning(false);
-    setSelected({});
-    refreshConfigured();
-    // Re-scan so "already used as X" badges reflect the new assignments.
-    handleScan();
+      if (errors.length) {
+        toast.error(`Assigned ${succeeded} of ${selectedFiles.length}. Errors: ${errors.join('; ')}`);
+      } else {
+        toast.success(`Assigned ${succeeded} file${succeeded === 1 ? '' : 's'}`);
+      }
+      setSelected({});
+      refreshConfigured();
+      handleScan();
+    });
   }
 
-  function updateConfiguredEdit(sizeKey, field, value) {
-    setConfiguredEdits((prev) => ({ ...prev, [sizeKey]: { ...prev[sizeKey], [field]: value } }));
-  }
-
-  function getConfiguredValue(row, field) {
-    const edit = configuredEdits[row.size_key];
-    if (edit && field in edit) return edit[field];
-    if (field === 'dpi') return row.dpi ?? '';
-    return row[field] ?? '';
-  }
-
-  async function saveConfiguredEdit(row) {
-    const dimensions = getConfiguredValue(row, 'dimensions');
-    const dpi = getConfiguredValue(row, 'dpi');
-    const orientation = getConfiguredValue(row, 'orientation');
-    const placementLayer = getConfiguredValue(row, 'placement_layer');
-    const category = getConfiguredValue(row, 'category');
-    setConfiguredStatus(`Saving ${row.size_key}…`);
+  async function handleConfiguredSave(row, dimensions, dpi, orientation, category, placementLayer) {
     try {
-      const res = await fetch('/api/mockup-templates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          size_key: row.size_key,
-          dimensions: dimensions || null,
-          dpi: dpi ? Number(dpi) : null,
-          orientation: orientation || null,
-          mockup_template: row.mockup_template_path,
-          placement_layer: placementLayer || null,
-          category: category || null,
-        }),
+      await api.mockups.templates.add({
+        size_key: row.size_key,
+        dimensions: dimensions || null,
+        dpi: dpi ? Number(dpi) : null,
+        orientation: orientation || null,
+        mockup_template: row.mockup_template_path,
+        placement_layer: placementLayer || null,
+        category: category || null,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Save failed');
-      setConfiguredStatus(`Saved ${row.size_key}.`);
+      toast.success(`Saved ${row.size_key}`);
       refreshConfigured();
+      setConfiguredKey((k) => k + 1);
     } catch (err) {
-      setConfiguredStatus(`Save failed: ${err.message}`);
+      toast.error(`Save failed: ${err.message}`);
     }
   }
 
-  async function removeConfigured(sizeKey) {
-    setConfiguredStatus(`Removing ${sizeKey}…`);
+  async function handleConfiguredRemove(sizeKey) {
+    const ok = await confirm({
+      title: 'Remove template',
+      description: `Remove the "${sizeKey}" template? This cannot be undone.`,
+      confirmText: 'Remove',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     try {
-      const res = await fetch(`/api/mockup-templates/${encodeURIComponent(sizeKey)}`, { method: 'DELETE' });
-      if (!res.ok && res.status !== 204) {
-        const data = await res.json();
-        throw new Error(data.error || 'Remove failed');
-      }
-      setConfiguredStatus(`Removed ${sizeKey}.`);
+      await api.mockups.templates.delete(sizeKey);
+      toast.success(`Removed ${sizeKey}`);
       refreshConfigured();
     } catch (err) {
-      setConfiguredStatus(`Remove failed: ${err.message}`);
+      toast.error(`Remove failed: ${err.message}`);
     }
   }
 
   return (
-    <div className="panel" style={{ padding: '2rem', border: 'none', background: 'transparent', boxShadow: 'none' }}>
-      <h2 style={{ marginTop: 0, marginBottom: '1.5rem', fontFamily: 'var(--font-body)', fontWeight: 700 }}>Mockup Templates</h2>
+    <div className="flex flex-col gap-6">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight">Mockup Templates</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Scan folders for mockup files and configure template assignments.
+        </p>
+      </div>
 
-      <div className="card settings-section-card">
-        <h3 className="settings-section-title">Templates folder</h3>
-        <div className="settings-subsection" style={{ marginBottom: 0 }}>
-          <div className="settings-field-row">
-            <div className="settings-field" style={{ flex: 1, minWidth: '260px' }}>
-              <span className="settings-field-label">Folder path</span>
-              <input
-                className="input"
+      {/* Templates Folder Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FolderOpen className="size-4 text-amber-400" />
+            Templates Folder
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex-1">
+              <Label htmlFor="folder-path" className="text-xs text-muted-foreground mb-1.5">Folder path</Label>
+              <Input
+                id="folder-path"
                 value={folder}
-                onChange={(e) => { setFolder(e.target.value); setFolderSavedMessage(''); }}
+                onChange={(e) => setFolder(e.target.value)}
                 onBlur={(e) => saveFolder(e.target.value)}
                 placeholder="/home/you/etsy-mockup-packs"
               />
             </div>
-            {hasFolderPicker && (
-              <button className="btn-secondary" onClick={handleBrowse}>Browse…</button>
-            )}
-            <button className="btn-primary" onClick={handleScan}>Scan folder</button>
-            {folderSavedMessage && <span className="text-muted mono-sm">{folderSavedMessage}</span>}
-          </div>
-          {scanStatus && <p className="mono taste-status" style={{ marginTop: '0.75rem' }}>{scanStatus}</p>}
-        </div>
-      </div>
-
-      {scanFiles.length > 0 && (
-        <div className="card settings-section-card">
-          <h3 className="settings-section-title">Select templates to configure</h3>
-          <div className="taste-grid">
-            {scanFiles.map((f) => (
-              <div key={f.path} className="surface taste-card mockup-template-card">
-                <TemplateThumb url={null} alt={f.filename} />
-                <label className="mockup-template-select-row">
-                  <input type="checkbox" checked={!!selected[f.path]} onChange={() => toggleSelected(f.path)} />
-                  <span className="mockup-template-filename">{f.filename}</span>
-                </label>
-                <p className="taste-card-meta">{f.width}×{f.height}px · {f.kind}</p>
-                {f.alreadyAssignedTo && (
-                  <p className="taste-card-meta">
-                    <span className="read-only-badge">already used as {f.alreadyAssignedTo}</span>
-                  </p>
-                )}
-                {selected[f.path] && (
-                  <div className="settings-field" style={{ marginTop: '0.5rem' }}>
-                    <span className="settings-field-label">Size key</span>
-                    <input
-                      className="input"
-                      value={perFileSizeKey[f.path] ?? ''}
-                      onChange={(e) => setPerFileSizeKey((prev) => ({ ...prev, [f.path]: e.target.value }))}
-                    />
-                    {f.kind === 'psd' && (
-                      <>
-                        <span className="settings-field-label" style={{ marginTop: '0.5rem' }}>Placement layer</span>
-                        <input
-                          className="input"
-                          value={perFilePlacementLayer[f.path] ?? ''}
-                          onChange={(e) => setPerFilePlacementLayer((prev) => ({ ...prev, [f.path]: e.target.value }))}
-                          placeholder="e.g. artwork"
-                        />
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {selectedFiles.length > 0 && (
-            <div className="settings-subsection" style={{ marginTop: '1.5rem' }}>
-              <h4 className="settings-sub-heading">Assign {selectedFiles.length} selected file{selectedFiles.length === 1 ? '' : 's'}</h4>
-              <div className="settings-field-row">
-                <FormField label="Dimensions" value={bulkDimensions} onChange={setBulkDimensions} placeholder="8x10" />
-                <FormField label="DPI" value={bulkDpi} onChange={setBulkDpi} placeholder="300" />
-                <FormField label="Orientation" value={bulkOrientation} onChange={setBulkOrientation} placeholder="portrait" />
-                <FormField
-                  label="Category"
-                  value={bulkCategory}
-                  onChange={setBulkCategory}
-                  placeholder="e.g. bedroom, mug, nature"
-                  list="mockup-category-options"
-                />
-                <button className="btn-primary" onClick={handleBulkAssign} disabled={assigning}>
-                  Assign {selectedFiles.length} file{selectedFiles.length === 1 ? '' : 's'}
-                </button>
-              </div>
-              {assignStatus && <p className="mono taste-status" style={{ marginTop: '0.75rem' }}>{assignStatus}</p>}
+            <div className="flex items-end gap-2">
+              {hasFolderPicker && (
+                <Button variant="outline" onClick={handleBrowse} className="shrink-0">
+                  <FolderOpen className="size-3.5" />
+                  Browse…
+                </Button>
+              )}
+              <Button onClick={handleScan} disabled={scanTask.pending} className="shrink-0">
+                {scanTask.pending ? 'Scanning…' : 'Scan folder'}
+                <FolderSearch className="size-3.5" />
+              </Button>
             </div>
+          </div>
+          {listTask.error && (
+            <p className="text-sm text-destructive mt-3">{listTask.error}</p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Scan Results */}
+      {scanTask.pending && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i} className="gap-0">
+              <Skeleton className="aspect-[4/3] w-full rounded-t-xl" />
+              <CardContent className="p-4 space-y-2">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
 
-      <div className="card settings-section-card">
-        <h3 className="settings-section-title">Configured templates</h3>
-        {configuredStatus && <p className="text-muted mono-sm" style={{ marginTop: 0 }}>{configuredStatus}</p>}
-        {configured.length ? (
-          <div className="taste-grid">
-            {configured.map((row) => (
-              <div key={row.size_key} className="surface taste-card mockup-template-card">
-                <TemplateThumb url={row.preview_url} alt={row.size_key} />
-                <p className="taste-card-meta mockup-template-filename">{row.size_key}</p>
-                <div className="settings-field-row">
+      {scanFiles.length > 0 && !scanTask.pending && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Plus className="size-4 text-amber-400" />
+              Select Templates to Configure
+              <Badge variant="secondary">{scanFiles.length} files</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-96 overflow-y-auto">
+              {scanFiles.map((f) => (
+                <div
+                  key={f.path}
+                  className={cn(
+                    'rounded-xl border p-3 transition-colors',
+                    selected[f.path]
+                      ? 'border-amber-500/50 bg-amber-500/5'
+                      : 'border-border bg-card'
+                  )}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <input
+                      type="checkbox"
+                      checked={!!selected[f.path]}
+                      onChange={() => toggleSelected(f.path)}
+                      className="rounded border-input accent-amber-500"
+                    />
+                    <span className="text-sm font-medium truncate flex-1" title={f.filename}>
+                      {f.filename}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {f.width}×{f.height}px
+                  </p>
+                  <Badge variant="outline" className="mt-1 text-[10px]">
+                    {f.kind.toUpperCase()}
+                  </Badge>
+                  {f.alreadyAssignedTo && (
+                    <p className="text-xs text-muted-foreground mt-1.5">
+                      already used as <span className="font-medium text-foreground">{f.alreadyAssignedTo}</span>
+                    </p>
+                  )}
+                  {selected[f.path] && (
+                    <div className="flex flex-col gap-1.5 mt-3 pt-3 border-t border-border">
+                      <div className="flex flex-col gap-1">
+                        <Label className="text-xs text-muted-foreground">Size key</Label>
+                        <Input
+                          value={perFileSizeKey[f.path] ?? ''}
+                          onChange={(e) =>
+                            setPerFileSizeKey((prev) => ({ ...prev, [f.path]: e.target.value }))
+                          }
+                          className="h-7 text-xs"
+                        />
+                      </div>
+                      {f.kind === 'psd' && (
+                        <div className="flex flex-col gap-1">
+                          <Label className="text-xs text-muted-foreground">Placement layer</Label>
+                          <Input
+                            value={perFilePlacementLayer[f.path] ?? ''}
+                            onChange={(e) =>
+                              setPerFilePlacementLayer((prev) => ({ ...prev, [f.path]: e.target.value }))
+                            }
+                            placeholder="e.g. artwork"
+                            className="h-7 text-xs"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Bulk Assign */}
+            {selectedFiles.length > 0 && (
+              <div className="mt-6 pt-4 border-t border-border">
+                <p className="text-sm font-medium mb-3">
+                  Bulk assign {selectedFiles.length} selected file{selectedFiles.length === 1 ? '' : 's'}
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 items-end">
                   <FormField
                     label="Dimensions"
-                    value={getConfiguredValue(row, 'dimensions')}
-                    onChange={(v) => updateConfiguredEdit(row.size_key, 'dimensions', v)}
+                    value={bulkDimensions}
+                    onChange={setBulkDimensions}
+                    placeholder="8x10"
+                    className="flex-1 min-w-0"
                   />
                   <FormField
                     label="DPI"
-                    value={getConfiguredValue(row, 'dpi')}
-                    onChange={(v) => updateConfiguredEdit(row.size_key, 'dpi', v)}
+                    value={bulkDpi}
+                    onChange={setBulkDpi}
+                    placeholder="300"
+                    className="w-24"
                   />
                   <FormField
                     label="Orientation"
-                    value={getConfiguredValue(row, 'orientation')}
-                    onChange={(v) => updateConfiguredEdit(row.size_key, 'orientation', v)}
+                    value={bulkOrientation}
+                    onChange={setBulkOrientation}
+                    placeholder="portrait"
+                    className="w-32"
                   />
                   <FormField
                     label="Category"
-                    value={getConfiguredValue(row, 'category')}
-                    onChange={(v) => updateConfiguredEdit(row.size_key, 'category', v)}
+                    value={bulkCategory}
+                    onChange={setBulkCategory}
+                    placeholder="e.g. bedroom"
                     list="mockup-category-options"
+                    className="flex-1 min-w-0"
                   />
+                  <Button
+                    onClick={handleBulkAssign}
+                    disabled={assignTask.pending}
+                    className="shrink-0"
+                  >
+                    {assignTask.pending ? 'Assigning…' : `Assign ${selectedFiles.length}`}
+                    <Plus className="size-3.5" />
+                  </Button>
                 </div>
-                {row.mockup_template_path && row.mockup_template_path.toLowerCase().endsWith('.psd') && (
-                  <FormField
-                    label="Placement layer"
-                    value={getConfiguredValue(row, 'placement_layer')}
-                    onChange={(v) => updateConfiguredEdit(row.size_key, 'placement_layer', v)}
-                    style={{ marginTop: '0.5rem' }}
-                  />
+                {assignTask.error && (
+                  <p className="text-sm text-destructive mt-2">{assignTask.error}</p>
                 )}
-                <div className="flex-row taste-card-actions" style={{ marginTop: '0.75rem', gap: '0.5rem' }}>
-                  <button className="btn-primary flex-1 btn-sm" onClick={() => saveConfiguredEdit(row)}>Save</button>
-                  <button className="btn-secondary flex-1 btn-sm" onClick={() => removeConfigured(row.size_key)}>Remove</button>
-                </div>
               </div>
-            ))}
-          </div>
-        ) : (
-          <p className="empty-state" style={{ margin: 0 }}>No templates configured yet — scan a folder above and assign some.</p>
-        )}
-      </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Configured Templates */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ImageOff className="size-4 text-amber-400" />
+            Configured Templates
+            {configured.length > 0 && <Badge variant="secondary">{configured.length}</Badge>}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {listTask.pending ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Card key={i} className="gap-0">
+                  <Skeleton className="aspect-[4/3] w-full rounded-t-xl" />
+                  <CardContent className="p-4 space-y-2">
+                    <Skeleton className="h-4 w-2/3" />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Skeleton className="h-7 w-full" />
+                      <Skeleton className="h-7 w-full" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : configured.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {configured.map((row) => (
+                <ConfiguredTemplateCard
+                  key={`${row.size_key}-${configuredKey}`}
+                  row={row}
+                  categoryOptions={categoryOptions}
+                  onSave={handleConfiguredSave}
+                  onRemove={handleConfiguredRemove}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <ImageOff className="size-10 text-muted-foreground/30 mb-3" />
+              <p className="text-sm text-muted-foreground">
+                No templates configured yet — scan a folder above and assign some.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <datalist id="mockup-category-options">
         {categoryOptions.map((c) => (
@@ -409,5 +535,3 @@ function MockupTemplates() {
     </div>
   );
 }
-
-export default MockupTemplates;

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import StatusPill from './components/StatusPill.jsx';
+import { Loader2, Download, RotateCcw, Check, AlertCircle, RefreshCw } from 'lucide-react';
+import StatusBadge from '@/components/layout/StatusBadge';
+import { Button } from '@/components/ui/button';
 
 function UpdaterStatus() {
   const [phase, setPhase] = useState('idle');
@@ -60,53 +62,82 @@ function UpdaterStatus() {
   }
 
   if (phase === 'checking') {
-    return <span className="text-muted mono-sm">Checking for updates…</span>;
+    return (
+      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Loader2 className="size-3 animate-spin" />
+        Checking for updates…
+      </span>
+    );
   }
 
   if (phase === 'available') {
     return (
-      <div className="flex-row flex-wrap" style={{ gap: '0.5rem' }}>
-        <StatusPill variant="pending">Update {version ? `v${version}` : ''} available</StatusPill>
-        <button className="btn-primary btn-sm" onClick={handleDownload}>Download update</button>
+      <div className="flex items-center gap-2">
+        <StatusBadge status="pending">
+          {version ? `Update v${version} available` : 'Update available'}
+        </StatusBadge>
+        <Button size="xs" onClick={handleDownload}>
+          <Download className="size-3" />
+          Download
+        </Button>
       </div>
     );
   }
 
   if (phase === 'downloading') {
-    return <span className="text-muted mono-sm">Downloading update… {percent}%</span>;
+    return (
+      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Loader2 className="size-3 animate-spin" />
+        Downloading… {percent}%
+      </span>
+    );
   }
 
   if (phase === 'downloaded') {
     return (
-      <div className="flex-row flex-wrap" style={{ gap: '0.5rem' }}>
-        <StatusPill variant="success">Update {version ? `v${version}` : ''} ready</StatusPill>
-        <button className="btn-primary btn-sm" onClick={handleInstall}>Restart & install</button>
+      <div className="flex items-center gap-2">
+        <StatusBadge status="success">
+          {version ? `Update v${version} ready` : 'Update ready'}
+        </StatusBadge>
+        <Button size="xs" onClick={handleInstall}>
+          <RotateCcw className="size-3" />
+          Restart
+        </Button>
       </div>
     );
   }
 
   if (phase === 'not-available') {
     return (
-      <div className="flex-row flex-wrap" style={{ gap: '0.5rem' }}>
-        <StatusPill variant="success">Up to date</StatusPill>
-        <button className="btn-ghost btn-sm" onClick={handleCheck}>Check again</button>
+      <div className="flex items-center gap-2">
+        <StatusBadge status="success">Up to date</StatusBadge>
+        <Button variant="ghost" size="xs" onClick={handleCheck}>
+          <RefreshCw className="size-3" />
+          Check
+        </Button>
       </div>
     );
   }
 
   if (phase === 'error') {
     return (
-      <div className="flex-row flex-wrap" style={{ gap: '0.5rem' }}>
-        <span className="text-danger mono-sm">{errorMsg}</span>
-        <button className="btn-secondary btn-sm" onClick={handleCheck}>Retry</button>
+      <div className="flex items-center gap-2">
+        <span className="flex items-center gap-1 text-xs text-destructive">
+          <AlertCircle className="size-3" />
+          {errorMsg}
+        </span>
+        <Button variant="secondary" size="xs" onClick={handleCheck}>
+          Retry
+        </Button>
       </div>
     );
   }
 
   return (
-    <button className="btn-ghost btn-sm" onClick={handleCheck}>
+    <Button variant="ghost" size="xs" onClick={handleCheck}>
+      <RefreshCw className="size-3" />
       Check for updates
-    </button>
+    </Button>
   );
 }
 

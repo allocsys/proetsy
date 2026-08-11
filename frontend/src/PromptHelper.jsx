@@ -1,236 +1,379 @@
-import { useEffect, useState } from 'react';
-import { useAsyncTask } from './hooks/useAsyncTask.js';
+import { useEffect, useState, useCallback } from 'react';
+import { Sparkles, Plus, Upload, Copy, Check, Clock, AlertTriangle } from 'lucide-react';
+import { toast } from 'sonner';
+import { api } from '@/hooks/useApi';
+import { useAsyncTask } from '@/hooks/useAsyncTask';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
 const ORIENTATIONS = ['portrait', 'landscape', 'square'];
+const COPIED_FEEDBACK_MS = 1500;
 
-function copyToClipboard(text) {
-  if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(text);
-  }
+function CopyButton({ text, id, copiedId, setCopiedId }) {
+  const isCopied = copiedId === id;
+  return (
+    <Button
+      variant="outline"
+      size="xs"
+      onClick={() => {
+        navigator.clipboard?.writeText(text);
+        setCopiedId(id);
+        setTimeout(() => setCopiedId((c) => (c === id ? null : c)), COPIED_FEEDBACK_MS);
+      }}
+    >
+      {isCopied ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+      {isCopied ? 'Copied!' : 'Copy'}
+    </Button>
+  );
 }
 
-const COPIED_FEEDBACK_MS = 1500;
+function PromptCard({ prompt, copiedId, setCopiedId }) {
+  return (
+    <Card className="gap-0">
+      <CardContent className="p-4">
+        <pre className="bg-muted/60 rounded-lg p-3 text-xs font-mono leading-relaxed whitespace-pre-wrap break-all max-h-40 overflow-y-auto mb-3">
+          {prompt.prompt_text}
+        </pre>
+        <div className="flex items-center justify-between gap-2">
+          <CopyButton
+            text={prompt.prompt_text}
+            id={`gen-${prompt.id}`}
+            copiedId={copiedId}
+            setCopiedId={setCopiedId}
+          />
+        </div>
+        {prompt.warnings?.length > 0 && (
+          <ul className="mt-3 space-y-1">
+            {prompt.warnings.map((w, i) => (
+              <li key={i} className="flex items-start gap-1.5 text-xs text-amber-400">
+                <AlertTriangle className="size-3 shrink-0 mt-0.5" />
+                <span>{w}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function HistoryRow({ prompt, copiedId, setCopiedId }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
+      <code className="text-xs font-mono text-muted-foreground break-all flex-1 min-w-0">
+        {prompt.prompt_text}
+      </code>
+      <CopyButton
+        text={prompt.prompt_text}
+        id={`hist-${prompt.id}`}
+        copiedId={copiedId}
+        setCopiedId={setCopiedId}
+      />
+    </div>
+  );
+}
 
 export default function PromptHelper() {
   const [trends, setTrends] = useState([]);
   const [selectedTrendId, setSelectedTrendId] = useState('');
-  const [orientation, setOrientation] = useState(ORIENTATIONS[0]);
+  const [orientation, setOrientation] = useState('portrait');
   const [newTrendTerm, setNewTrendTerm] = useState('');
   const [newTrendCategory, setNewTrendCategory] = useState('');
   const [generated, setGenerated] = useState([]);
   const [history, setHistory] = useState([]);
-  const [loadingTrends, setLoadingTrends] = useState(false);
-  const [csvMessage, setCsvMessage] = useState('');
   const [copiedId, setCopiedId] = useState(null);
-  // addTrend and generate already shared one loading+error pair before this hook existed
-  // (loadTrends/loadHistory intentionally fail silently with no error state, and the CSV
-  // import has its own message-based feedback instead -- neither matches this pending/
-  // error shape, so both are left as local state below).
+  const [historyTab, setHistoryTab] = useState('portrait');
+
+  const trendsTask = useAsyncTask();
   const addTrendTask = useAsyncTask();
   const generateTask = useAsyncTask();
-  const error = addTrendTask.error || generateTask.error;
+  const historyTasks = { portrait: useAsyncTask(), landscape: useAsyncTask(), square: useAsyncTask() };
 
-  async function loadTrends() {
-    setLoadingTrends(true);
-    try {
-      const res = await fetch('/api/trends');
-      const data = await res.json();
-      if (res.ok) setTrends(data);
-    } finally {
-      setLoadingTrends(false);
+  const loadTrends = useCallback(() => {
+    trendsTask.run(async () => {
+      const data = await api.trends.list();
+      setTrends(Array.isArray(data) ? data : []);
+    });
+  }, [trendsTask]);
+
+  const loadHistory = useCallback((o) => {
+    historyTasks[o].run(async () => {
+      const data = await api.prompts.list(o);
+      setHistory(Array.isArray(data) ? data : []);
+    });
+  }, [historyTasks]);
+
+  useEffect(() => { loadTrends(); }, [loadTrends]);
+  useEffect(() => { loadHistory(historyTab); }, [historyTab, loadHistory]);
+
+  function handleAddTrend() {
+    if (!newTrendTerm.trim()) {
+      toast.error('Enter a trend term');
+      return;
     }
-  }
-
-  async function loadHistory(forOrientation) {
-    const res = await fetch(`/api/prompts?orientation=${encodeURIComponent(forOrientation)}`);
-    const data = await res.json();
-    if (res.ok) setHistory(data);
-  }
-
-  useEffect(() => {
-    loadTrends();
-  }, []);
-
-  useEffect(() => {
-    loadHistory(orientation);
-  }, [orientation]);
-
-  function addTrend() {
-    if (!newTrendTerm.trim()) return;
     addTrendTask.run(async () => {
-      const res = await fetch('/api/trends', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ term: newTrendTerm, category: newTrendCategory || undefined }),
+      const data = await api.trends.add({
+        term: newTrendTerm,
+        category: newTrendCategory || undefined,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to add trend');
+      toast.success(`Added trend: ${newTrendTerm}`);
       setNewTrendTerm('');
       setNewTrendCategory('');
       await loadTrends();
-      setSelectedTrendId(String(data.id));
+      if (data?.id) setSelectedTrendId(String(data.id));
     });
   }
 
-  async function importTrendsCsv(file) {
+  async function handleCsvImport(file) {
     if (!file) return;
-    setCsvMessage(`Importing ${file.name}…`);
     try {
       const csv = await file.text();
-      const res = await fetch('/api/trends/csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ csv }),
-      });
-      const data = await res.json();
-      setCsvMessage(res.ok ? `Imported ${data.imported} trend(s) from ${file.name}.` : data.error);
-      if (res.ok) await loadTrends();
+      const data = await api.trends.csv(csv);
+      toast.success(`Imported ${data.imported} trend(s) from ${file.name}`);
+      await loadTrends();
     } catch (err) {
-      setCsvMessage(`Import failed: ${err.message}`);
+      toast.error(`CSV import failed: ${err.message}`);
     }
   }
 
-  function handleCopy(id, text) {
-    copyToClipboard(text);
-    setCopiedId(id);
-    setTimeout(() => {
-      setCopiedId((current) => (current === id ? null : current));
-    }, COPIED_FEEDBACK_MS);
-  }
-
-  function generate() {
+  function handleGenerate() {
     generateTask.run(async () => {
-      const res = await fetch('/api/prompts/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          trend_id: selectedTrendId ? Number(selectedTrendId) : null,
-          orientation,
-        }),
+      const data = await api.prompts.generate({
+        trend_id: selectedTrendId ? Number(selectedTrendId) : null,
+        orientation,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Prompt generation failed');
-      setGenerated(data.prompts);
+      setGenerated(data.prompts || []);
+      toast.success(`Generated ${(data.prompts || []).length} prompt${(data.prompts || []).length === 1 ? '' : 's'}`);
       await loadHistory(orientation);
     });
   }
 
   return (
-    <div className="panel" style={{ padding: '2rem', border: 'none', background: 'transparent', boxShadow: 'none' }}>
-      <h2 style={{ marginTop: 0, marginBottom: '1.5rem', fontFamily: 'var(--font-body)', fontWeight: 700 }}>Prompt Helper & Trends</h2>
-      
-      <div className="card settings-section-card">
-        <h3 className="settings-section-title">Generate Prompts</h3>
-        <div className="settings-field-row mb-3">
-          <div className="settings-field flex-1">
-            <label className="settings-field-label" htmlFor="prompt-orientation-select">Orientation:</label>
-            <select 
-              className="input" 
-              id="prompt-orientation-select"
-              value={orientation} 
-              onChange={(e) => setOrientation(e.target.value)}
-            >
-              {ORIENTATIONS.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-          <div className="settings-field flex-1">
-            <span className="settings-field-label" id="prompt-trend-label">Trend</span>
-            <select 
-              className="input" 
-              aria-labelledby="prompt-trend-label"
-              value={selectedTrendId} 
-              onChange={(e) => setSelectedTrendId(e.target.value)} 
-              disabled={loadingTrends}
-            >
-              <option value="">(none)</option>
-              {trends.map((t) => (
-                <option key={t.id} value={t.id}>{t.term}{t.category ? ` (${t.category})` : ''}</option>
-              ))}
-            </select>
-          </div>
-          <button className="btn-primary" onClick={generate} disabled={generateTask.pending}>
-            {generateTask.pending ? 'Generating…' : 'Generate prompts'}
-          </button>
-        </div>
+    <div className="flex flex-col gap-6">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight">Prompt Helper</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Generate product listing prompts from current design trends.
+        </p>
       </div>
 
-      <div className="card settings-section-card">
-        <h3 className="settings-section-title">Add Trend</h3>
-        <div className="settings-field-row mb-3">
-          <div className="settings-field flex-1">
-            <span className="settings-field-label">New trend term</span>
-            <input
-              className="input"
-              placeholder="Add a new trend"
-              aria-label="Add a new trend"
-              value={newTrendTerm}
-              onChange={(e) => setNewTrendTerm(e.target.value)}
-            />
+      {/* Generate Prompts Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="size-4 text-amber-400" />
+            Generate Prompts
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-3 items-end">
+            <div className="flex-1 w-full min-w-0">
+              <Label className="text-xs text-muted-foreground mb-1.5">Orientation</Label>
+              <Select value={orientation} onValueChange={setOrientation}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ORIENTATIONS.map((o) => (
+                    <SelectItem key={o} value={o}>{o.charAt(0).toUpperCase() + o.slice(1)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex-1 w-full min-w-0">
+              <Label className="text-xs text-muted-foreground mb-1.5">Trend</Label>
+              <Select value={selectedTrendId} onValueChange={setSelectedTrendId} disabled={trendsTask.pending}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={trendsTask.pending ? 'Loading…' : '(none)'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {trends.map((t) => (
+                    <SelectItem key={t.id} value={String(t.id)}>
+                      {t.term}{t.category ? ` (${t.category})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={handleGenerate} disabled={generateTask.pending} className="shrink-0">
+              {generateTask.pending ? 'Generating…' : 'Generate prompts'}
+              <Sparkles className="size-3.5" />
+            </Button>
           </div>
-          <div className="settings-field flex-1">
-            <span className="settings-field-label">Category</span>
-            <input
-              className="input"
-              placeholder="Category"
-              aria-label="Trend category"
-              value={newTrendCategory}
-              onChange={(e) => setNewTrendCategory(e.target.value)}
-            />
+          {(trendsTask.error || generateTask.error) && (
+            <p className="text-sm text-destructive mt-3">{trendsTask.error || generateTask.error}</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Add Trend Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Plus className="size-4 text-amber-400" />
+            Add Trend
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-3 items-end">
+            <div className="flex-1 w-full min-w-0">
+              <Label className="text-xs text-muted-foreground mb-1.5">New trend term</Label>
+              <Input
+                value={newTrendTerm}
+                onChange={(e) => setNewTrendTerm(e.target.value)}
+                placeholder="Add a new trend"
+                onKeyDown={(e) => e.key === 'Enter' && handleAddTrend()}
+              />
+            </div>
+            <div className="flex-1 w-full min-w-0">
+              <Label className="text-xs text-muted-foreground mb-1.5">Category</Label>
+              <Input
+                value={newTrendCategory}
+                onChange={(e) => setNewTrendCategory(e.target.value)}
+                placeholder="Category"
+                onKeyDown={(e) => e.key === 'Enter' && handleAddTrend()}
+              />
+            </div>
+            <Button
+              variant="outline"
+              onClick={handleAddTrend}
+              disabled={addTrendTask.pending || !newTrendTerm.trim()}
+              className="shrink-0"
+            >
+              {addTrendTask.pending ? 'Adding…' : 'Add trend'}
+              <Plus className="size-3.5" />
+            </Button>
           </div>
-          <button className="btn-secondary" onClick={addTrend} disabled={addTrendTask.pending || !newTrendTerm.trim()}>
-            {addTrendTask.pending ? 'Adding…' : 'Add trend'}
-          </button>
-        </div>
 
-        <div className="mt-2 text-muted mono-sm mb-2 settings-field" style={{ marginTop: '1rem' }}>
-          <span className="settings-field-label">Import CSV (<code>term</code>, <code>category</code>)</span>
-          <div className="settings-field-row" style={{ marginTop: '0.35rem' }}>
-            <input className="input input-auto" id="csv-file-input" type="file" accept=".csv,text/csv" onChange={(e) => importTrendsCsv(e.target.files?.[0])} />
-            {csvMessage && <span className="text-muted mono-sm">{csvMessage}</span>}
+          <div className="mt-4 pt-4 border-t border-border">
+            <Label className="text-xs text-muted-foreground mb-1.5">
+              Import CSV <span className="font-mono">(term, category)</span>
+            </Label>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = '.csv,text/csv';
+                  input.onchange = (e) => handleCsvImport(e.target.files?.[0]);
+                  input.click();
+                }}
+              >
+                <Upload className="size-3.5" />
+                Choose CSV file
+              </Button>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {error && <p className="text-danger mt-2">{error}</p>}
+          {addTrendTask.error && (
+            <p className="text-sm text-destructive mt-3">{addTrendTask.error}</p>
+          )}
+        </CardContent>
+      </Card>
 
-      {generated.length > 0 && (
-        <div className="card settings-section-card">
-          <h3 className="settings-section-title">Generated Prompts</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {generated.map((p) => (
-              <div key={p.id} className="surface p-4" style={{ padding: '1rem', borderRadius: 'var(--radius-md)' }}>
-                <code className="prompt-code-block block mb-2">{p.prompt_text}</code>
-                <button className="btn-secondary btn-sm" onClick={() => handleCopy(`generated-${p.id}`, p.prompt_text)}>
-                  {copiedId === `generated-${p.id}` ? 'Copied!' : 'Copy'}
-                </button>
-                {p.warnings.length > 0 && (
-                  <ul className="prompt-warnings-list mt-2">
-                    {p.warnings.map((w, i) => <li key={i}>{w}</li>)}
-                  </ul>
+      {/* Generated Prompts */}
+      {generateTask.pending && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="size-4 text-amber-400" />
+              Generated Prompts
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="space-y-2">
+                  <Skeleton className="h-20 w-full rounded-lg" />
+                  <Skeleton className="h-7 w-20" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {generated.length > 0 && !generateTask.pending && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="size-4 text-amber-400" />
+              Generated Prompts
+              <Badge variant="secondary">{generated.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {generated.map((p) => (
+                <PromptCard
+                  key={p.id}
+                  prompt={p}
+                  copiedId={copiedId}
+                  setCopiedId={setCopiedId}
+                />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* History */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="size-4 text-amber-400" />
+            History
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Tabs value={historyTab} onValueChange={setHistoryTab}>
+            <TabsList>
+              {ORIENTATIONS.map((o) => (
+                <TabsTrigger key={o} value={o}>
+                  {o.charAt(0).toUpperCase() + o.slice(1)}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+
+            {ORIENTATIONS.map((o) => (
+              <TabsContent key={o} value={o}>
+                {historyTasks[o].pending ? (
+                  <div className="space-y-2 mt-3">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} className="h-10 w-full rounded-lg" />
+                    ))}
+                  </div>
+                ) : history.length > 0 ? (
+                  <div className="flex flex-col gap-2 mt-3 max-h-96 overflow-y-auto">
+                    {history.map((p) => (
+                      <HistoryRow
+                        key={p.id}
+                        prompt={p}
+                        copiedId={copiedId}
+                        setCopiedId={setCopiedId}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <Clock className="size-8 text-muted-foreground/30 mb-2" />
+                    <p className="text-sm text-muted-foreground">No prompts generated for {o} yet.</p>
+                  </div>
                 )}
-              </div>
+              </TabsContent>
             ))}
-          </div>
-        </div>
-      )}
-
-      {history.length > 0 && (
-        <div className="card settings-section-card">
-          <h3 className="settings-section-title">History: &quot;{orientation}&quot;</h3>
-          <ul className="prompt-history-list" style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {history.map((p) => (
-              <li key={p.id} className="prompt-history-item flex-row items-center justify-between surface" style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <code className="mono-sm" style={{ wordBreak: 'break-all', marginRight: '1rem' }}>{p.prompt_text}</code> 
-                <button className="btn-ghost btn-sm" onClick={() => handleCopy(`history-${p.id}`, p.prompt_text)}>
-                  {copiedId === `history-${p.id}` ? 'Copied!' : 'Copy'}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   );
 }
