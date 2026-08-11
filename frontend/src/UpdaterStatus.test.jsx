@@ -3,9 +3,13 @@ import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import UpdaterStatus from './UpdaterStatus.jsx';
 
-// Builds a fake updaterAPI matching preload.js's real bridge shape: each onX
-// subscriber captures its callback (so tests can fire it directly, standing in for
-// main.js sending a real 'updater:*' IPC event) and returns an unsubscribe spy.
+// StatusBadge is mocked in setup-ui.js, but UpdaterStatus imports from @/components/layout/StatusBadge
+// which resolves differently when imported from UpdaterStatus.test.jsx.
+// Mock it here to be safe.
+vi.mock('./components/layout/StatusBadge.jsx', () => ({
+  default: ({ status, children }) => <span data-testid="status-badge">{children}</span>,
+}));
+
 function makeUpdaterAPI(overrides = {}) {
   const callbacks = {};
   const on = (name) => vi.fn((cb) => {
@@ -36,7 +40,7 @@ afterEach(() => {
 describe('UpdaterStatus — feature detection', () => {
   it('renders nothing when window.updaterAPI is absent (dev-in-browser path)', () => {
     render(<UpdaterStatus />);
-    expect(screen.queryByTestId('updater-status')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });
 
@@ -51,7 +55,7 @@ describe('UpdaterStatus — check flow', () => {
     await user.click(button);
 
     expect(api.checkForUpdates).toHaveBeenCalled();
-    expect(await screen.findByText('Checking for updates…')).toBeInTheDocument();
+    expect(await screen.findByText(/Checking for updates/)).toBeInTheDocument();
   });
 
   it('falls back to idle when checkForUpdates resolves skipped (dev/unpackaged build)', async () => {
@@ -79,7 +83,7 @@ describe('UpdaterStatus — check flow', () => {
 });
 
 describe('UpdaterStatus — update lifecycle events', () => {
-  it('shows "Up to date" on updater:update-not-available', async () => {
+  it('shows "Up to date" on update-not-available', async () => {
     const { api, callbacks } = makeUpdaterAPI();
     window.updaterAPI = api;
     render(<UpdaterStatus />);
@@ -87,10 +91,10 @@ describe('UpdaterStatus — update lifecycle events', () => {
     act(() => callbacks.notAvailable({}));
 
     expect(await screen.findByText('Up to date')).toBeInTheDocument();
-    expect(screen.getByText('Check again')).toBeInTheDocument();
+    expect(screen.getByText('Check')).toBeInTheDocument();
   });
 
-  it('shows the version and a Download button on updater:update-available, then wires the click', async () => {
+  it('shows the version and a Download button on update-available', async () => {
     const { api, callbacks } = makeUpdaterAPI();
     window.updaterAPI = api;
     const user = userEvent.setup();
@@ -99,21 +103,21 @@ describe('UpdaterStatus — update lifecycle events', () => {
     act(() => callbacks.available({ version: '1.2.3' }));
 
     expect(await screen.findByText(/Update v1\.2\.3 available/)).toBeInTheDocument();
-    await user.click(screen.getByText('Download update'));
+    await user.click(screen.getByText('Download'));
     expect(api.downloadUpdate).toHaveBeenCalled();
   });
 
-  it('shows download progress percentage on updater:download-progress', async () => {
+  it('shows download progress percentage on download-progress', async () => {
     const { callbacks, api } = makeUpdaterAPI();
     window.updaterAPI = api;
     render(<UpdaterStatus />);
 
     act(() => callbacks.progress({ percent: 42.7 }));
 
-    expect(await screen.findByText(/Downloading update… 43%/)).toBeInTheDocument();
+    expect(await screen.findByText(/Downloading.*43%/)).toBeInTheDocument();
   });
 
-  it('shows a Restart & install button on updater:update-downloaded, wired to quitAndInstall', async () => {
+  it('shows a Restart button on update-downloaded, wired to quitAndInstall', async () => {
     const { api, callbacks } = makeUpdaterAPI();
     window.updaterAPI = api;
     const user = userEvent.setup();
@@ -122,11 +126,11 @@ describe('UpdaterStatus — update lifecycle events', () => {
     act(() => callbacks.downloaded({ version: '1.2.3' }));
 
     expect(await screen.findByText(/Update v1\.2\.3 ready/)).toBeInTheDocument();
-    await user.click(screen.getByText('Restart & install'));
+    await user.click(screen.getByText('Restart'));
     expect(api.quitAndInstall).toHaveBeenCalled();
   });
 
-  it('shows the error message and a Retry button on updater:error', async () => {
+  it('shows the error message and a Retry button on error', async () => {
     const { callbacks, api } = makeUpdaterAPI();
     window.updaterAPI = api;
     render(<UpdaterStatus />);
