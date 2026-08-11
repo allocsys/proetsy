@@ -87,7 +87,8 @@ export default function ReviewView({
           <div className="settings-field">
             <span className="settings-field-label">Or enter a Job ID directly</span>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               placeholder="Job ID"
               value={jobIdInput}
               onChange={(e) => setJobIdInput(e.target.value)}
