@@ -162,7 +162,12 @@ function App() {
     refreshTags: tagsAndTrendsApi.refreshTags,
   });
 
-  // Route-based side-effects
+  // Route-based side-effects. Deliberately depends on currentPath only: settingsApi/
+  // apiKeysApi/jobsApi are new object literals every render (their functions aren't
+  // memoized as a group), so including them here would refire this effect on every
+  // render while on /settings or /review (refresh -> setState -> re-render -> new
+  // object -> effect refires -> infinite loop). The functions called below still
+  // close over fresh state each time the effect *does* run, so this is safe.
   useEffect(() => {
     if (currentPath.startsWith('/settings')) {
       settingsApi.refreshRateLimits();
@@ -172,7 +177,8 @@ function App() {
     if (currentPath.startsWith('/review')) {
       jobsApi.refreshJobs();
     }
-  }, [currentPath, settingsApi, apiKeysApi, jobsApi]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPath]);
 
   function goTo(target) {
     if (target.startsWith('/')) {
