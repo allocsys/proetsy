@@ -1,3 +1,4 @@
+import { useNavigate, useParams } from 'react-router-dom';
 import Tabs from '../components/Tabs.jsx';
 import Skeleton from '../components/Skeleton.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -12,7 +13,15 @@ const SETTINGS_TABS = [
   { id: 'automation', label: 'Automation & Diagnostics' },
 ];
 
-export default function SettingsView({ settingsTab, setSettingsTab, settingsApi, apiKeysApi, tagsAndTrendsApi }) {
+export default function SettingsView({ settingsApi, apiKeysApi, tagsAndTrendsApi }) {
+  const navigate = useNavigate();
+  const { tab } = useParams();
+  const settingsTab = tab || 'tags-trends';
+
+  function handleTabChange(newTab) {
+    navigate(`/settings/${newTab}`);
+  }
+
   return (
     <div>
       <h2 style={{ marginTop: 0, marginBottom: '1.5rem' }}>Shop Settings & Tags</h2>
@@ -20,7 +29,7 @@ export default function SettingsView({ settingsTab, setSettingsTab, settingsApi,
       <Tabs
         tabs={SETTINGS_TABS}
         activeId={settingsTab}
-        onChange={setSettingsTab}
+        onChange={handleTabChange}
         className="settings-tabs-nav"
       />
 
