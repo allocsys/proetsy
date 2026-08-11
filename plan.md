@@ -91,18 +91,35 @@ structural, so every step ships independently and the app never breaks mid-way.
 - Remaining before merge: confirm CI is green on `feat/react-router`, manual
   smoke test of deep links (`/review/:jobId`, `/settings/:tab`), then open a PR.
 
-## Step 6 — Polish pass
-- Toast notifications for save/copy/error actions, replacing inline
-  `*Message` state where a transient toast reads better than persistent text
-  (keep persistent text where the message needs to stay visible, e.g. API key
-  add errors).
-- Page/view transition animation on route change (Step 5 makes this trivial).
-- Keyboard shortcuts for power users (e.g. `g` then a letter for nav, matching
-  the existing sidebar groups).
-- Light theme: the `--studio-*` variable system already isolates all color
-  values, so this is mostly adding a second `:root[data-theme="light"]` block
-  and a toggle — no component changes needed if Steps 1–4 kept styling in CSS
-  variables rather than hardcoded inline colors.
+## Step 6 — Polish pass ✅ DONE (pending CI/merge)
+**Status:** Implemented on branch `feat/polish-pass`, not yet merged to `main`.
+- Toast notifications: new `Toast.jsx` (`ToastProvider`/`useToast`), wired in
+  `main.jsx`. Transient save/copy/CSV-import/watch-folder confirmations across
+  Settings, TasteFilter, PromptHelper, MockupTemplates, and
+  MockupCategorySelector now surface as toasts instead of inline `*Message`
+  state; persistent-by-design banners (API key add errors, the
+  backend-unreachable banner, background-fetch failures) were deliberately
+  left as-is since those need to stay visible, not flash and disappear.
+- Page/view transition animation on route change: a `.route-transition` fade+
+  slide-in wrapper around `<Routes>`'s output in `App.jsx`, respecting
+  `prefers-reduced-motion` (already handled globally in `styles.css`).
+- Keyboard shortcuts: new `hooks/useKeyboardShortcuts.js` — press `g` then a
+  letter to jump to a view (`u`/`m`/`h`/`r`/`p`/`s`, mirroring the sidebar's
+  own order), `?` opens a reference modal, `Escape` closes it. Ignored while a
+  form field has focus or a modifier key is held, so normal typing and
+  browser/OS shortcuts are never hijacked. Discoverable via a small header
+  button in addition to the `?` key.
+- Light theme: `styles.css`'s `--studio-*` variables now have a
+  `[data-theme="light"]` override block. Every remaining hardcoded color that
+  would've broken it (sidebar background, scrollbar thumb, inline-code color,
+  and hover/border overlays previously written as literal
+  `rgba(255,255,255,…)`) was first pulled into its own variable — no other
+  component changes needed, as anticipated. Toggled from a header button in
+  `App.jsx`, persisted to `localStorage`, and applied via a small inline
+  script in `index.html` before first paint so there's no flash-of-
+  wrong-theme on load.
+- Remaining before merge: confirm CI is green on `feat/polish-pass`, manual
+  smoke test of the theme toggle and each `g`+letter shortcut, then open a PR.
 
 ---
 
