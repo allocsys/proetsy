@@ -1,0 +1,101 @@
+# Frontend UI Fix Plan
+
+Context: the frontend (`frontend/src/`) works functionally but looks unpolished.
+Verified against the repo on 2026-08-11:
+
+- `App.jsx` is 1,795 lines with 51 `useState` hooks and 85 inline `style={{...}}` usages.
+- `p-2`, `p-3`, `p-4`, `p-5`, `m-0`, `font-bold`, `items-center`, `justify-between`
+  are used as `className` values in `PromptHelper.jsx`, `TasteFilter.jsx`, and
+  `JobMockupReview.jsx`, but none of them are defined in `styles.css` — they
+  silently do nothing (broken spacing/layout in those three files only).
+- No router package in `package.json`; navigation is pure `activeView` state.
+- There IS a real hand-rolled design system already (CSS custom properties for
+  spacing/color/radius/shadow, `StatusPill` component, consistent `.card` /
+  `.btn-primary` / `.btn-secondary` / `.data-table` / `.workspace-tabs` classes,
+  focus-visible states, responsive breakpoints). This is not a from-scratch
+  rebuild — it's cleanup, consolidation, and componentization on top of an
+  existing system.
+
+Goal: sequence the work from highest-visual-impact/lowest-risk to more
+structural, so every step ships independently and the app never breaks mid-way.
+
+---
+
+## Step 1 — Kill the phantom utility classes (quick, safe, isolated)
+**Files:** `PromptHelper.jsx`, `TasteFilter.jsx`, `JobMockupReview.jsx`
+- Replace `p-2/p-3/p-4/p-5`, `m-0`, `font-bold`, `items-center`, `justify-between`
+  with either (a) the existing spacing scale (`--space-*` vars) via new small
+  utility classes added to `styles.css`, or (b) inline equivalents matching
+  what's already used elsewhere in the same file.
+- No behavior change. Verify visually in the three affected views (Prompt
+  Helper, Taste Filter upload lane, Mockup review).
+- Risk: near zero. Ship first.
+
+## Step 2 — Add loading skeletons and real empty states
+- Replace bare "Loading…" text (tags, trends, API keys, rate limits, jobs)
+  with a small `<Skeleton />` component (a few CSS-only placeholder bars using
+  existing `--studio-*` tokens).
+- Replace italic `.empty-state` text-only empty states with icon + message +
+  CTA where a CTA makes sense (e.g. "No jobs yet" → link to Upload), matching
+  the pattern already used in the Listing History empty state.
+- Still no structural change to App.jsx; purely visual/component-level.
+
+## Step 3 — Extract shared UI primitives
+- Pull recurring inline patterns into small components in
+  `frontend/src/components/`: `Skeleton`, `EmptyState`, `Modal` (generalize the
+  existing confirm-dialog markup), `Tabs` (generalize `.workspace-tabs`),
+  `FormField` (label + input + saved-flash, used ~15x in Settings).
+- Swap these into App.jsx and the Job* review components in place, one
+  component at a time, so each swap is independently testable.
+- This directly reduces the 85 inline-style usages as a side effect, since the
+  new components own their own styling.
+
+## Step 4 — Break `App.jsx` into route-level view components
+- Split into `views/UploadView.jsx`, `views/HistoryView.jsx`,
+  `views/ReviewView.jsx`, `views/SettingsView.jsx` (with its four sub-tabs
+  staying as-is or splitting further into `views/settings/*`),
+  `views/PromptHelperView.jsx`, `views/MockupTemplatesView.jsx`.
+- Lift shared state (jobs, settings, tags, trends, api keys, etc.) into a
+  small number of custom hooks (`useJobs`, `useSettings`, `useTagsAndTrends`,
+  `useApiKeys`) or a lightweight context, so each view component only takes
+  what it needs as props/hook return values instead of one 51-`useState` blob.
+- Do this after Step 3 so the extracted primitives are already in place and
+  don't need to be re-threaded through the new view files.
+
+## Step 5 — Add React Router
+- Add `react-router-dom`, map `NAV_ITEMS` ids to real routes
+  (`/upload`, `/history`, `/review/:jobId?`, `/settings/:tab?`, etc.).
+- Replace `activeView`/`goTo()` state with `useNavigate`/`useParams`.
+- Gives browser back/forward and deep links (e.g. linking directly to a job
+  review or a specific Settings tab) for free.
+- Do this after Step 4 — routing per already-separated view components is a
+  mechanical swap; routing a 1,795-line monolith is not.
+
+## Step 6 — Polish pass
+- Toast notifications for save/copy/error actions, replacing inline
+  `*Message` state where a transient toast reads better than persistent text
+  (keep persistent text where the message needs to stay visible, e.g. API key
+  add errors).
+- Page/view transition animation on route change (Step 5 makes this trivial).
+- Keyboard shortcuts for power users (e.g. `g` then a letter for nav, matching
+  the existing sidebar groups).
+- Light theme: the `--studio-*` variable system already isolates all color
+  values, so this is mostly adding a second `:root[data-theme="light"]` block
+  and a toggle — no component changes needed if Steps 1–4 kept styling in CSS
+  variables rather than hardcoded inline colors.
+
+---
+
+## Explicitly deferred / not recommended as a first move
+- A full Tailwind + shadcn/ui rewrite. The existing design system is coherent
+  and mostly not broken — the phantom classes are a small, contained bug, not
+  evidence the whole styling approach needs replacing. Revisit only if, after
+  Steps 1–4, the team still finds the CSS-variable system limiting.
+
+## Suggested order for shipping (smallest safe PRs)
+1. Step 1 (phantom classes)
+2. Step 2 (skeletons/empty states)
+3. Step 3 (shared primitives)
+4. Step 4 (split App.jsx)
+5. Step 5 (router)
+6. Step 6 (polish, pick items independently as time allows)
