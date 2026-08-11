@@ -57,18 +57,21 @@ structural, so every step ships independently and the app never breaks mid-way.
   price, Delivery text, Watched folder path, Watch category, and Auto
   threshold. All CI checks green.
 
-## Step 4 — Break `App.jsx` into route-level view components 🚧 IN PROGRESS
-**Status:** Branch `refactor/split-app-into-views` created off `main`, work not yet started.
+## Step 4 — Break `App.jsx` into route-level view components ✅ DONE (pending merge)
+**Status:** Complete on branch `refactor/split-app-into-views`, not yet merged to `main`.
+- Shared state lifted into `hooks/useJobs.js`, `hooks/useSettings.js`,
+  `hooks/useTagsAndTrends.js`, `hooks/useApiKeys.js` (plus a pre-existing
+  `hooks/useAsyncTask.js`); App.jsx now only owns cross-cutting nav/dialog
+  state instead of one 51-`useState` blob.
 - Split into `views/UploadView.jsx`, `views/HistoryView.jsx`,
-  `views/ReviewView.jsx`, `views/SettingsView.jsx` (with its four sub-tabs
-  staying as-is or splitting further into `views/settings/*`),
-  `views/PromptHelperView.jsx`, `views/MockupTemplatesView.jsx`.
-- Lift shared state (jobs, settings, tags, trends, api keys, etc.) into a
-  small number of custom hooks (`useJobs`, `useSettings`, `useTagsAndTrends`,
-  `useApiKeys`) or a lightweight context, so each view component only takes
-  what it needs as props/hook return values instead of one 51-`useState` blob.
-- Do this after Step 3 so the extracted primitives are already in place and
-  don't need to be re-threaded through the new view files.
+  `views/ReviewView.jsx`, `views/SettingsView.jsx` (kept as one file with its
+  four sub-tabs switched internally, matching how it already worked — no
+  further `views/settings/*` split needed), `views/PromptHelperView.jsx`,
+  `views/MockupTemplatesView.jsx`. Each view takes only the hook return
+  values/props it needs.
+- Remaining before merge: run the full test suite (`App.test.jsx` covers this
+  flow end-to-end through the DOM, so it should still pass unchanged since no
+  rendered markup was altered) and open a PR.
 
 ## Step 5 — Add React Router
 - Add `react-router-dom`, map `NAV_ITEMS` ids to real routes
