@@ -4,6 +4,7 @@ import Skeleton from './components/Skeleton.jsx';
 import EmptyState from './components/EmptyState.jsx';
 import Modal from './components/Modal.jsx';
 import Tabs from './components/Tabs.jsx';
+import FormField from './components/FormField.jsx';
 import JobArtworkAnalysisReview from './JobArtworkAnalysisReview.jsx';
 import JobListingReview from './JobListingReview.jsx';
 import JobMockupReview from './JobMockupReview.jsx';
@@ -79,11 +80,6 @@ const NAV_ITEMS = [
   { id: 'settings', label: 'Shop Settings & Tags', group: 'Configuration', icon: 'settings' },
 ];
 
-// plan.md step 7: Settings was one long scroll (tags, trends, shop conventions, API
-// keys, automation/watch-folder config, rate-limit diagnostics) with sensitive key
-// management sitting directly next to trivial fields. Split into sub-tabs so each
-// concern gets its own screen -- API Keys (sensitive) now has a tab of its own,
-// visually and navigationally separated from everything else.
 const SETTINGS_TABS = [
   { id: 'tags-trends', label: 'Tags & Trends' },
   { id: 'general', label: 'Shop & Pipeline' },
@@ -139,13 +135,13 @@ function App() {
   const [tags, setTags] = useState([]);
   const [tagsText, setTagsText] = useState('');
   const [tagsCategory, setTagsCategory] = useState('');
-  const [tagsSavedMessage, setTagsSavedMessage] = useState(null); // { text, ok }
-  const [tagsCsvMessage, setTagsCsvMessage] = useState(null); // { text, ok }
-  const [tagsDeleteMessage, setTagsDeleteMessage] = useState(null); // { text, ok } | null
-  const [trendsDeleteMessage, setTrendsDeleteMessage] = useState(null); // { text, ok } | null
-  const [tagsBackfillMessage, setTagsBackfillMessage] = useState(null); // { text, ok }
+  const [tagsSavedMessage, setTagsSavedMessage] = useState(null);
+  const [tagsCsvMessage, setTagsCsvMessage] = useState(null);
+  const [tagsDeleteMessage, setTagsDeleteMessage] = useState(null);
+  const [trendsDeleteMessage, setTrendsDeleteMessage] = useState(null);
+  const [tagsBackfillMessage, setTagsBackfillMessage] = useState(null);
   const [tagsBackfillRunning, setTagsBackfillRunning] = useState(false);
-  const [tagsBackfillPreview, setTagsBackfillPreview] = useState(null); // { checked, updates } | null
+  const [tagsBackfillPreview, setTagsBackfillPreview] = useState(null);
   const [tagsBackfillPreviewLoading, setTagsBackfillPreviewLoading] = useState(false);
   const [watchStatus, setWatchStatus] = useState(null);
   const [rateLimits, setRateLimits] = useState([]);
@@ -179,12 +175,12 @@ function App() {
   const [rateLimitsLoading, setRateLimitsLoading] = useState(true);
   const [rateLimitsUpdatedAt, setRateLimitsUpdatedAt] = useState(null);
   const [savedFlashes, setSavedFlashes] = useState({});
-  const [confirmAction, setConfirmAction] = useState(null); // { message, onConfirm } | null
-  const [settingsTab, setSettingsTab] = useState('tags-trends'); // plan.md step 7: which Settings sub-tab is active
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [settingsTab, setSettingsTab] = useState('tags-trends');
   const [configBackupMessage, setConfigBackupMessage] = useState('');
-  const [configImportMessage, setConfigImportMessage] = useState(null); // { text, ok } | null
+  const [configImportMessage, setConfigImportMessage] = useState(null);
   const [configImporting, setConfigImporting] = useState(false);
-  const [suggestedWatchFolder, setSuggestedWatchFolder] = useState(null); // { suggested, exists } | null
+  const [suggestedWatchFolder, setSuggestedWatchFolder] = useState(null);
 
   useEffect(() => {
     if (!activeJobId) {
@@ -213,8 +209,6 @@ function App() {
       });
   }, [activeJobId]);
 
-  // Memoized so components/effects that depend on it (all the refreshXxx functions
-  // below) get a stable reference instead of a new closure every render.
   const reportFetchError = useCallback(
     (source) => (err) => setFetchError({ source, message: err.message }),
     []
@@ -231,9 +225,6 @@ function App() {
     }, 2000);
   }
 
-  // Shared in-app confirmation modal for destructive actions (tags, trends, API
-  // keys), replacing native window.confirm() popups so the styling and UX stays
-  // consistent with the rest of the dashboard.
   function requestConfirm(message, onConfirm) {
     setConfirmAction({ message, onConfirm });
   }
@@ -305,9 +296,6 @@ function App() {
       .catch(reportFetchError('refreshWatchStatus'));
   }, [reportFetchError]);
 
-  // One-click default for the watched-folder field (see #3 in the automation pass) --
-  // fills the field with the suggested Downloads folder and turns watching on in one
-  // action, instead of requiring the user to hand-type a full path first.
   async function useDefaultWatchFolder() {
     let suggestion = suggestedWatchFolder;
     if (!suggestion) {
@@ -366,9 +354,6 @@ function App() {
     refreshWatchStatus();
     refreshRateLimits();
     refreshApiKeys();
-    // These refreshers are now stabilized with useCallback ([reportFetchError], which is
-    // itself stabilized with []), so listing them here does not turn this into a
-    // run-on-every-render effect -- it still only runs once on mount, as intended.
   }, [
     refreshApiKeys,
     refreshJobs,
@@ -502,14 +487,11 @@ function App() {
     requestConfirm(`Delete tag "${tagText}"? This can't be undone.`, async () => {
       const res = await fetch(`/api/tags/${id}`, { method: 'DELETE' });
       if (!res.ok) {
-        // A 404/500 has a JSON { error } body per the route's contract, but guard the
-        // parse anyway in case something upstream (a proxy, a crash) returns a
-        // non-JSON error page instead.
         let message = 'Failed to delete tag';
         try {
           message = (await res.json()).error || message;
         } catch {
-          // no JSON body -- keep the generic message
+          // no JSON body
         }
         setTagsDeleteMessage({ text: message, ok: false });
         return;
@@ -527,7 +509,7 @@ function App() {
         try {
           message = (await res.json()).error || message;
         } catch {
-          // no JSON body -- keep the generic message
+          // no JSON body
         }
         setTrendsDeleteMessage({ text: message, ok: false });
         return;
@@ -559,8 +541,6 @@ function App() {
     refreshTags();
   }
 
-  // Step 1: fetch the proposed matches without writing anything (backend dry_run=true),
-  // so the user can see exactly what would change before committing to it.
   async function previewBackfillTagCategories() {
     setTagsBackfillPreviewLoading(true);
     setTagsBackfillMessage(null);
@@ -580,9 +560,6 @@ function App() {
     setTagsBackfillPreviewLoading(false);
   }
 
-  // Step 2: user reviewed the preview and chose to apply it — commits the exact same
-  // matches that were just shown (the matching logic is deterministic, see
-  // user-list.js's suggestCategoriesForUncategorizedTags).
   async function applyBackfillTagCategories() {
     setTagsBackfillRunning(true);
     setTagsBackfillMessage({ text: 'Applying…', ok: true });
@@ -674,9 +651,6 @@ function App() {
     refreshPipelineConfig();
   }
 
-  // Downloads a full config backup (settings, product sizes/mockup templates, tag
-  // library, API keys) as a JSON file via the browser's normal download flow -- same
-  // mechanism on Windows/macOS/Linux, nothing platform-specific to install or configure.
   async function downloadConfigBackup() {
     setConfigBackupMessage('Preparing backup…');
     try {
@@ -699,8 +673,6 @@ function App() {
     }
   }
 
-  // Restores a previously downloaded backup file. Upserts/dedupes server-side rather
-  // than wiping first, so this is safe to re-run without losing anything added since.
   async function importConfigBackup(file) {
     if (!file) return;
     setConfigImporting(true);
@@ -729,7 +701,6 @@ function App() {
       setConfigImportMessage({ text: `Import failed: ${err.message}`, ok: false });
     }
     setConfigImporting(false);
-    // Refresh every panel a restored bundle could have touched.
     fetch('/api/settings').then((r) => r.json()).then(setSettings).catch(() => {});
     refreshPipelineConfig();
     refreshApiKeys();
@@ -819,7 +790,7 @@ function App() {
                 try {
                   localStorage.setItem('proetsy_sidebar_collapsed', String(next));
                 } catch {
-                  // ignore storage errors (e.g. private browsing)
+                  // ignore storage errors
                 }
                 return next;
               })}
@@ -1150,29 +1121,28 @@ function App() {
 
                 <div className="settings-subsection">
                   <div className="settings-field-row">
-                    <div className="settings-field">
-                      <label htmlFor="settings-default-price" className="settings-field-label">Default price{savedFlashes.default_price ? <span className="field-saved-hint">Saved</span> : null}</label>
-                      <input
-                        id="settings-default-price"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={settings.default_price || ''}
-                        onChange={(e) => setSettings((s) => ({ ...s, default_price: e.target.value }))}
-                        onBlur={(e) => saveSettings({ default_price: e.target.value })}
-                        placeholder="24.00"
-                      />
-                    </div>
-                    <div className="settings-field" style={{ flex: 1, minWidth: '240px' }}>
-                      <label htmlFor="settings-delivery-text" className="settings-field-label">Delivery text{savedFlashes.delivery_text ? <span className="field-saved-hint">Saved</span> : null}</label>
-                      <input
-                        id="settings-delivery-text"
-                        value={settings.delivery_text || ''}
-                        onChange={(e) => setSettings((s) => ({ ...s, delivery_text: e.target.value }))}
-                        onBlur={(e) => saveSettings({ delivery_text: e.target.value })}
-                        placeholder="Digital file, no physical shipment"
-                      />
-                    </div>
+                    <FormField
+                      id="settings-default-price"
+                      label="Default price"
+                      saved={!!savedFlashes.default_price}
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={settings.default_price || ''}
+                      onChange={(e) => setSettings((s) => ({ ...s, default_price: e.target.value }))}
+                      onBlur={(e) => saveSettings({ default_price: e.target.value })}
+                      placeholder="24.00"
+                    />
+                    <FormField
+                      id="settings-delivery-text"
+                      label="Delivery text"
+                      saved={!!savedFlashes.delivery_text}
+                      wrapperStyle={{ flex: 1, minWidth: '240px' }}
+                      value={settings.delivery_text || ''}
+                      onChange={(e) => setSettings((s) => ({ ...s, delivery_text: e.target.value }))}
+                      onBlur={(e) => saveSettings({ delivery_text: e.target.value })}
+                      placeholder="Digital file, no physical shipment"
+                    />
                   </div>
                 </div>
 
@@ -1314,32 +1284,33 @@ function App() {
                     Auto-import from folder
                   </label>
                   <div className="settings-field-row">
-                    <div className="settings-field" style={{ flex: 1, minWidth: '260px' }}>
-                      <label htmlFor="settings-watched-folder" className="settings-field-label">Watched folder path{savedFlashes.taste_filter_watch_folder ? <span className="field-saved-hint">Saved</span> : null}</label>
-                      <div className="flex-row" style={{ gap: '0.5rem', alignItems: 'center' }}>
-                        <input
+                    <div style={{ flex: 1, minWidth: '260px' }}>
+                      <div className="flex-row" style={{ gap: '0.5rem', alignItems: 'flex-end' }}>
+                        <FormField
                           id="settings-watched-folder"
+                          label="Watched folder path"
+                          saved={!!savedFlashes.taste_filter_watch_folder}
+                          wrapperStyle={{ flex: 1 }}
                           style={{ flex: 1 }}
                           value={settings.taste_filter_watch_folder || ''}
                           onChange={(e) => setSettings((s) => ({ ...s, taste_filter_watch_folder: e.target.value }))}
                           onBlur={(e) => saveWatchSetting({ taste_filter_watch_folder: e.target.value })}
                           placeholder="/home/you/midjourney-downloads"
                         />
-                        <button type="button" className="btn-secondary btn-sm" onClick={useDefaultWatchFolder} title="Fill in your Downloads folder and turn watching on">
+                        <button type="button" className="btn-secondary btn-sm" onClick={useDefaultWatchFolder} title="Fill in your Downloads folder and turn watching on" style={{ height: '34px' }}>
                           Use Downloads folder
                         </button>
                       </div>
                     </div>
-                    <div className="settings-field">
-                      <label htmlFor="settings-watch-category" className="settings-field-label">Category (optional){savedFlashes.taste_filter_watch_category ? <span className="field-saved-hint">Saved</span> : null}</label>
-                      <input
-                        id="settings-watch-category"
-                        value={settings.taste_filter_watch_category || ''}
-                        onChange={(e) => setSettings((s) => ({ ...s, taste_filter_watch_category: e.target.value }))}
-                        onBlur={(e) => saveWatchSetting({ taste_filter_watch_category: e.target.value })}
-                        placeholder="e.g. square-canvas"
-                      />
-                    </div>
+                    <FormField
+                      id="settings-watch-category"
+                      label="Category (optional)"
+                      saved={!!savedFlashes.taste_filter_watch_category}
+                      value={settings.taste_filter_watch_category || ''}
+                      onChange={(e) => setSettings((s) => ({ ...s, taste_filter_watch_category: e.target.value }))}
+                      onBlur={(e) => saveWatchSetting({ taste_filter_watch_category: e.target.value })}
+                      placeholder="e.g. square-canvas"
+                    />
                   </div>
                   {watchStatus && (
                     <p className="text-muted mono-sm" style={{ marginTop: '0.75rem' }}>
@@ -1365,21 +1336,21 @@ function App() {
                     />
                     Auto-compute taste threshold
                   </label>
-                  <div className="settings-field" style={{ maxWidth: '200px', opacity: settings.taste_filter_auto_enabled === 'true' ? 1 : 0.6 }}>
-                    <label htmlFor="settings-auto-threshold" className="settings-field-label">Auto threshold (score cutoff){settings.taste_filter_auto_enabled === 'true' ? '' : ' (inactive — enable auto-compute above)'}{savedFlashes.taste_filter_auto_threshold ? <span className="field-saved-hint">Saved</span> : null}</label>
-                    <input
-                      id="settings-auto-threshold"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="1"
-                      disabled={settings.taste_filter_auto_enabled !== 'true'}
-                      value={settings.taste_filter_auto_threshold ?? ''}
-                      onChange={(e) => setSettings((s) => ({ ...s, taste_filter_auto_threshold: e.target.value }))}
-                      onBlur={(e) => saveSettings({ taste_filter_auto_threshold: e.target.value })}
-                      placeholder="0.3"
-                    />
-                  </div>
+                  <FormField
+                    id="settings-auto-threshold"
+                    label={`Auto threshold (score cutoff)${settings.taste_filter_auto_enabled === 'true' ? '' : ' (inactive — enable auto-compute above)'}`}
+                    saved={!!savedFlashes.taste_filter_auto_threshold}
+                    wrapperStyle={{ maxWidth: '200px', opacity: settings.taste_filter_auto_enabled === 'true' ? 1 : 0.6 }}
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="1"
+                    disabled={settings.taste_filter_auto_enabled !== 'true'}
+                    value={settings.taste_filter_auto_threshold ?? ''}
+                    onChange={(e) => setSettings((s) => ({ ...s, taste_filter_auto_threshold: e.target.value }))}
+                    onBlur={(e) => saveSettings({ taste_filter_auto_threshold: e.target.value })}
+                    placeholder="0.3"
+                  />
                 </div>
 
                 <div className="settings-subsection" style={{ marginBottom: 0 }}>
