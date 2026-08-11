@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import StatusPill from './components/StatusPill.jsx';
 import Skeleton from './components/Skeleton.jsx';
 import EmptyState from './components/EmptyState.jsx';
+import Modal from './components/Modal.jsx';
 import JobArtworkAnalysisReview from './JobArtworkAnalysisReview.jsx';
 import JobListingReview from './JobListingReview.jsx';
 import JobMockupReview from './JobMockupReview.jsx';
@@ -1774,23 +1775,24 @@ function App() {
         </main>
       </div>
 
-      {confirmAction && (
-        <div className="modal-overlay" role="presentation" onClick={confirmActionCancel}>
-          <div
-            className="modal-box"
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="confirm-dialog-message"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p id="confirm-dialog-message" className="modal-message">{confirmAction.message}</p>
-            <div className="modal-actions">
-              <button className="btn-secondary" onClick={confirmActionCancel}>Cancel</button>
-              <button className="btn-primary modal-btn-danger" onClick={confirmActionAccept}>Delete</button>
-            </div>
-          </div>
+      <Modal
+        open={Boolean(confirmAction)}
+        onClose={confirmActionCancel}
+        role="alertdialog"
+        labelledBy="confirm-dialog-message"
+      >
+        <p id="confirm-dialog-message" className="modal-message">
+          {confirmAction?.message}
+        </p>
+        <div className="modal-actions">
+          <button className="btn-secondary" onClick={confirmActionCancel}>
+            Cancel
+          </button>
+          <button className="btn-primary modal-btn-danger" onClick={confirmActionAccept}>
+            Delete
+          </button>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }
