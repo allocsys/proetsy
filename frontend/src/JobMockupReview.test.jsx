@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import JobMockupReview from './JobMockupReview.jsx';
+import { ToastProvider } from './components/Toast.jsx';
 
 const NEEDS_REVIEW_MOCKUP = {
   id: 5,
@@ -30,6 +31,10 @@ const TEMPLATE_UNCATEGORIZED = { size_key: 'misc-size', category: null };
 // (GET /api/mockup-templates/categories, GET /api/mockup-templates) alongside whatever
 // a given test cares about (e.g. GET /api/jobs/:id/mockups), so matching by call order
 // alone (plain mockResolvedValueOnce) is no longer reliable here.
+function renderReview(props) {
+  return render(<ToastProvider><JobMockupReview {...props} /></ToastProvider>);
+}
+
 function makeFetchMock(map) {
   return vi.fn((url, opts) => {
     const entry = map.find(([matcher]) => (typeof matcher === 'string' ? url === matcher : matcher.test(url)));
@@ -52,12 +57,12 @@ beforeEach(() => {
 
 describe('JobMockupReview', () => {
   it('disables "Load mockups" when no jobId is given', () => {
-    render(<JobMockupReview jobId={null} />);
+    renderReview({ jobId: null });
     expect(screen.getByText('Load mockups')).toBeDisabled();
   });
 
   it('shows the empty state before anything is loaded', () => {
-    render(<JobMockupReview jobId="42" />);
+    renderReview({ jobId: '42' });
     expect(screen.getByText('No mockups loaded yet.')).toBeInTheDocument();
   });
 
@@ -67,7 +72,7 @@ describe('JobMockupReview', () => {
       ['/api/jobs/42/mockups', () => ({ ok: true, json: async () => [NEEDS_REVIEW_MOCKUP] })],
     ]);
     const user = userEvent.setup();
-    render(<JobMockupReview jobId="42" />);
+    renderReview({ jobId: '42' });
 
     await user.click(screen.getByText('Load mockups'));
 
@@ -83,7 +88,7 @@ describe('JobMockupReview', () => {
       ['/api/jobs/42/mockups', () => ({ ok: true, json: async () => [RESOLVED_MOCKUP] })],
     ]);
     const user = userEvent.setup();
-    render(<JobMockupReview jobId="42" />);
+    renderReview({ jobId: '42' });
 
     await user.click(screen.getByText('Load mockups'));
 
@@ -103,7 +108,7 @@ describe('JobMockupReview', () => {
       [/\/api\/jobs\/42\/mockups\/5\/variant/, () => ({ ok: true, json: async () => ({ id: 5, selected_variant: 'ai_extended' }) })],
     ]);
     const user = userEvent.setup();
-    render(<JobMockupReview jobId="42" />);
+    renderReview({ jobId: '42' });
     await user.click(screen.getByText('Load mockups'));
     await screen.findByText('Use AI extended');
 
@@ -126,7 +131,7 @@ describe('JobMockupReview', () => {
       [/\/api\/jobs\/42\/mockups\/5\/variant/, () => ({ ok: false, json: async () => ({ error: 'Mockup not found' }) })],
     ]);
     const user = userEvent.setup();
-    render(<JobMockupReview jobId="42" />);
+    renderReview({ jobId: '42' });
     await user.click(screen.getByText('Load mockups'));
     await screen.findByText('Use smart crop');
 
@@ -138,7 +143,7 @@ describe('JobMockupReview', () => {
 
 describe('MockupCategorySelector (Rollout step 5)', () => {
   it('shows an empty state when no categories are configured yet', async () => {
-    render(<JobMockupReview jobId="42" />);
+    renderReview({ jobId: '42' });
 
     expect(await screen.findByText(/No mockup categories configured yet/)).toBeInTheDocument();
   });
@@ -148,7 +153,7 @@ describe('MockupCategorySelector (Rollout step 5)', () => {
       ['/api/mockup-templates/categories', () => ({ ok: true, json: async () => ['bedroom', 'mug'] })],
       ['/api/mockup-templates', () => ({ ok: true, json: async () => [TEMPLATE_BEDROOM, TEMPLATE_MUG] })],
     ]);
-    render(<JobMockupReview jobId="42" />);
+    renderReview({ jobId: '42' });
 
     expect(await screen.findByText('bedroom')).toBeInTheDocument();
     expect(screen.getByText('mug')).toBeInTheDocument();
@@ -160,7 +165,7 @@ describe('MockupCategorySelector (Rollout step 5)', () => {
       ['/api/mockup-templates', () => ({ ok: true, json: async () => [TEMPLATE_BEDROOM] })],
     ]);
     const user = userEvent.setup();
-    render(<JobMockupReview jobId="42" />);
+    renderReview({ jobId: '42' });
     await screen.findByText('bedroom');
 
     const button = screen.getByText('Generate mockups for selected categories');
@@ -186,7 +191,7 @@ describe('MockupCategorySelector (Rollout step 5)', () => {
       ['/api/jobs/42/mockups', () => ({ ok: true, json: async () => [] })],
     ]);
     const user = userEvent.setup();
-    render(<JobMockupReview jobId="42" />);
+    renderReview({ jobId: '42' });
     await screen.findByText('bedroom');
 
     // Only check "bedroom" — "mug" and the uncategorized template should be excluded.
@@ -211,7 +216,7 @@ describe('MockupCategorySelector (Rollout step 5)', () => {
       }],
     ]);
     const user = userEvent.setup();
-    render(<JobMockupReview jobId="42" />);
+    renderReview({ jobId: '42' });
     await screen.findByText('bedroom');
 
     await user.click(screen.getByRole('checkbox'));
@@ -227,7 +232,7 @@ describe('MockupCategorySelector (Rollout step 5)', () => {
       ['/api/jobs/42/run', () => ({ ok: false, json: async () => ({ error: 'Job not found' }) })],
     ]);
     const user = userEvent.setup();
-    render(<JobMockupReview jobId="42" />);
+    renderReview({ jobId: '42' });
     await screen.findByText('bedroom');
 
     await user.click(screen.getByRole('checkbox'));
