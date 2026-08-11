@@ -7,6 +7,7 @@ import { useJobs } from './hooks/useJobs.js';
 import { useApiKeys } from './hooks/useApiKeys.js';
 import { useTagsAndTrends } from './hooks/useTagsAndTrends.js';
 import { useSettings } from './hooks/useSettings.js';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js';
 import UploadView from './views/UploadView.jsx';
 import HistoryView from './views/HistoryView.jsx';
 import ReviewView from './views/ReviewView.jsx';
@@ -80,6 +81,17 @@ const NAV_ITEMS = [
   { id: 'settings', label: 'Shop Settings & Tags', group: 'Configuration', icon: 'settings', path: '/settings/tags-trends' },
 ];
 
+// plan.md Step 6: keyboard shortcuts -- "g" then one of these letters jumps to
+// the matching view, mirroring NAV_ITEMS' own order/grouping above.
+const SHORTCUT_MAP = {
+  u: '/upload',
+  m: '/mockup-templates',
+  h: '/history',
+  r: '/review',
+  p: '/prompt-helper',
+  s: '/settings/tags-trends',
+};
+
 function App() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -97,6 +109,24 @@ function App() {
       return false;
     }
   });
+  // plan.md Step 6: light theme, persisted alongside sidebar-collapsed above.
+  // Falls back to the OS-level preference, then dark, if nothing's stored yet.
+  const [theme, setTheme] = useState(() => {
+    try {
+      const stored = localStorage.getItem('proetsy_theme');
+      if (stored === 'light' || stored === 'dark') return stored;
+    } catch {
+      // ignore storage errors (e.g. private browsing)
+    }
+    try {
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        return 'light';
+      }
+    } catch {
+      // matchMedia unsupported in this environment
+    }
+    return 'dark';
+  });
   const [fetchError, setFetchError] = useState(null);
   const [reviewTab, setReviewTab] = useState('analysis');
   const [activeJobInfo, setActiveJobInfo] = useState(null);
@@ -108,6 +138,21 @@ function App() {
   const [uploadStatus, setUploadStatus] = useState('');
 
   const isSettingsActive = currentPath.startsWith('/settings');
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    try {
+      localStorage.setItem('proetsy_theme', theme);
+    } catch {
+      // ignore storage errors (e.g. private browsing)
+    }
+  }, [theme]);
+
+  function toggleTheme() {
+    setTheme((t) => (t === 'light' ? 'dark' : 'light'));
+  }
+
+  const { helpOpen, setHelpOpen } = useKeyboardShortcuts(navigate, SHORTCUT_MAP);
 
   useEffect(() => {
     if (!currentPath.startsWith('/settings') && currentPath !== '/') {
@@ -328,6 +373,34 @@ function App() {
             </button>
           </div>
           <UpdaterStatus />
+          <button
+            className="btn-secondary btn-sm"
+            onClick={() => setHelpOpen(true)}
+            aria-label="Keyboard shortcuts"
+            title="Keyboard shortcuts (press ?)"
+          >
+            <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="2" y="6" width="20" height="12" rx="2" />
+              <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h12" />
+            </svg>
+          </button>
+          <button
+            className="btn-secondary btn-sm"
+            onClick={toggleTheme}
+            aria-label={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
+            title={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
+          >
+            {theme === 'light' ? (
+              <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+              </svg>
+            ) : (
+              <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="5" />
+                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+              </svg>
+            )}
+          </button>
           <button className="btn-secondary" onClick={() => navigate(isSettingsActive ? (previousPath || '/upload') : '/settings/tags-trends')}>
             <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ width: '14px', height: '14px' }}>
               <circle cx="12" cy="12" r="3" />
@@ -528,6 +601,31 @@ function App() {
           </button>
           <button className="btn-primary modal-btn-danger" onClick={confirmActionAccept}>
             Delete
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        labelledBy="shortcuts-dialog-title"
+      >
+        <h2 id="shortcuts-dialog-title" style={{ marginTop: 0 }}>Keyboard shortcuts</h2>
+        <p className="modal-message">
+          Press <kbd className="mono">g</kbd> then a letter to jump to a view.
+        </p>
+        <ul className="shortcuts-list">
+          <li><kbd className="mono">g</kbd> <kbd className="mono">u</kbd> — Upload</li>
+          <li><kbd className="mono">g</kbd> <kbd className="mono">m</kbd> — Mockup Templates</li>
+          <li><kbd className="mono">g</kbd> <kbd className="mono">h</kbd> — Listing History</li>
+          <li><kbd className="mono">g</kbd> <kbd className="mono">r</kbd> — Review a Job</li>
+          <li><kbd className="mono">g</kbd> <kbd className="mono">p</kbd> — Prompt Helper</li>
+          <li><kbd className="mono">g</kbd> <kbd className="mono">s</kbd> — Settings</li>
+          <li><kbd className="mono">?</kbd> — Toggle this help</li>
+        </ul>
+        <div className="modal-actions">
+          <button className="btn-secondary" onClick={() => setHelpOpen(false)}>
+            Close
           </button>
         </div>
       </Modal>
