@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAsyncTask } from './hooks/useAsyncTask.js';
+import EmptyState from './components/EmptyState.jsx';
 
 function tagsToText(tags) {
   return Array.isArray(tags) ? tags.join(', ') : '';
@@ -238,7 +239,7 @@ export default function JobListingReview({ jobId }) {
         <ListingCard key={l.id} listing={l} onSaved={handleSaved} conventions={conventions} />
       ))}
       {listings.length === 0 && !loading && !error && (
-        <p className="empty-state">No listings loaded yet.</p>
+        <EmptyState message="No listings loaded yet." />
       )}
     </div>
   );
