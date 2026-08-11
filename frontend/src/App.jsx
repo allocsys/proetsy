@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import StatusPill from './components/StatusPill.jsx';
 import Modal from './components/Modal.jsx';
 import UpdaterStatus from './UpdaterStatus.jsx';
 import { useJobs } from './hooks/useJobs.js';
@@ -11,6 +12,15 @@ import ReviewView from './views/ReviewView.jsx';
 import SettingsView from './views/SettingsView.jsx';
 import PromptHelperView from './views/PromptHelperView.jsx';
 import MockupTemplatesView from './views/MockupTemplatesView.jsx';
+
+export function StatusBadge({ status }) {
+  const statusText = status || 'pending';
+  return (
+    <StatusPill variant={statusText} ariaLabel={`Status: ${statusText}`}>
+      {statusText}
+    </StatusPill>
+  );
+}
 
 export function NavIcon({ name }) {
   switch (name) {
@@ -384,7 +394,7 @@ function App() {
           {health && health.status === 'unreachable' && (
             <div className="backend-banner">
               <span>Backend not running — start it with <code className="mono">npm run dev</code> from the backend/ folder.</span>
-              <span className="status-pill pending" role="status" aria-label="Status: pending">pending</span>
+              <StatusBadge status="pending" />
             </div>
           )}
 
