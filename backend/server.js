@@ -438,6 +438,16 @@ app.get('/api/tags', (req, res) => {
   res.json(db.prepare('SELECT * FROM tags ORDER BY tag_text').all());
 });
 
+// Settings panel's "Delete tag" button (Tags & Trends) -- previously missing entirely,
+// so every delete request 404'd silently (the frontend didn't check the response status
+// before refreshing). See docs/known-issues/functional-correctness-review-2026-08-11.md #2.
+app.delete('/api/tags/:id', (req, res) => {
+  const db = getDb();
+  const result = db.prepare('DELETE FROM tags WHERE id = ?').run(Number(req.params.id));
+  if (result.changes === 0) return res.status(404).json({ error: 'Tag not found' });
+  res.status(204).end();
+});
+
 // Body: { tags: "one\nper\nline" or ["one", "two"], category?, source? }. Skips tags
 // already present (by exact text) so pasting the same list twice doesn't duplicate rows.
 app.post('/api/tags/bulk', (req, res) => {
@@ -877,6 +887,15 @@ app.post('/api/trends', (req, res) => {
   if (!term) return res.status(400).json({ error: 'term is required' });
   const trend = addManualTrend(term, category || null);
   res.status(201).json(trend);
+});
+
+// Settings panel's "Delete trend" button (Tags & Trends) -- same missing-route issue as
+// DELETE /api/tags/:id above. See docs/known-issues/functional-correctness-review-2026-08-11.md #2.
+app.delete('/api/trends/:id', (req, res) => {
+  const db = getDb();
+  const result = db.prepare('DELETE FROM trends WHERE id = ?').run(Number(req.params.id));
+  if (result.changes === 0) return res.status(404).json({ error: 'Trend not found' });
+  res.status(204).end();
 });
 
 // CSV import (ARCHITECTURE.md -> Trends Provider Layer -> "CSV import in manual.js").

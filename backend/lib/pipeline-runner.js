@@ -89,7 +89,16 @@ export async function runPendingModulesForJob(jobId, options = {}) {
   const mockupComposerStatus = moduleStatus(job, 'mockup_composer');
   if (mockupComposerStatus === 'pending' || mockupComposerStatus === 'failed') {
     setModuleStatus(jobId, 'mockup_composer', 'running', { required: false });
-    const sizeKeys = options.sizeKeys ?? Object.keys(getProductSizes());
+    // Only default to sizes that actually have a mockup template configured -- mirrors
+    // listing-generator/index.js's `availableSizes` filter. Previously this defaulted to
+    // every configured size regardless, so composeMockup() would predictably throw ("no
+    // mockup_template configured") for any untemplated size on every single run. See
+    // docs/known-issues/functional-correctness-review-2026-08-11.md #3.
+    const sizeKeys =
+      options.sizeKeys ??
+      Object.entries(getProductSizes())
+        .filter(([, size]) => Boolean(size.mockup_template))
+        .map(([sizeKey]) => sizeKey);
     const perSize = {};
     let anySucceeded = false;
     for (const sizeKey of sizeKeys) {

@@ -95,6 +95,34 @@ export function getJobWithModules(jobId) {
   return { ...job, modules };
 }
 
+// Re-derives a job's overall_status from its modules once one of them reaches a
+// terminal state, per the Suggested fix in
+// docs/known-issues/functional-correctness-review-2026-08-11.md #1: previously nothing
+// ever set overall_status to a success value, so a fully-finished job stayed 'running'
+// forever. Called from setModuleStatus() after every status write so every caller
+// (the /run/* routes, pipeline-runner.js) gets this for free.
+//
+// 'skipped' modules don't count towards "pending-eligible" -- a job where every
+// non-skipped module is done (all 'success', or 'failed' with no required module
+// among the failures... though a required failure already short-circuits to 'failed'
+// above) is complete. If any non-skipped module is still 'pending'/'running', the job
+// isn't done yet and overall_status is left alone (already 'running' from createJob or
+// an earlier call).
+function finalizeJobStatus(db, jobId) {
+  const current = db.prepare('SELECT overall_status FROM jobs WHERE id = ?').get(jobId);
+  if (!current || current.overall_status === 'failed') return; // already terminal / a required module failed
+
+  const modules = db
+    .prepare("SELECT status FROM job_modules WHERE job_id = ? AND status != 'skipped'")
+    .all(jobId);
+
+  const allTerminal = modules.length > 0 && modules.every((m) => m.status === 'success' || m.status === 'failed');
+  if (!allTerminal) return;
+
+  const anyFailed = modules.some((m) => m.status === 'failed');
+  db.prepare("UPDATE jobs SET overall_status = ? WHERE id = ?").run(anyFailed ? 'failed' : 'success', jobId);
+}
+
 // Sets/replaces the manual-notes fallback input used by Module 2 when Module 1 is
 // skipped or fails (see ARCHITECTURE.md -> Module 2 input, and the `jobs.manual_notes`
 // column).
@@ -141,4 +169,9 @@ export function setModuleStatus(jobId, moduleName, status, { errorMessage = null
       "UPDATE jobs SET overall_status = CASE WHEN overall_status = 'failed' THEN overall_status ELSE 'running' END WHERE id = ?"
     ).run(jobId);
   }
+
+  // A non-required module failure doesn't hit the branch above, but it can still be the
+  // last module the job was waiting on -- so this needs to run regardless of which
+  // branch (if any) fired.
+  finalizeJobStatus(db, jobId);
 }

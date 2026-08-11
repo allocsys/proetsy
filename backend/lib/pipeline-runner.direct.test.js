@@ -43,10 +43,17 @@ beforeAll(async () => {
     generateImage: vi.fn(),
   }));
 
-  // Two configured sizes: one always succeeds, one always throws — exercises the
-  // "at least one size succeeded" partial-success branch.
+  // Two templated sizes: one always succeeds, one always throws — exercises the
+  // "at least one size succeeded" partial-success branch. Both need a mockup_template
+  // set, since runPendingModulesForJob's default sizeKeys now filters out any size
+  // without one (docs/known-issues/functional-correctness-review-2026-08-11.md #3) —
+  // 'size-untemplated' below covers that filter itself.
   vi.doMock('../config/index.js', () => ({
-    getProductSizes: vi.fn(() => ({ 'size-ok': {}, 'size-bad': {} })),
+    getProductSizes: vi.fn(() => ({
+      'size-ok': { mockup_template: 'templates/ok.png' },
+      'size-bad': { mockup_template: 'templates/bad.png' },
+      'size-untemplated': {},
+    })),
     getPipelineConfig: vi.fn(() => ({
       pipeline: [
         { module: 'image_analyzer', enabled: true },
@@ -121,7 +128,7 @@ describe('runPendingModulesForJob - mockup_composer partial-success rule', () =>
 });
 
 describe('runPendingModulesForJob - options.sizeKeys filter (Rollout step 4)', () => {
-  it('with no sizeKeys option, attempts every configured size (regression guard)', async () => {
+  it('with no sizeKeys option, attempts every configured size that has a mockup_template (regression guard)', async () => {
     const { generateMockupForJob } = await import('./mockup-generator.js');
     generateMockupForJob.mockClear();
     const jobId = createJob(artworkId);
@@ -132,6 +139,17 @@ describe('runPendingModulesForJob - options.sizeKeys filter (Rollout step 4)', (
       ['size-bad', 'size-ok'].sort()
     );
     expect(Object.keys(results.mockup_composer.perSize).sort()).toEqual(['size-bad', 'size-ok'].sort());
+  });
+
+  it('excludes a configured size with no mockup_template from the default sizeKeys list (#3 fix)', async () => {
+    const { generateMockupForJob } = await import('./mockup-generator.js');
+    generateMockupForJob.mockClear();
+    const jobId = createJob(artworkId);
+
+    const { results } = await runPendingModulesForJob(jobId);
+
+    expect(generateMockupForJob).not.toHaveBeenCalledWith(expect.anything(), 'size-untemplated');
+    expect(results.mockup_composer.perSize['size-untemplated']).toBeUndefined();
   });
 
   it('with a sizeKeys filter, only attempts the given sizes (not every configured size)', async () => {
