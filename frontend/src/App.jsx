@@ -3,6 +3,7 @@ import StatusPill from './components/StatusPill.jsx';
 import Skeleton from './components/Skeleton.jsx';
 import EmptyState from './components/EmptyState.jsx';
 import Modal from './components/Modal.jsx';
+import Tabs from './components/Tabs.jsx';
 import JobArtworkAnalysisReview from './JobArtworkAnalysisReview.jsx';
 import JobListingReview from './JobListingReview.jsx';
 import JobMockupReview from './JobMockupReview.jsx';
@@ -88,6 +89,42 @@ const SETTINGS_TABS = [
   { id: 'general', label: 'Shop & Pipeline' },
   { id: 'api-keys', label: 'API Keys' },
   { id: 'automation', label: 'Automation & Diagnostics' },
+];
+
+const REVIEW_TABS = [
+  {
+    id: 'analysis',
+    label: 'Image Analysis',
+    icon: (
+      <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '14px', height: '14px' }}>
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'listings',
+    label: 'Listings',
+    icon: (
+      <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '14px', height: '14px' }}>
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="16" y1="13" x2="8" y2="13" />
+        <line x1="16" y1="17" x2="8" y2="17" />
+        <polyline points="10 9 9 9 8 9" />
+      </svg>
+    ),
+  },
+  {
+    id: 'mockups',
+    label: 'Mockups',
+    icon: (
+      <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '14px', height: '14px' }}>
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+        <circle cx="8.5" cy="8.5" r="1.5" />
+        <polyline points="21 15 16 10 5 21" />
+      </svg>
+    ),
+  },
 ];
 
 function App() {
@@ -881,17 +918,12 @@ function App() {
             <div>
               <h2 style={{ marginTop: 0, marginBottom: '1.5rem' }}>Shop Settings & Tags</h2>
 
-              <div className="workspace-tabs settings-tabs-nav">
-                {SETTINGS_TABS.map((tab) => (
-                  <button
-                    key={tab.id}
-                    className={`workspace-tab-btn ${settingsTab === tab.id ? 'active' : ''}`}
-                    onClick={() => setSettingsTab(tab.id)}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
+              <Tabs
+                tabs={SETTINGS_TABS}
+                activeId={settingsTab}
+                onChange={setSettingsTab}
+                className="settings-tabs-nav"
+              />
 
               <div className="settings-dashboard-grid">
 
@@ -1670,41 +1702,11 @@ function App() {
                     </div>
                   </div>
 
-                  <div className="workspace-tabs">
-                    <button
-                      className={`workspace-tab-btn ${reviewTab === 'analysis' ? 'active' : ''}`}
-                      onClick={() => setReviewTab('analysis')}
-                    >
-                      <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '14px', height: '14px' }}>
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                      </svg>
-                      Image Analysis
-                    </button>
-                    <button
-                      className={`workspace-tab-btn ${reviewTab === 'listings' ? 'active' : ''}`}
-                      onClick={() => setReviewTab('listings')}
-                    >
-                      <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '14px', height: '14px' }}>
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                        <polyline points="14 2 14 8 20 8" />
-                        <line x1="16" y1="13" x2="8" y2="13" />
-                        <line x1="16" y1="17" x2="8" y2="17" />
-                        <polyline points="10 9 9 9 8 9" />
-                      </svg>
-                      Listings
-                    </button>
-                    <button
-                      className={`workspace-tab-btn ${reviewTab === 'mockups' ? 'active' : ''}`}
-                      onClick={() => setReviewTab('mockups')}
-                    >
-                      <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '14px', height: '14px' }}>
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                        <circle cx="8.5" cy="8.5" r="1.5" />
-                        <polyline points="21 15 16 10 5 21" />
-                      </svg>
-                      Mockups
-                    </button>
-                  </div>
+                  <Tabs
+                    tabs={REVIEW_TABS}
+                    activeId={reviewTab}
+                    onChange={setReviewTab}
+                  />
 
                   <div className="workspace-panel-body">
                     <div style={{ display: reviewTab === 'analysis' ? 'block' : 'none' }}>
