@@ -21,8 +21,9 @@ structural, so every step ships independently and the app never breaks mid-way.
 
 ---
 
-## Step 1 — Kill the phantom utility classes (quick, safe, isolated)
+## Step 1 — Kill the phantom utility classes (quick, safe, isolated) ✅ DONE
 **Files:** `PromptHelper.jsx`, `TasteFilter.jsx`, `JobMockupReview.jsx`
+**Status:** Merged to `main` (branch `fix/phantom-utility-classes`).
 - Replace `p-2/p-3/p-4/p-5`, `m-0`, `font-bold`, `items-center`, `justify-between`
   with either (a) the existing spacing scale (`--space-*` vars) via new small
   utility classes added to `styles.css`, or (b) inline equivalents matching
@@ -31,7 +32,8 @@ structural, so every step ships independently and the app never breaks mid-way.
   Helper, Taste Filter upload lane, Mockup review).
 - Risk: near zero. Ship first.
 
-## Step 2 — Add loading skeletons and real empty states
+## Step 2 — Add loading skeletons and real empty states ✅ DONE
+**Status:** Merged to `main` (branch `feat/skeletons-empty-states`).
 - Replace bare "Loading…" text (tags, trends, API keys, rate limits, jobs)
   with a small `<Skeleton />` component (a few CSS-only placeholder bars using
   existing `--studio-*` tokens).
@@ -40,7 +42,8 @@ structural, so every step ships independently and the app never breaks mid-way.
   the pattern already used in the Listing History empty state.
 - Still no structural change to App.jsx; purely visual/component-level.
 
-## Step 3 — Extract shared UI primitives
+## Step 3 — Extract shared UI primitives ✅ DONE
+**Status:** Merged to `main` via PR #69 (branch `refactor/shared-ui-primitives`).
 - Pull recurring inline patterns into small components in
   `frontend/src/components/`: `Skeleton`, `EmptyState`, `Modal` (generalize the
   existing confirm-dialog markup), `Tabs` (generalize `.workspace-tabs`),
@@ -49,18 +52,26 @@ structural, so every step ships independently and the app never breaks mid-way.
   component at a time, so each swap is independently testable.
 - This directly reduces the 85 inline-style usages as a side effect, since the
   new components own their own styling.
+- Landed: `Modal` swapped into the confirm dialog; `Tabs` swapped into the
+  Settings sub-tabs and Job review tabs; `FormField` swapped into Default
+  price, Delivery text, Watched folder path, Watch category, and Auto
+  threshold. All CI checks green.
 
-## Step 4 — Break `App.jsx` into route-level view components
+## Step 4 — Break `App.jsx` into route-level view components ✅ DONE (pending merge)
+**Status:** Complete on branch `refactor/split-app-into-views`, not yet merged to `main`.
+- Shared state lifted into `hooks/useJobs.js`, `hooks/useSettings.js`,
+  `hooks/useTagsAndTrends.js`, `hooks/useApiKeys.js` (plus a pre-existing
+  `hooks/useAsyncTask.js`); App.jsx now only owns cross-cutting nav/dialog
+  state instead of one 51-`useState` blob.
 - Split into `views/UploadView.jsx`, `views/HistoryView.jsx`,
-  `views/ReviewView.jsx`, `views/SettingsView.jsx` (with its four sub-tabs
-  staying as-is or splitting further into `views/settings/*`),
-  `views/PromptHelperView.jsx`, `views/MockupTemplatesView.jsx`.
-- Lift shared state (jobs, settings, tags, trends, api keys, etc.) into a
-  small number of custom hooks (`useJobs`, `useSettings`, `useTagsAndTrends`,
-  `useApiKeys`) or a lightweight context, so each view component only takes
-  what it needs as props/hook return values instead of one 51-`useState` blob.
-- Do this after Step 3 so the extracted primitives are already in place and
-  don't need to be re-threaded through the new view files.
+  `views/ReviewView.jsx`, `views/SettingsView.jsx` (kept as one file with its
+  four sub-tabs switched internally, matching how it already worked — no
+  further `views/settings/*` split needed), `views/PromptHelperView.jsx`,
+  `views/MockupTemplatesView.jsx`. Each view takes only the hook return
+  values/props it needs.
+- Remaining before merge: run the full test suite (`App.test.jsx` covers this
+  flow end-to-end through the DOM, so it should still pass unchanged since no
+  rendered markup was altered) and open a PR.
 
 ## Step 5 — Add React Router
 - Add `react-router-dom`, map `NAV_ITEMS` ids to real routes
