@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import StatusPill from './components/StatusPill.jsx';
+import Skeleton from './components/Skeleton.jsx';
+import EmptyState from './components/EmptyState.jsx';
 import JobArtworkAnalysisReview from './JobArtworkAnalysisReview.jsx';
 import JobListingReview from './JobListingReview.jsx';
 import JobMockupReview from './JobMockupReview.jsx';
@@ -939,7 +941,7 @@ function App() {
                     </p>
                   )}
                   {tagsLoading ? (
-                    <p className="empty-state">Loading…</p>
+                    <Skeleton count={4} />
                   ) : tags.length ? (
                     <ul className="settings-compact-list">
                       {tags.map((t) => (
@@ -957,7 +959,7 @@ function App() {
                       ))}
                     </ul>
                   ) : (
-                    <p className="empty-state">No tags added yet.</p>
+                    <EmptyState message="No tags added yet — add some above to get started." />
                   )}
                 </div>
 
@@ -1031,7 +1033,7 @@ function App() {
                     </p>
                   )}
                   {trendsLoading ? (
-                    <p className="empty-state">Loading…</p>
+                    <Skeleton count={4} />
                   ) : trends.length ? (
                     <ul className="settings-compact-list">
                       {trends.map((t) => (
@@ -1049,7 +1051,7 @@ function App() {
                       ))}
                     </ul>
                   ) : (
-                    <p className="empty-state">No trends added yet.</p>
+                    <EmptyState message="No trends added yet — add one below." />
                   )}
                   <div className="flex-row flex-wrap mt-2">
                     <div className="settings-field" style={{ flex: 1, minWidth: '140px' }}>
@@ -1155,7 +1157,7 @@ function App() {
                     Securely stored API keys for Gemini & Claude providers. Key values are masked after saving.
                   </p>
                   {apiKeysLoading ? (
-                    <p className="empty-state">Loading…</p>
+                    <Skeleton variant="table" count={3} />
                   ) : apiKeys.length ? (
                     <div className="data-table-wrapper">
                       <table className="data-table">
@@ -1193,7 +1195,7 @@ function App() {
                       </table>
                     </div>
                   ) : (
-                    <p className="empty-state">No dashboard-managed keys yet — add one below to enable Gemini/Claude calls.</p>
+                    <EmptyState message="No dashboard-managed keys yet — add one below to enable Gemini/Claude calls." compact />
                   )}
 
                   <div className="settings-field-row" style={{ marginTop: '1rem' }}>
@@ -1360,7 +1362,7 @@ function App() {
                       </div>
                     </div>
                     {rateLimitsLoading ? (
-                      <p className="empty-state" style={{ margin: 0 }}>Loading…</p>
+                      <Skeleton variant="table" count={2} />
                     ) : rateLimits.length ? (
                       <div className="data-table-wrapper">
                         <table className="data-table" style={{ marginBottom: 0 }}>
@@ -1391,7 +1393,7 @@ function App() {
                         </table>
                       </div>
                     ) : (
-                      <p className="empty-state" style={{ margin: 0 }}>No key/model pair has hit a rate limit yet.</p>
+                      <EmptyState message="No key/model pair has hit a rate limit yet." compact />
                     )}
                   </div>
                 </div>
@@ -1506,13 +1508,10 @@ function App() {
             <section className="paper-card card">
               <h2 style={{ marginTop: 0 }}>Listing History</h2>
               {jobs.length === 0 ? (
-                <div className="empty-state-box" style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--studio-ink-soft)' }}>
-                  <svg style={{ width: '40px', height: '40px', opacity: 0.5, marginBottom: '0.75rem' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="9" />
-                    <path d="M12 7v5l3 3" />
-                  </svg>
-                  <p className="empty-state" style={{ margin: 0, fontStyle: 'normal', fontWeight: 500, fontSize: '13.5px' }}>No jobs yet — drop some artwork on the Upload view to get started.</p>
-                </div>
+                <EmptyState
+                  message="No jobs yet — drop some artwork on the Upload view to get started."
+                  cta={{ label: 'Go to Upload', onClick: () => goTo('upload') }}
+                />
               ) : (
                 <div style={{ overflowX: 'auto' }}>
                   <table className="data-table">
@@ -1750,7 +1749,10 @@ function App() {
                 </div>
               ) : (
                 <div className="paper-card card">
-                  <p className="empty-state">No jobs yet — drop some artwork on the Upload view to get started.</p>
+                  <EmptyState
+                    message="No jobs yet — drop some artwork on the Upload view to get started."
+                    cta={{ label: 'Go to Upload', onClick: () => goTo('upload') }}
+                  />
                 </div>
               )}
             </section>
