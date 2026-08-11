@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAsyncTask } from './hooks/useAsyncTask.js';
+import { useToast } from './components/Toast.jsx';
 
 const ORIENTATIONS = ['portrait', 'landscape', 'square'];
 
@@ -12,6 +13,7 @@ function copyToClipboard(text) {
 const COPIED_FEEDBACK_MS = 1500;
 
 export default function PromptHelper() {
+  const { showToast } = useToast();
   const [trends, setTrends] = useState([]);
   const [selectedTrendId, setSelectedTrendId] = useState('');
   const [orientation, setOrientation] = useState(ORIENTATIONS[0]);
@@ -20,11 +22,10 @@ export default function PromptHelper() {
   const [generated, setGenerated] = useState([]);
   const [history, setHistory] = useState([]);
   const [loadingTrends, setLoadingTrends] = useState(false);
-  const [csvMessage, setCsvMessage] = useState('');
   const [copiedId, setCopiedId] = useState(null);
   // addTrend and generate already shared one loading+error pair before this hook existed
   // (loadTrends/loadHistory intentionally fail silently with no error state, and the CSV
-  // import has its own message-based feedback instead -- neither matches this pending/
+  // import gives its own feedback via toast instead -- neither matches this pending/
   // error shape, so both are left as local state below).
   const addTrendTask = useAsyncTask();
   const generateTask = useAsyncTask();
@@ -74,7 +75,6 @@ export default function PromptHelper() {
 
   async function importTrendsCsv(file) {
     if (!file) return;
-    setCsvMessage(`Importing ${file.name}…`);
     try {
       const csv = await file.text();
       const res = await fetch('/api/trends/csv', {
@@ -83,10 +83,13 @@ export default function PromptHelper() {
         body: JSON.stringify({ csv }),
       });
       const data = await res.json();
-      setCsvMessage(res.ok ? `Imported ${data.imported} trend(s) from ${file.name}.` : data.error);
+      showToast(
+        res.ok ? `Imported ${data.imported} trend(s) from ${file.name}.` : (data.error || 'Import failed'),
+        res.ok ? 'success' : 'error'
+      );
       if (res.ok) await loadTrends();
     } catch (err) {
-      setCsvMessage(`Import failed: ${err.message}`);
+      showToast(`Import failed: ${err.message}`, 'error');
     }
   }
 
@@ -188,7 +191,6 @@ export default function PromptHelper() {
           <span className="settings-field-label">Import CSV (<code>term</code>, <code>category</code>)</span>
           <div className="settings-field-row" style={{ marginTop: '0.35rem' }}>
             <input className="input input-auto" id="csv-file-input" type="file" accept=".csv,text/csv" onChange={(e) => importTrendsCsv(e.target.files?.[0])} />
-            {csvMessage && <span className="text-muted mono-sm">{csvMessage}</span>}
           </div>
         </div>
       </div>
