@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAsyncTask } from './hooks/useAsyncTask.js';
+import EmptyState from './components/EmptyState.jsx';
 
 /**
  * One mockup's review card.
@@ -159,9 +160,7 @@ function MockupCategorySelector({ jobId, onGenerated }) {
           </div>
         </>
       ) : (
-        <p className="empty-state" style={{ margin: 0 }}>
-          No mockup categories configured yet.
-        </p>
+        <EmptyState message="No mockup categories configured yet." compact />
       )}
       {status && <p className="mono taste-status mt-2">{status}</p>}
       {error && <p className="text-danger mt-2">{error}</p>}
@@ -202,7 +201,7 @@ export default function JobMockupReview({ jobId }) {
         <MockupCard key={m.id} mockup={m} onVariantChange={handleVariantChange} />
       ))}
       {mockups.length === 0 && !loading && !error && (
-        <p className="empty-state">No mockups loaded yet.</p>
+        <EmptyState message="No mockups loaded yet." />
       )}
     </div>
   );
