@@ -122,6 +122,7 @@ async function openSettingsTab(user, tabLabel) {
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  localStorage.clear();
 });
 
 describe('App', () => {
@@ -747,5 +748,68 @@ describe('App', () => {
     await screen.findByText('ok');
 
     expect(screen.queryByText(/Background update failed/)).not.toBeInTheDocument();
+  });
+
+  it('navigates via the g+letter keyboard shortcut (plan.md Step 6)', async () => {
+    mockFetchByUrl({ '/api/jobs': [] });
+    const user = userEvent.setup();
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
+    await screen.findByText('ok');
+
+    await user.keyboard('gh');
+
+    expect(await screen.findByText(/No jobs yet — drop some artwork/)).toBeInTheDocument();
+  });
+
+  it('opens and closes the keyboard shortcuts help with "?" and Escape (plan.md Step 6)', async () => {
+    mockFetchByUrl();
+    const user = userEvent.setup();
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
+    await screen.findByText('ok');
+
+    await user.keyboard('?');
+    expect(await screen.findByRole('heading', { name: 'Keyboard shortcuts' })).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('heading', { name: 'Keyboard shortcuts' })).not.toBeInTheDocument();
+  });
+
+  it('also opens the shortcuts help from its header button', async () => {
+    mockFetchByUrl();
+    const user = userEvent.setup();
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
+    await screen.findByText('ok');
+
+    await user.click(screen.getByRole('button', { name: 'Keyboard shortcuts' }));
+    expect(await screen.findByRole('heading', { name: 'Keyboard shortcuts' })).toBeInTheDocument();
+  });
+
+  it('does not treat "g" as a shortcut leader while typing in a form field', async () => {
+    mockFetchByUrl();
+    const user = userEvent.setup();
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
+    await screen.findByText('ok');
+
+    await user.click(screen.getAllByText('Review a Job')[0]);
+    const jobIdField = screen.getByPlaceholderText('Job ID');
+    await user.type(jobIdField, 'gh');
+
+    expect(jobIdField).toHaveValue('gh');
+    // Still on the Review view -- "gh" typed into the field didn't navigate to History.
+    expect(screen.queryByText(/No jobs yet — drop some artwork/)).not.toBeInTheDocument();
+  });
+
+  it('toggles the light/dark theme, applies it to <html>, and persists the choice (plan.md Step 6)', async () => {
+    mockFetchByUrl();
+    const user = userEvent.setup();
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
+    await screen.findByText('ok');
+
+    const toggle = screen.getByRole('button', { name: /switch to light theme/i });
+    await user.click(toggle);
+
+    expect(document.documentElement.dataset.theme).toBe('light');
+    expect(localStorage.getItem('proetsy_theme')).toBe('light');
+    expect(screen.getByRole('button', { name: /switch to dark theme/i })).toBeInTheDocument();
   });
 });
