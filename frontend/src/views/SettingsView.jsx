@@ -68,19 +68,9 @@ export default function SettingsView({ settingsApi, apiKeysApi, tagsAndTrendsApi
               </datalist>
             </div>
             <button className="btn-primary" onClick={tagsAndTrendsApi.saveTags} disabled={!tagsAndTrendsApi.tagsText.trim()}>Save tags</button>
-            {tagsAndTrendsApi.tagsSavedMessage && (
-              <span className={`mono-sm ${tagsAndTrendsApi.tagsSavedMessage.ok ? 'text-success' : 'text-danger'}`}>
-                {tagsAndTrendsApi.tagsSavedMessage.text}
-              </span>
-            )}
           </div>
 
           <h4 className="settings-sub-heading" style={{ marginTop: '1rem' }}>Current tags</h4>
-          {tagsAndTrendsApi.tagsDeleteMessage && (
-            <p className={`mono-sm ${tagsAndTrendsApi.tagsDeleteMessage.ok ? 'text-success' : 'text-danger'}`} style={{ marginTop: 0 }}>
-              {tagsAndTrendsApi.tagsDeleteMessage.text}
-            </p>
-          )}
           {tagsAndTrendsApi.tagsLoading ? (
             <Skeleton count={4} />
           ) : tagsAndTrendsApi.tags.length ? (
@@ -111,19 +101,9 @@ export default function SettingsView({ settingsApi, apiKeysApi, tagsAndTrendsApi
               Import CSV
               <input type="file" accept=".csv,text/csv" onChange={(e) => tagsAndTrendsApi.importTagsCsv(e.target.files?.[0])} />
             </label>
-            {tagsAndTrendsApi.tagsCsvMessage && (
-              <span className={`mono-sm ${tagsAndTrendsApi.tagsCsvMessage.ok ? 'text-success' : 'text-danger'}`}>
-                {tagsAndTrendsApi.tagsCsvMessage.text}
-              </span>
-            )}
             <button className="btn-secondary btn-sm" onClick={tagsAndTrendsApi.previewBackfillTagCategories} disabled={tagsAndTrendsApi.tagsBackfillPreviewLoading || tagsAndTrendsApi.tagsBackfillRunning}>
               {tagsAndTrendsApi.tagsBackfillPreviewLoading ? 'Checking…' : 'Suggest categories for uncategorized tags'}
             </button>
-            {tagsAndTrendsApi.tagsBackfillMessage && (
-              <span className={`mono-sm ${tagsAndTrendsApi.tagsBackfillMessage.ok ? 'text-success' : 'text-danger'}`}>
-                {tagsAndTrendsApi.tagsBackfillMessage.text}
-              </span>
-            )}
           </div>
 
           {tagsAndTrendsApi.tagsBackfillPreview && (
@@ -168,11 +148,6 @@ export default function SettingsView({ settingsApi, apiKeysApi, tagsAndTrendsApi
 
         <div className="settings-subsection" style={{ marginBottom: 0 }}>
           <h4 className="settings-sub-heading">Trend list</h4>
-          {tagsAndTrendsApi.trendsDeleteMessage && (
-            <p className={`mono-sm ${tagsAndTrendsApi.trendsDeleteMessage.ok ? 'text-success' : 'text-danger'}`} style={{ marginTop: 0 }}>
-              {tagsAndTrendsApi.trendsDeleteMessage.text}
-            </p>
-          )}
           {tagsAndTrendsApi.trendsLoading ? (
             <Skeleton count={4} />
           ) : tagsAndTrendsApi.trends.length ? (
@@ -243,12 +218,6 @@ export default function SettingsView({ settingsApi, apiKeysApi, tagsAndTrendsApi
             />
           </label>
         </div>
-        {settingsApi.configBackupMessage && <p className="text-muted mono-sm" style={{ marginTop: '0.5rem' }}>{settingsApi.configBackupMessage}</p>}
-        {settingsApi.configImportMessage && (
-          <p className={`mono-sm ${settingsApi.configImportMessage.ok ? 'text-success' : 'text-danger'}`} style={{ marginTop: '0.5rem' }}>
-            {settingsApi.configImportMessage.text}
-          </p>
-        )}
       </div>
       )}
 
