@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TasteFilter from './TasteFilter.jsx';
+import { ToastProvider } from './components/Toast.jsx';
 
 const CANDIDATE = {
   imagePath: '/data/candidates/img1.png',
@@ -60,13 +61,21 @@ function makeFile(name = 'candidate.png') {
   return new File(['fake-image-bytes'], name, { type: 'image/png' });
 }
 
+// TasteFilter calls useToast(), whose context only exists under <ToastProvider> (see
+// main.jsx) -- every render() below needs that ancestor or it crashes with "useToast
+// must be used within ToastProvider", same fix applied to App/ShopConventions/
+// PromptHelper/MockupTemplates tests.
+function renderTasteFilter(props) {
+  return render(<ToastProvider><TasteFilter {...props} /></ToastProvider>);
+}
+
 // Every test's fetch.mock.calls[0] and [1] are the mount-time centroids/prompts calls
 // pre-queued in beforeEach above; a test's own first real call is at this index.
 const MOUNT_TIME_CALLS = 2;
 
 describe('TasteFilter', () => {
   it('renders the empty dropzone state with no candidates', () => {
-    render(<TasteFilter />);
+    renderTasteFilter();
     expect(screen.getByText('Drag & drop a batch of candidate images here')).toBeInTheDocument();
     expect(screen.queryByText('Keep')).not.toBeInTheDocument();
   });
@@ -74,7 +83,7 @@ describe('TasteFilter', () => {
   it('imports a batch and renders scored candidates', async () => {
     fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ candidates: [CANDIDATE] }) });
     const user = userEvent.setup();
-    render(<TasteFilter />);
+    renderTasteFilter();
 
     // The file input has no associated <label htmlFor>, so query by type instead.
     const input = document.querySelector('input[type="file"]');
@@ -89,7 +98,7 @@ describe('TasteFilter', () => {
   it('sends the category and prompt ID fields along with an import', async () => {
     fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ candidates: [] }) });
     const user = userEvent.setup();
-    render(<TasteFilter />);
+    renderTasteFilter();
 
     await user.type(screen.getByPlaceholderText('e.g. square-canvas'), 'square-canvas');
     await user.type(screen.getByPlaceholderText('links to Module 4'), '17');
@@ -106,7 +115,7 @@ describe('TasteFilter', () => {
   it('labeling a candidate removes it from the grid', async () => {
     fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ candidates: [CANDIDATE] }) });
     const user = userEvent.setup();
-    render(<TasteFilter />);
+    renderTasteFilter();
     const input = document.querySelector('input[type="file"]');
     await user.upload(input, makeFile());
     await screen.findByText('Keep');
@@ -136,7 +145,7 @@ describe('TasteFilter', () => {
       json: async () => ({ counts: { global: { keptCount: 12, discardedCount: 4 } } }),
     });
     const user = userEvent.setup();
-    render(<TasteFilter />);
+    renderTasteFilter();
 
     await user.click(screen.getByText('Recompute now'));
 
@@ -147,7 +156,7 @@ describe('TasteFilter', () => {
     const errored = { imagePath: '/data/candidates/bad.png', error: 'Not a valid image' };
     fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ candidates: [errored, CANDIDATE] }) });
     const user = userEvent.setup();
-    render(<TasteFilter />);
+    renderTasteFilter();
     const input = document.querySelector('input[type="file"]');
     await user.upload(input, [makeFile('bad.png'), makeFile('good.png')]);
 
@@ -160,7 +169,7 @@ describe('TasteFilter', () => {
     const user = userEvent.setup();
     const refreshJobs = vi.fn();
     const overrides = { listing_generator: true, mockup_composer: false };
-    render(<TasteFilter overrides={overrides} refreshJobs={refreshJobs} />);
+    renderTasteFilter({ overrides, refreshJobs });
 
     const input = document.querySelector('input[type="file"]');
     await user.upload(input, makeFile());
@@ -196,7 +205,7 @@ describe('TasteFilter', () => {
     fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ candidates: [CANDIDATE] }) });
     const user = userEvent.setup();
     const refreshJobs = vi.fn();
-    render(<TasteFilter overrides={{}} refreshJobs={refreshJobs} />);
+    renderTasteFilter({ overrides: {}, refreshJobs });
 
     const input = document.querySelector('input[type="file"]');
     await user.upload(input, makeFile());
@@ -236,7 +245,7 @@ describe('TasteFilter — Step 2.9: collapsed Auto-sorted section for autoDecisi
       json: async () => ({ candidates: [NEEDS_REVIEW, AUTO_KEEP, AUTO_DISCARD] }),
     });
     const user = userEvent.setup();
-    render(<TasteFilter />);
+    renderTasteFilter();
     const input = document.querySelector('input[type="file"]');
     await user.upload(input, makeFile());
 
@@ -251,7 +260,7 @@ describe('TasteFilter — Step 2.9: collapsed Auto-sorted section for autoDecisi
       json: async () => ({ candidates: [NEEDS_REVIEW, AUTO_KEEP, AUTO_DISCARD] }),
     });
     const user = userEvent.setup();
-    render(<TasteFilter />);
+    renderTasteFilter();
     const input = document.querySelector('input[type="file"]');
     await user.upload(input, makeFile());
     await screen.findByText('Auto-sorted (2)');
@@ -266,7 +275,7 @@ describe('TasteFilter — Step 2.9: collapsed Auto-sorted section for autoDecisi
   it('correcting an auto-sorted candidate calls the same /taste-filter/label route and removes the card', async () => {
     fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ candidates: [AUTO_KEEP] }) });
     const user = userEvent.setup();
-    render(<TasteFilter />);
+    renderTasteFilter();
     const input = document.querySelector('input[type="file"]');
     await user.upload(input, makeFile());
     await screen.findByText('Auto-sorted (1)');
@@ -296,7 +305,7 @@ describe('TasteFilter — Step 2.9: collapsed Auto-sorted section for autoDecisi
   it('does not render an Auto-sorted section when no candidate has an autoDecision', async () => {
     fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ candidates: [CANDIDATE] }) });
     const user = userEvent.setup();
-    render(<TasteFilter />);
+    renderTasteFilter();
     const input = document.querySelector('input[type="file"]');
     await user.upload(input, makeFile());
     await screen.findByText('Keep');
@@ -310,14 +319,14 @@ describe('TasteFilter — watched-folder auto-import via SSE (Module 7 -> "Auto-
   // every test mounts TasteFilter, which always opens this connection, not just this block.
 
   it('opens a stream connection to /api/taste-filter/pending/stream on mount', () => {
-    render(<TasteFilter />);
+    renderTasteFilter();
     const urls = sourceInstances.map((s) => s.url);
     expect(urls).toContain('/api/taste-filter/pending/stream');
   });
 
   it('merges a watcher-pushed candidate into the grid when a message event arrives', async () => {
     const watched = { ...CANDIDATE, imagePath: '/data/taste-filter/from-watcher.png', imageUrl: '/taste-filter-files/from-watcher.png' };
-    render(<TasteFilter />);
+    renderTasteFilter();
     const [source] = sourceInstances;
 
     act(() => {
@@ -329,7 +338,7 @@ describe('TasteFilter — watched-folder auto-import via SSE (Module 7 -> "Auto-
 
   it('does not re-add a candidate already merged in from an earlier event', async () => {
     const watched = { ...CANDIDATE, imagePath: '/data/taste-filter/from-watcher.png', imageUrl: '/taste-filter-files/from-watcher.png' };
-    render(<TasteFilter />);
+    renderTasteFilter();
     const [source] = sourceInstances;
 
     act(() => {
@@ -345,7 +354,7 @@ describe('TasteFilter — watched-folder auto-import via SSE (Module 7 -> "Auto-
   });
 
   it('ignores a malformed message instead of throwing', async () => {
-    render(<TasteFilter />);
+    renderTasteFilter();
     const [source] = sourceInstances;
 
     expect(() => {
@@ -357,7 +366,7 @@ describe('TasteFilter — watched-folder auto-import via SSE (Module 7 -> "Auto-
   });
 
   it('closes the stream connection on unmount', () => {
-    const { unmount } = render(<TasteFilter />);
+    const { unmount } = renderTasteFilter();
     const source = sourceInstances.find((s) => s.url === '/api/taste-filter/pending/stream');
 
     unmount();
@@ -373,7 +382,7 @@ describe('TasteFilter — CLIP model download progress bar', () => {
   }
 
   it('opens a stream connection to /api/taste-filter/model-status/stream on mount, and closes it on unmount', () => {
-    const { unmount } = render(<TasteFilter />);
+    const { unmount } = renderTasteFilter();
     const source = modelStatusSource();
     expect(source).toBeDefined();
 
@@ -382,13 +391,13 @@ describe('TasteFilter — CLIP model download progress bar', () => {
   });
 
   it('renders nothing before the stream delivers a first message', () => {
-    render(<TasteFilter />);
+    renderTasteFilter();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
   });
 
   it('renders nothing once status is ready', async () => {
-    render(<TasteFilter />);
+    renderTasteFilter();
     act(() => {
       modelStatusSource().onmessage({
         data: JSON.stringify({ status: 'ready', bytesDownloaded: 0, totalBytes: null, error: null }),
@@ -398,7 +407,7 @@ describe('TasteFilter — CLIP model download progress bar', () => {
   });
 
   it('renders a determinate progress bar with percentage when Content-Length was known', async () => {
-    render(<TasteFilter />);
+    renderTasteFilter();
     act(() => {
       modelStatusSource().onmessage({
         data: JSON.stringify({
@@ -415,7 +424,7 @@ describe('TasteFilter — CLIP model download progress bar', () => {
   });
 
   it('renders an indeterminate bar (MB downloaded only) when totalBytes is null', async () => {
-    render(<TasteFilter />);
+    renderTasteFilter();
     act(() => {
       modelStatusSource().onmessage({
         data: JSON.stringify({
@@ -432,7 +441,7 @@ describe('TasteFilter — CLIP model download progress bar', () => {
   });
 
   it('surfaces a download error inline', async () => {
-    render(<TasteFilter />);
+    renderTasteFilter();
     act(() => {
       modelStatusSource().onmessage({
         data: JSON.stringify({
