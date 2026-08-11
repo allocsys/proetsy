@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAsyncTask } from './hooks/useAsyncTask.js';
 import EmptyState from './components/EmptyState.jsx';
+import { useToast } from './components/Toast.jsx';
 
 /**
  * One mockup's review card.
@@ -86,11 +87,11 @@ function MockupCard({ mockup, onVariantChange }) {
  * that forcing it through the hook would risk changing this existing behavior.
  */
 function MockupCategorySelector({ jobId, onGenerated }) {
+  const { showToast } = useToast();
   const [categories, setCategories] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [checked, setChecked] = useState({});
-  const [status, setStatus] = useState('');
   const { pending: running, error, run } = useAsyncTask();
 
   useEffect(() => {
@@ -119,11 +120,7 @@ function MockupCategorySelector({ jobId, onGenerated }) {
 
   async function handleGenerate() {
     if (!jobId || !resolvedSizeKeys.length) return;
-    setStatus('Generating mockups…');
-    // useAsyncTask's run() catches internally rather than rejecting, so it always
-    // resolves -- use its return value (the task's own return, or undefined on
-    // failure) to tell success from failure here, rather than a .catch().
-    const succeeded = await run(async () => {
+    await run(async () => {
       const res = await fetch(`/api/jobs/${jobId}/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -131,11 +128,9 @@ function MockupCategorySelector({ jobId, onGenerated }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to generate mockups');
-      setStatus(`Generated mockups for ${resolvedSizeKeys.length} template${resolvedSizeKeys.length === 1 ? '' : 's'}.`);
+      showToast(`Generated mockups for ${resolvedSizeKeys.length} template${resolvedSizeKeys.length === 1 ? '' : 's'}.`, 'success');
       onGenerated?.();
-      return true;
     });
-    if (!succeeded) setStatus('');
   }
 
   if (!loaded) return null;
@@ -162,7 +157,6 @@ function MockupCategorySelector({ jobId, onGenerated }) {
       ) : (
         <EmptyState message="No mockup categories configured yet." compact />
       )}
-      {status && <p className="mono taste-status mt-2">{status}</p>}
       {error && <p className="text-danger mt-2">{error}</p>}
     </div>
   );
