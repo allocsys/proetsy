@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import EmptyState from './components/EmptyState.jsx';
+import { useToast } from './components/Toast.jsx';
 
 // plan.md -> "Frontend changes" -> new component `frontend/src/MockupTemplates.jsx`.
 // Not job-scoped -- mirrors TasteFilter.jsx/PromptHelper.jsx's shape, not
@@ -47,8 +48,8 @@ function FormField({ label, value, onChange, placeholder, list, style }) {
 }
 
 function MockupTemplates() {
+  const { showToast } = useToast();
   const [folder, setFolder] = useState('');
-  const [folderSavedMessage, setFolderSavedMessage] = useState('');
   const [scanStatus, setScanStatus] = useState('');
   const [scanFiles, setScanFiles] = useState([]);
   const [selected, setSelected] = useState({}); // path -> boolean
@@ -103,7 +104,7 @@ function MockupTemplates() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mockup_templates_dir: value }),
     }).catch(() => {});
-    setFolderSavedMessage('Saved.');
+    showToast('Saved.', 'success');
   }
 
   // Rollout step 5: calls the native OS folder picker via the preload bridge
@@ -115,7 +116,6 @@ function MockupTemplates() {
     const picked = await window.mockupTemplatesAPI.selectFolder();
     if (!picked) return;
     setFolder(picked);
-    setFolderSavedMessage('');
     await saveFolder(picked);
   }
 
@@ -269,7 +269,7 @@ function MockupTemplates() {
               <input
                 className="input"
                 value={folder}
-                onChange={(e) => { setFolder(e.target.value); setFolderSavedMessage(''); }}
+                onChange={(e) => setFolder(e.target.value)}
                 onBlur={(e) => saveFolder(e.target.value)}
                 placeholder="/home/you/etsy-mockup-packs"
               />
@@ -278,7 +278,6 @@ function MockupTemplates() {
               <button className="btn-secondary" onClick={handleBrowse}>Browse…</button>
             )}
             <button className="btn-primary" onClick={handleScan}>Scan folder</button>
-            {folderSavedMessage && <span className="text-muted mono-sm">{folderSavedMessage}</span>}
           </div>
           {scanStatus && <p className="mono taste-status" style={{ marginTop: '0.75rem' }}>{scanStatus}</p>}
         </div>
