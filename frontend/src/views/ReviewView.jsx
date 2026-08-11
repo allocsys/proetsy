@@ -1,3 +1,4 @@
+import { useNavigate, useParams } from 'react-router-dom';
 import Tabs from '../components/Tabs.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import JobArtworkAnalysisReview from '../JobArtworkAnalysisReview.jsx';
@@ -45,7 +46,7 @@ export default function ReviewView({
   recentJobsSorted,
   jobIdInput,
   setJobIdInput,
-  activeJobId,
+  activeJobId: propActiveJobId,
   setActiveJobId,
   activeJobInfo,
   reviewTab,
@@ -53,6 +54,10 @@ export default function ReviewView({
   openJob,
   goTo,
 }) {
+  const navigate = useNavigate();
+  const { jobId: routeJobId } = useParams();
+  const activeJobId = routeJobId || propActiveJobId;
+
   return (
     <section className="paper-card" style={{ padding: 0, background: 'transparent', border: 'none', boxShadow: 'none' }}>
       <div className="paper-card card" style={{ marginBottom: '1rem' }}>
@@ -66,8 +71,8 @@ export default function ReviewView({
               onChange={(e) => {
                 if (!e.target.value) return;
                 setJobIdInput(e.target.value);
-                setActiveJobId(e.target.value);
                 setReviewTab('analysis');
+                navigate(`/review/${e.target.value}`);
               }}
               disabled={!recentJobsSorted.length}
             >
@@ -89,7 +94,7 @@ export default function ReviewView({
               style={{ maxWidth: '160px' }}
             />
           </div>
-          <button className="btn-primary" onClick={() => { setActiveJobId(jobIdInput); setReviewTab('analysis'); }} disabled={!jobIdInput} style={{ height: '34px', marginTop: '1.25rem' }}>
+          <button className="btn-primary" onClick={() => { setReviewTab('analysis'); navigate(`/review/${jobIdInput}`); }} disabled={!jobIdInput} style={{ height: '34px', marginTop: '1.25rem' }}>
             Load job
           </button>
         </div>
