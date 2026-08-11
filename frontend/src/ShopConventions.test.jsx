@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ShopConventions from './ShopConventions.jsx';
+import { ToastProvider } from './components/Toast.jsx';
 
 const CONVENTIONS = {
   listing: {
@@ -35,7 +36,7 @@ beforeEach(() => {
 
 describe('ShopConventions', () => {
   it('loads and renders initial conventions', async () => {
-    render(<ShopConventions />);
+    render(<ToastProvider><ShopConventions /></ToastProvider>);
     expect(await screen.findByDisplayValue('|')).toBeInTheDocument();
     expect(screen.getByDisplayValue('140')).toBeInTheDocument();
     expect(screen.getByDisplayValue('frame')).toBeInTheDocument();
@@ -49,7 +50,7 @@ describe('ShopConventions', () => {
       return Promise.resolve({ ok: true, json: async () => CONVENTIONS });
     });
     const user = userEvent.setup();
-    render(<ShopConventions />);
+    render(<ToastProvider><ShopConventions /></ToastProvider>);
     await screen.findByDisplayValue('|');
 
     const input = screen.getByDisplayValue('140');
@@ -77,7 +78,7 @@ describe('ShopConventions', () => {
       return Promise.resolve({ ok: true, json: async () => CONVENTIONS });
     });
     const user = userEvent.setup();
-    render(<ShopConventions />);
+    render(<ToastProvider><ShopConventions /></ToastProvider>);
     await screen.findByDisplayValue('|');
 
     await user.click(screen.getByText('Save shop conventions'));

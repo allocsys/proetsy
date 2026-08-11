@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import MockupTemplates from './MockupTemplates.jsx';
+import { ToastProvider } from './components/Toast.jsx';
 
 const SCAN_FILE_FLAT = {
   filename: 'frame-8x10.png',
@@ -66,7 +67,7 @@ function makeFetchQueue(map) {
 
 describe('MockupTemplates — folder field', () => {
   it('loads the saved folder from settings and saves an edit on blur', async () => {
-    render(<MockupTemplates />);
+    render(<ToastProvider><MockupTemplates /></ToastProvider>);
     const input = await screen.findByDisplayValue('/templates');
 
     fetch.mockClear();
@@ -98,7 +99,7 @@ describe('MockupTemplates — scan and select', () => {
       })],
     ]);
     const user = userEvent.setup();
-    render(<MockupTemplates />);
+    render(<ToastProvider><MockupTemplates /></ToastProvider>);
     await screen.findByDisplayValue('/templates');
 
     await user.click(screen.getByText('Scan folder'));
@@ -119,7 +120,7 @@ describe('MockupTemplates — scan and select', () => {
       })],
     ]);
     const user = userEvent.setup();
-    render(<MockupTemplates />);
+    render(<ToastProvider><MockupTemplates /></ToastProvider>);
     await screen.findByDisplayValue('/templates');
     await user.click(screen.getByText('Scan folder'));
     await screen.findByText('mug-white.psd');
@@ -145,7 +146,7 @@ describe('MockupTemplates — bulk assign', () => {
       })],
     ]);
     const user = userEvent.setup();
-    render(<MockupTemplates />);
+    render(<ToastProvider><MockupTemplates /></ToastProvider>);
     await screen.findByDisplayValue('/templates');
     await user.click(screen.getByText('Scan folder'));
     await screen.findByText('frame-8x10.png');
@@ -185,7 +186,7 @@ describe('MockupTemplates — Electron Browse button (Rollout step 5)', () => {
   });
 
   it('does not render a Browse button when window.mockupTemplatesAPI is absent (browser path)', async () => {
-    render(<MockupTemplates />);
+    render(<ToastProvider><MockupTemplates /></ToastProvider>);
     await screen.findByDisplayValue('/templates');
 
     expect(screen.queryByText('Browse…')).not.toBeInTheDocument();
@@ -194,7 +195,7 @@ describe('MockupTemplates — Electron Browse button (Rollout step 5)', () => {
   it('renders a Browse button that fills and saves the folder field when window.mockupTemplatesAPI is present (Electron path)', async () => {
     window.mockupTemplatesAPI = { selectFolder: vi.fn().mockResolvedValue('/Users/me/mockup-packs') };
     const user = userEvent.setup();
-    render(<MockupTemplates />);
+    render(<ToastProvider><MockupTemplates /></ToastProvider>);
     await screen.findByDisplayValue('/templates');
 
     await user.click(screen.getByText('Browse…'));
@@ -215,7 +216,7 @@ describe('MockupTemplates — Electron Browse button (Rollout step 5)', () => {
   it('leaves the folder field untouched when the user cancels the native dialog', async () => {
     window.mockupTemplatesAPI = { selectFolder: vi.fn().mockResolvedValue(null) };
     const user = userEvent.setup();
-    render(<MockupTemplates />);
+    render(<ToastProvider><MockupTemplates /></ToastProvider>);
     await screen.findByDisplayValue('/templates');
 
     fetch.mockClear();
@@ -235,7 +236,7 @@ describe('MockupTemplates — configured templates', () => {
       [/\/api\/mockup-templates\/8x10-portrait/, () => ({ ok: true, status: 204, json: async () => ({}) })],
     ]);
     const user = userEvent.setup();
-    render(<MockupTemplates />);
+    render(<ToastProvider><MockupTemplates /></ToastProvider>);
 
     expect(await screen.findByText('8x10-portrait')).toBeInTheDocument();
 
@@ -253,7 +254,7 @@ describe('MockupTemplates — configured templates', () => {
       }],
     ]);
     const user = userEvent.setup();
-    render(<MockupTemplates />);
+    render(<ToastProvider><MockupTemplates /></ToastProvider>);
     await screen.findByText('8x10-portrait');
 
     const dpiInput = screen.getByDisplayValue('300');
@@ -284,7 +285,7 @@ describe('MockupTemplates — configured templates', () => {
       ['/api/mockup-templates/categories', () => ({ ok: true, json: async () => ['bedroom'] })],
     ]);
     const user = userEvent.setup();
-    render(<MockupTemplates />);
+    render(<ToastProvider><MockupTemplates /></ToastProvider>);
     await screen.findByText('8x10-portrait');
 
     const categoryInput = screen.getAllByDisplayValue('')[0];

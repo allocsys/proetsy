@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
+import { ToastProvider } from './components/Toast.jsx';
 
 // App.jsx wires five already-independently-tested review/module components
 // (JobArtworkAnalysisReview, JobListingReview, JobMockupReview, PromptHelper,
@@ -126,7 +127,7 @@ beforeEach(() => {
 describe('App', () => {
   it('shows backend status once health resolves', async () => {
     mockFetchByUrl();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
 
     expect(await screen.findByText('ok')).toBeInTheDocument();
   });
@@ -139,7 +140,7 @@ describe('App', () => {
       if (url === '/api/jobs' || url === '/api/trends' || url === '/api/tags') return Promise.resolve({ ok: true, json: async () => [] });
       return Promise.resolve({ ok: true, json: async () => ({}) });
     });
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
 
     expect(await screen.findByText(/Backend not running/)).toBeInTheDocument();
   });
@@ -148,7 +149,7 @@ describe('App', () => {
     mockFetchByUrl({
       '/api/setup-status': { readyToRun: false, geminiKeyConfigured: false, hasTagLibrary: false, hasProductSize: false },
     });
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
 
     expect(await screen.findByText('Setup incomplete')).toBeInTheDocument();
     expect(screen.getByText(/Gemini API key configured/)).toBeInTheDocument();
@@ -156,7 +157,7 @@ describe('App', () => {
 
   it('does not show the setup alert once everything is ready', async () => {
     mockFetchByUrl();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
 
     await screen.findByText('ok');
     expect(screen.queryByText('Setup incomplete')).not.toBeInTheDocument();
@@ -164,7 +165,7 @@ describe('App', () => {
 
   it('renders pipeline module checkboxes, disabling the required one', async () => {
     mockFetchByUrl();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
 
     const listingCheckbox = await screen.findByRole('checkbox', { name: /listing_generator/ });
     expect(listingCheckbox).toBeChecked();
@@ -177,7 +178,7 @@ describe('App', () => {
   it('toggling a non-required module flips its override state', async () => {
     mockFetchByUrl();
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
 
     const analyzerCheckbox = await screen.findByRole('checkbox', { name: /image_analyzer/ });
     expect(analyzerCheckbox).toBeChecked();
@@ -189,7 +190,7 @@ describe('App', () => {
   it('clicking a required module checkbox is a no-op', async () => {
     mockFetchByUrl();
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
 
     const listingCheckbox = await screen.findByRole('checkbox', { name: /listing_generator/ });
     await user.click(listingCheckbox);
@@ -199,7 +200,7 @@ describe('App', () => {
   it('shows the empty-history state with no jobs', async () => {
     mockFetchByUrl({ '/api/jobs': [] });
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     await user.click(screen.getAllByText('Listing History')[0]);
@@ -210,7 +211,7 @@ describe('App', () => {
   it('renders the job history table and loads a job into review on click', async () => {
     mockFetchByUrl({ '/api/jobs': [JOB] });
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     await user.click(screen.getAllByText('Listing History')[0]);
@@ -228,7 +229,7 @@ describe('App', () => {
   it('loads a job into review by typing its ID directly', async () => {
     mockFetchByUrl();
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     await user.click(screen.getAllByText('Review a Job')[0]);
@@ -240,7 +241,7 @@ describe('App', () => {
 
   it('renders the sidebar nav in group order, with Mockup Templates under Pipeline right after Upload (plan.md -> "Nav: move Mockup Templates under Upload")', async () => {
     mockFetchByUrl();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     const sidebarLabels = Array.from(document.querySelectorAll('.sidebar-nav-item')).map((el) => el.textContent);
@@ -257,7 +258,7 @@ describe('App', () => {
   it('collapses the direct/uncurated Pipeline upload lane by default, expanding on click, while the Curation lane stays visible (plan.md Rollout step 7)', async () => {
     mockFetchByUrl();
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     // Curation lane renders expanded immediately, no click needed -- it's the
@@ -280,7 +281,7 @@ describe('App', () => {
   it('renders the Taste Filter module on the default Upload view, and Prompt Helper on its own nav item', async () => {
     mockFetchByUrl();
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     // Taste Filter is merged into the default 'upload' view (Step 1.6) -- no nav
@@ -303,7 +304,7 @@ describe('App', () => {
       '/api/jobs/run-batch': {},
     });
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     const file = new File(['fake-bytes'], 'fox.png', { type: 'image/png' });
@@ -345,7 +346,7 @@ describe('App', () => {
   it('shows an error message when the upload itself fails', async () => {
     mockFetchByUrl({ '/api/artworks/upload': { error: 'No files received' } });
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     const file = new File(['fake-bytes'], 'fox.png', { type: 'image/png' });
@@ -358,7 +359,7 @@ describe('App', () => {
   it('opens the settings panel and saves pasted tags with no category', async () => {
     mockFetchByUrl({ '/api/tags/bulk': { inserted: 3, total: 10 } });
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     await openSettings(user);
@@ -381,7 +382,7 @@ describe('App', () => {
       '/api/tags/bulk': { inserted: 1, total: 11 },
     });
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     await openSettings(user);
@@ -410,7 +411,7 @@ describe('App', () => {
   it('imports a tag CSV file from the settings panel', async () => {
     mockFetchByUrl({ '/api/tags/csv': { inserted: 4 } });
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     await openSettings(user);
@@ -426,7 +427,7 @@ describe('App', () => {
   it('adds a trend from the settings panel', async () => {
     mockFetchByUrl({ '/api/trends': (url, options) => (options?.method === 'POST' ? {} : []) });
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     await openSettings(user);
@@ -447,7 +448,7 @@ describe('App', () => {
   it('shows the editable shop conventions form, pre-populated, in the settings panel (plan.md step 4)', async () => {
     mockFetchByUrl();
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     await openSettingsTab(user, 'Shop & Pipeline');
@@ -459,7 +460,7 @@ describe('App', () => {
   it('defaults the Settings panel to the Tags & Trends tab, hiding other tabs\' content until selected (plan.md step 7)', async () => {
     mockFetchByUrl();
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     await openSettings(user);
@@ -478,7 +479,7 @@ describe('App', () => {
       '/api/taste-filter/watch-status': { active: true, folder: '/home/you/midjourney', category: 'square-canvas', pendingCount: 2, lastError: null },
     });
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     await openSettingsTab(user, 'Automation & Diagnostics');
@@ -492,7 +493,7 @@ describe('App', () => {
       '/api/settings': (url, options) => (options?.method === 'PATCH' ? { taste_filter_watch_enabled: 'true' } : {}),
     });
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     await openSettingsTab(user, 'Automation & Diagnostics');
@@ -518,7 +519,7 @@ describe('App', () => {
   it('lists dashboard-managed API keys, masked, in the Settings panel', async () => {
     mockFetchByUrl({ '/api/settings/api-keys': [API_KEY_ROW] });
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     await openSettingsTab(user, 'API Keys');
@@ -531,7 +532,7 @@ describe('App', () => {
   it('shows the empty state when no dashboard-managed keys exist yet', async () => {
     mockFetchByUrl({ '/api/settings/api-keys': [] });
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     await openSettingsTab(user, 'API Keys');
@@ -547,7 +548,7 @@ describe('App', () => {
       },
     });
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     await openSettingsTab(user, 'API Keys');
@@ -590,7 +591,7 @@ describe('App', () => {
     });
 
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     await openSettingsTab(user, 'API Keys');
@@ -603,7 +604,7 @@ describe('App', () => {
   it('toggles an API key enabled/disabled via PATCH', async () => {
     mockFetchByUrl({ '/api/settings/api-keys': [API_KEY_ROW] });
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     await openSettingsTab(user, 'API Keys');
@@ -620,7 +621,7 @@ describe('App', () => {
   it('deletes an API key after confirming in the in-app modal, and does nothing if cancelled', async () => {
     mockFetchByUrl({ '/api/settings/api-keys': [API_KEY_ROW] });
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     await openSettingsTab(user, 'API Keys');
@@ -646,7 +647,7 @@ describe('App', () => {
   it('deletes a tag after confirming in the in-app modal', async () => {
     mockFetchByUrl({ '/api/tags': [{ id: 1, tag_text: 'boho decor', category: 'boho' }] });
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     await openSettings(user);
@@ -664,7 +665,7 @@ describe('App', () => {
   it('deletes a trend after confirming in the in-app modal', async () => {
     mockFetchByUrl({ '/api/trends': [{ id: 9, term: 'cottagecore', category: null }] });
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     await openSettings(user);
@@ -682,7 +683,7 @@ describe('App', () => {
   it('renders the persisted Pipeline Modules checkboxes in Settings, disabling the required module', async () => {
     mockFetchByUrl();
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     await openSettingsTab(user, 'Shop & Pipeline');
@@ -698,7 +699,7 @@ describe('App', () => {
       '/api/settings': (url, options) => (options?.method === 'PATCH' ? {} : {}),
     });
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     await openSettingsTab(user, 'Shop & Pipeline');
@@ -729,7 +730,7 @@ describe('App', () => {
       return Promise.resolve({ ok: true, json: async () => ({}) });
     });
     const user = userEvent.setup();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     expect(
@@ -742,7 +743,7 @@ describe('App', () => {
 
   it('does not show the fetch-error banner when all background fetches succeed', async () => {
     mockFetchByUrl();
-    render(<MemoryRouter><App /></MemoryRouter>);
+    render(<MemoryRouter><ToastProvider><App /></ToastProvider></MemoryRouter>);
     await screen.findByText('ok');
 
     expect(screen.queryByText(/Background update failed/)).not.toBeInTheDocument();

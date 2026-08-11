@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import PromptHelper from './PromptHelper.jsx';
+import { ToastProvider } from './components/Toast.jsx';
 
 const TREND = { id: 3, term: 'cottagecore', category: 'portrait' };
 
@@ -20,7 +21,7 @@ beforeEach(() => {
 describe('PromptHelper', () => {
   it('loads trends and orientation history on mount', async () => {
     mockInitialLoad({ trends: [TREND] });
-    render(<PromptHelper />);
+    render(<ToastProvider><PromptHelper /></ToastProvider>);
 
     expect(await screen.findByText('cottagecore (portrait)')).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith('/api/trends');
@@ -30,7 +31,7 @@ describe('PromptHelper', () => {
   it('re-fetches history when the orientation changes', async () => {
     mockInitialLoad();
     const user = userEvent.setup();
-    render(<PromptHelper />);
+    render(<ToastProvider><PromptHelper /></ToastProvider>);
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
 
     fetch.mockResolvedValueOnce({ ok: true, json: async () => [] });
@@ -44,7 +45,7 @@ describe('PromptHelper', () => {
   it('adds a new trend and selects it', async () => {
     mockInitialLoad();
     const user = userEvent.setup();
-    render(<PromptHelper />);
+    render(<ToastProvider><PromptHelper /></ToastProvider>);
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
 
     fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ id: 9, term: 'cozy autumn' }) });
@@ -64,7 +65,7 @@ describe('PromptHelper', () => {
   it('generates prompts and displays warnings', async () => {
     mockInitialLoad();
     const user = userEvent.setup();
-    render(<PromptHelper />);
+    render(<ToastProvider><PromptHelper /></ToastProvider>);
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
 
     fetch.mockResolvedValueOnce({
@@ -84,7 +85,7 @@ describe('PromptHelper', () => {
   it('shows an error if generation fails', async () => {
     mockInitialLoad();
     const user = userEvent.setup();
-    render(<PromptHelper />);
+    render(<ToastProvider><PromptHelper /></ToastProvider>);
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
 
     fetch.mockResolvedValueOnce({ ok: false, json: async () => ({ error: 'All Gemini keys/models rate-limited' }) });
@@ -95,7 +96,7 @@ describe('PromptHelper', () => {
 
   it('copies a prompt to the clipboard', async () => {
     mockInitialLoad({ history: [{ id: 2, prompt_text: 'existing prompt text' }] });
-    render(<PromptHelper />);
+    render(<ToastProvider><PromptHelper /></ToastProvider>);
     await screen.findByText('existing prompt text');
 
     const user = userEvent.setup();
