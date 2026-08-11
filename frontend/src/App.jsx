@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import StatusPill from './components/StatusPill.jsx';
 import Modal from './components/Modal.jsx';
 import UpdaterStatus from './UpdaterStatus.jsx';
@@ -49,7 +50,7 @@ export function NavIcon({ name }) {
     case 'review':
       return (
         <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 022 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 022 2h2a2 2 0 022-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
         </svg>
       );
     case 'prompt':
@@ -71,20 +72,23 @@ export function NavIcon({ name }) {
 }
 
 const NAV_ITEMS = [
-  { id: 'upload', label: 'Upload', group: 'Pipeline', icon: 'upload' },
-  { id: 'mockup-templates', label: 'Mockup Templates', group: 'Pipeline', icon: 'templates' },
-  { id: 'history', label: 'Listing History', group: 'Pipeline', icon: 'history' },
-  { id: 'review', label: 'Review a Job', group: 'Pipeline', icon: 'review' },
-  { id: 'prompt-helper', label: 'Prompt Helper', group: 'Modules', icon: 'prompt' },
-  { id: 'settings', label: 'Shop Settings & Tags', group: 'Configuration', icon: 'settings' },
+  { id: 'upload', label: 'Upload', group: 'Pipeline', icon: 'upload', path: '/upload' },
+  { id: 'mockup-templates', label: 'Mockup Templates', group: 'Pipeline', icon: 'templates', path: '/mockup-templates' },
+  { id: 'history', label: 'Listing History', group: 'Pipeline', icon: 'history', path: '/history' },
+  { id: 'review', label: 'Review a Job', group: 'Pipeline', icon: 'review', path: '/review' },
+  { id: 'prompt-helper', label: 'Prompt Helper', group: 'Modules', icon: 'prompt', path: '/prompt-helper' },
+  { id: 'settings', label: 'Shop Settings & Tags', group: 'Configuration', icon: 'settings', path: '/settings/tags-trends' },
 ];
 
 function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const currentPath = location.pathname;
+
   // --- Cross-cutting / navigation state (not owned by any single hook) ---
   const [health, setHealth] = useState(null);
   const [setupStatus, setSetupStatus] = useState(null);
   const [activeJobId, setActiveJobId] = useState(null);
-  const [activeView, setActiveView] = useState('upload');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
       const stored = localStorage.getItem('proetsy_sidebar_collapsed');
@@ -97,12 +101,19 @@ function App() {
   const [reviewTab, setReviewTab] = useState('analysis');
   const [activeJobInfo, setActiveJobInfo] = useState(null);
   const [showHowItWorks, setShowHowItWorks] = useState(false);
-  const [previousView, setPreviousView] = useState('upload');
+  const [previousPath, setPreviousPath] = useState('/upload');
   const [confirmAction, setConfirmAction] = useState(null); // { message, onConfirm } | null
-  const [settingsTab, setSettingsTab] = useState('tags-trends');
   const [jobIdInput, setJobIdInput] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
+
+  const isSettingsActive = currentPath.startsWith('/settings');
+
+  useEffect(() => {
+    if (!currentPath.startsWith('/settings') && currentPath !== '/') {
+      setPreviousPath(currentPath);
+    }
+  }, [currentPath]);
 
   // Memoized so components/effects that depend on it get a stable reference
   // instead of a new closure every render.
@@ -151,20 +162,36 @@ function App() {
     refreshTags: tagsAndTrendsApi.refreshTags,
   });
 
-  function goTo(view) {
-    if (view === 'settings' && activeView !== 'settings') {
-      setPreviousView(activeView);
-    }
-    setActiveView(view);
-    if (view === 'settings') {
+  // Route-based side-effects
+  useEffect(() => {
+    if (currentPath.startsWith('/settings')) {
       settingsApi.refreshRateLimits();
       apiKeysApi.refreshApiKeys();
       settingsApi.refreshPipelineConfig();
     }
-    if (view === 'review') {
+    if (currentPath.startsWith('/review')) {
       jobsApi.refreshJobs();
     }
+  }, [currentPath, settingsApi, apiKeysApi, jobsApi]);
+
+  function goTo(target) {
+    if (target.startsWith('/')) {
+      navigate(target);
+    } else {
+      navigate(`/${target}`);
+    }
   }
+
+  useEffect(() => {
+    const match = currentPath.match(/^\/review\/([^/]+)/);
+    const jobIdFromRoute = match ? match[1] : null;
+    if (jobIdFromRoute) {
+      setActiveJobId(jobIdFromRoute);
+      setJobIdInput(jobIdFromRoute);
+    } else {
+      setActiveJobId(null);
+    }
+  }, [currentPath]);
 
   useEffect(() => {
     if (!activeJobId) {
@@ -254,7 +281,14 @@ function App() {
   function openJob(jobId) {
     setActiveJobId(String(jobId));
     setJobIdInput(String(jobId));
-    goTo('review');
+    navigate(`/review/${jobId}`);
+  }
+
+  function isItemActive(item) {
+    if (item.id === 'upload') return currentPath === '/upload' || currentPath === '/';
+    if (item.id === 'settings') return currentPath.startsWith('/settings');
+    if (item.id === 'review') return currentPath.startsWith('/review');
+    return currentPath === `/${item.id}`;
   }
 
   const navGroups = ['Pipeline', 'Modules', 'Configuration'];
@@ -288,12 +322,12 @@ function App() {
             </button>
           </div>
           <UpdaterStatus />
-          <button className="btn-secondary" onClick={() => goTo(activeView === 'settings' ? previousView : 'settings')}>
+          <button className="btn-secondary" onClick={() => navigate(isSettingsActive ? (previousPath || '/upload') : '/settings/tags-trends')}>
             <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ width: '14px', height: '14px' }}>
               <circle cx="12" cy="12" r="3" />
               <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
             </svg>
-            {activeView === 'settings' ? 'Close settings' : 'Settings'}
+            {isSettingsActive ? 'Close settings' : 'Settings'}
           </button>
         </div>
       </header>
@@ -302,8 +336,8 @@ function App() {
         {NAV_ITEMS.map((item) => (
           <button
             key={item.id}
-            className={`mobile-nav-item ${activeView === item.id ? 'active' : ''}`}
-            onClick={() => goTo(item.id)}
+            className={`mobile-nav-item ${isItemActive(item) ? 'active' : ''}`}
+            onClick={() => navigate(item.path)}
           >
             <NavIcon name={item.icon} />
             {item.label}
@@ -343,8 +377,8 @@ function App() {
               {NAV_ITEMS.filter((item) => item.group === group).map((item) => (
                 <button
                   key={item.id}
-                  className={`sidebar-nav-item ${activeView === item.id ? 'active' : ''}`}
-                  onClick={() => goTo(item.id)}
+                  className={`sidebar-nav-item ${isItemActive(item) ? 'active' : ''}`}
+                  onClick={() => navigate(item.path)}
                   title={item.label}
                 >
                   <NavIcon name={item.icon} />
@@ -416,62 +450,60 @@ function App() {
             </div>
           )}
 
-          {activeView === 'settings' && (
-            <SettingsView
-              settingsTab={settingsTab}
-              setSettingsTab={setSettingsTab}
-              settingsApi={settingsApi}
-              apiKeysApi={apiKeysApi}
-              tagsAndTrendsApi={tagsAndTrendsApi}
-            />
-          )}
-
-          {activeView === 'upload' && (
-            <UploadView
-              pipelineDefault={settingsApi.pipelineDefault}
-              overrides={settingsApi.overrides}
-              setOverrides={settingsApi.setOverrides}
-              toggleModule={settingsApi.toggleModule}
-              refreshJobs={jobsApi.refreshJobs}
-              dragActive={dragActive}
-              setDragActive={setDragActive}
-              uploadStatus={uploadStatus}
-              handleFiles={handleFiles}
-              onDrop={onDrop}
-              showHowItWorks={showHowItWorks}
-              setShowHowItWorks={setShowHowItWorks}
-            />
-          )}
-
-          {activeView === 'history' && (
-            <HistoryView
-              jobs={jobsApi.jobs}
-              groupedJobs={jobsApi.groupedJobs}
-              expandedBatches={jobsApi.expandedBatches}
-              setExpandedBatches={jobsApi.setExpandedBatches}
-              openJob={openJob}
-              goTo={goTo}
-            />
-          )}
-
-          {activeView === 'review' && (
-            <ReviewView
-              recentJobsSorted={jobsApi.recentJobsSorted}
-              jobIdInput={jobIdInput}
-              setJobIdInput={setJobIdInput}
-              activeJobId={activeJobId}
-              setActiveJobId={setActiveJobId}
-              activeJobInfo={activeJobInfo}
-              reviewTab={reviewTab}
-              setReviewTab={setReviewTab}
-              openJob={openJob}
-              goTo={goTo}
-            />
-          )}
-
-          {activeView === 'prompt-helper' && <PromptHelperView />}
-
-          {activeView === 'mockup-templates' && <MockupTemplatesView />}
+          <Routes>
+            <Route path="/" element={<Navigate to="/upload" replace />} />
+            <Route path="/upload" element={
+              <UploadView
+                pipelineDefault={settingsApi.pipelineDefault}
+                overrides={settingsApi.overrides}
+                setOverrides={settingsApi.setOverrides}
+                toggleModule={settingsApi.toggleModule}
+                refreshJobs={jobsApi.refreshJobs}
+                dragActive={dragActive}
+                setDragActive={setDragActive}
+                uploadStatus={uploadStatus}
+                handleFiles={handleFiles}
+                onDrop={onDrop}
+                showHowItWorks={showHowItWorks}
+                setShowHowItWorks={setShowHowItWorks}
+              />
+            } />
+            <Route path="/mockup-templates" element={<MockupTemplatesView />} />
+            <Route path="/history" element={
+              <HistoryView
+                jobs={jobsApi.jobs}
+                groupedJobs={jobsApi.groupedJobs}
+                expandedBatches={jobsApi.expandedBatches}
+                setExpandedBatches={jobsApi.setExpandedBatches}
+                openJob={openJob}
+                goTo={goTo}
+              />
+            } />
+            <Route path="/review/:jobId?" element={
+              <ReviewView
+                recentJobsSorted={jobsApi.recentJobsSorted}
+                jobIdInput={jobIdInput}
+                setJobIdInput={setJobIdInput}
+                activeJobId={activeJobId}
+                setActiveJobId={setActiveJobId}
+                activeJobInfo={activeJobInfo}
+                reviewTab={reviewTab}
+                setReviewTab={setReviewTab}
+                openJob={openJob}
+                goTo={goTo}
+              />
+            } />
+            <Route path="/prompt-helper" element={<PromptHelperView />} />
+            <Route path="/settings" element={<Navigate to="/settings/tags-trends" replace />} />
+            <Route path="/settings/:tab" element={
+              <SettingsView
+                settingsApi={settingsApi}
+                apiKeysApi={apiKeysApi}
+                tagsAndTrendsApi={tagsAndTrendsApi}
+              />
+            } />
+            <Route path="*" element={<Navigate to="/upload" replace />} />
+          </Routes>
         </main>
       </div>
 

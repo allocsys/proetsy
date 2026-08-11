@@ -57,8 +57,8 @@ structural, so every step ships independently and the app never breaks mid-way.
   price, Delivery text, Watched folder path, Watch category, and Auto
   threshold. All CI checks green.
 
-## Step 4 — Break `App.jsx` into route-level view components ✅ DONE (pending merge)
-**Status:** Complete on branch `refactor/split-app-into-views`, not yet merged to `main`.
+## Step 4 — Break `App.jsx` into route-level view components ✅ DONE
+**Status:** Merged to `main` via PR #70 (branch `refactor/split-app-into-views`).
 - Shared state lifted into `hooks/useJobs.js`, `hooks/useSettings.js`,
   `hooks/useTagsAndTrends.js`, `hooks/useApiKeys.js` (plus a pre-existing
   `hooks/useAsyncTask.js`); App.jsx now only owns cross-cutting nav/dialog
@@ -73,14 +73,23 @@ structural, so every step ships independently and the app never breaks mid-way.
   flow end-to-end through the DOM, so it should still pass unchanged since no
   rendered markup was altered) and open a PR.
 
-## Step 5 — Add React Router
-- Add `react-router-dom`, map `NAV_ITEMS` ids to real routes
-  (`/upload`, `/history`, `/review/:jobId?`, `/settings/:tab?`, etc.).
-- Replace `activeView`/`goTo()` state with `useNavigate`/`useParams`.
-- Gives browser back/forward and deep links (e.g. linking directly to a job
-  review or a specific Settings tab) for free.
-- Do this after Step 4 — routing per already-separated view components is a
-  mechanical swap; routing a 1,795-line monolith is not.
+## Step 5 — Add React Router ✅ DONE (pending CI/merge)
+**Status:** Implemented on branch `feat/react-router`, not yet merged to `main`.
+- Added `react-router-dom` (^6.26.2) to `frontend/package.json`.
+- `main.jsx` now wraps `<App />` in `BrowserRouter`.
+- `App.jsx` converted from `activeView`/`goTo()` state to `<Routes>`/`<Route>`
+  with `useNavigate`/`useLocation`; NAV_ITEMS ids mapped to `/upload`,
+  `/mockup-templates`, `/history`, `/review/:jobId?`, `/prompt-helper`,
+  `/settings/:tab?`, with `/` and unknown paths redirecting to `/upload`.
+  Settings/review data-refresh side effects reimplemented as route-keyed
+  `useEffect`s so deep links trigger them too, not just sidebar clicks.
+- `ReviewView.jsx` reads `:jobId` via `useParams()` and navigates to
+  `/review/:jobId` on job selection; `SettingsView.jsx` reads `:tab` via
+  `useParams()` (defaulting to `tags-trends`) and navigates on sub-tab clicks.
+- `App.test.jsx` render calls wrapped in `MemoryRouter` so existing assertions
+  still pass.
+- Remaining before merge: confirm CI is green on `feat/react-router`, manual
+  smoke test of deep links (`/review/:jobId`, `/settings/:tab`), then open a PR.
 
 ## Step 6 — Polish pass
 - Toast notifications for save/copy/error actions, replacing inline
