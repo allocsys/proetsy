@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import EmptyState from './components/EmptyState.jsx';
 
 // plan.md -> "Frontend changes" -> new component `frontend/src/MockupTemplates.jsx`.
 // Not job-scoped -- mirrors TasteFilter.jsx/PromptHelper.jsx's shape, not
@@ -397,7 +398,7 @@ function MockupTemplates() {
             ))}
           </div>
         ) : (
-          <p className="empty-state" style={{ margin: 0 }}>No templates configured yet — scan a folder above and assign some.</p>
+          <EmptyState message="No templates configured yet — scan a folder above and assign some." compact />
         )}
       </div>
 
