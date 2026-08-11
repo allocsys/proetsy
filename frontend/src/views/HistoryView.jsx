@@ -57,7 +57,7 @@ export default function HistoryView({ jobs, groupedJobs, expandedBatches, setExp
                 );
                 return (
                   <>
-                    <tr key={`batch-${batchId}`} style={{ background: 'rgba(255, 255, 255, 0.02)' }}>
+                    <tr key={`batch-${batchId}`} style={{ background: 'var(--overlay-weak)' }}>
                       <td className="mono">
                         <button
                           className="btn-secondary btn-sm"
