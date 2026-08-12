@@ -62,6 +62,12 @@ test.describe('critical path: upload → generate listing → review → copy-to
     // file input -- only UploadView is ever mounted here.
     await page.locator('input[type="file"][accept="image/*"]').setInputFiles(artworkPath);
 
+    // Unlike the pre-rebuild UI (which auto-triggered the upload chain straight from
+    // file selection), UploadView.jsx's handleUpload() -- and therefore the whole
+    // upload -> job-creation -> run-batch chain -- only fires from the "Start Pipeline"
+    // button's onClick. setInputFiles alone only populates the selected-files list.
+    await page.getByRole('button', { name: 'Start Pipeline' }).click();
+
     // Upload -> job creation -> the full server-side pipeline run (image_analyzer ->
     // listing_generator -> mockup_composer, see backend/lib/pipeline-runner.js) all
     // happen inside one awaited chain in UploadView.jsx's handleUpload(); the success
