@@ -54,72 +54,70 @@ test.describe('critical path: upload → generate listing → review → copy-to
     await expect(page.getByTestId('backend-status')).toContainText('Backend OK', { timeout: 15000 });
 
     const artworkPath = writeTestArtwork();
-    // The direct-upload Pipeline lane (including #section-pipeline and its "Done."
-    // status text below) lives inside a <details> that's collapsed by default -- expand
-    // it first. setInputFiles doesn't require visibility, so skipping this click would
-    // let the upload silently succeed while the "Done." text stayed hidden inside the
-    // closed disclosure, timing out the later toBeVisible() assertion for the wrong
-    // reason.
-    await page.getByText('Direct upload (skips curation').click();
 
-    // Drives the dropzone's plain file-input fallback (Module 6 -> "A drop zone (plus a
-    // plain file input fallback)") — far more reliable from Playwright than simulating
-    // an actual HTML5 drag-and-drop event sequence. Scoped to #section-pipeline: Module
-    // 7's TasteFilter importer (frontend/src/TasteFilter.jsx) also renders an
-    // `input[type="file"][accept="image/*"]`, so the bare selector is ambiguous
-    // (2 matches) now that both exist on the page at once.
-    await page.locator('#section-pipeline input[type="file"][accept="image/*"]').setInputFiles(artworkPath);
+    // Drives the dropzone's plain file-input fallback (UploadView.jsx) — far more
+    // reliable from Playwright than simulating an actual HTML5 drag-and-drop event
+    // sequence. App.jsx routes exactly one view at a time (a switch on activeView), so
+    // unlike the pre-rebuild UI there's no risk of this colliding with TasteFilter's own
+    // file input -- only UploadView is ever mounted here.
+    await page.locator('input[type="file"][accept="image/*"]').setInputFiles(artworkPath);
 
     // Upload -> job creation -> the full server-side pipeline run (image_analyzer ->
     // listing_generator -> mockup_composer, see backend/lib/pipeline-runner.js) all
-    // happen inside one awaited chain in App.jsx's handleFiles(); the "Done." status
-    // message only appears once POST /api/jobs/run-batch has actually returned.
-    await expect(page.getByText(/^Done\./)).toBeVisible({ timeout: 20000 });
+    // happen inside one awaited chain in UploadView.jsx's handleUpload(); the success
+    // message only appears once the run-batch call has actually returned.
+    await expect(page.getByText('Pipeline started successfully!')).toBeVisible({ timeout: 20000 });
 
     // Module 2 (Listing Generator) is required/non-skippable — regardless of whether
     // Module 1 or the optional Module 3 (no real mockup templates exist in this test
     // environment, so it's expected to fail) had any trouble, the job's overall_status
     // should never be 'failed' for this run.
     //
-    // The Listing History table only mounts once the sidebar's "Listing History" nav
+    // The Listing History view only mounts once the sidebar's "Listing History" nav
     // item switches App.jsx's activeView to 'history' -- it isn't in the DOM before
     // that, so this has to navigate there rather than just waiting on the locator.
-    // Scoped to .sidebar-nav-item: the same label also appears in .mobile-nav-strip
-    // (both render at once in this test's default viewport), so the bare text/role
-    // selector would match twice.
-    await page.locator('.sidebar-nav-item', { hasText: 'Listing History' }).click();
-    const historyRow = page.locator('table.data-table tbody tr').first();
-    await expect(historyRow).not.toContainText('failed');
+    // Sidebar.jsx and MobileNav.jsx use distinct labels ("Listing History" vs
+    // "History"), so a plain role-based lookup is unambiguous even though both navs
+    // render at once in this test's default viewport.
+    await page.getByRole('button', { name: 'Listing History' }).click();
+
+    // HistoryView.jsx is a card/list layout (BatchGroup/JobRow), not a table -- with a
+    // single job in this run, its own "Review" button is the simplest stable anchor.
+    const reviewButton = page.getByRole('button', { name: 'Review' });
+    await expect(reviewButton).toBeVisible();
+    await expect(page.locator('main')).not.toContainText('Failed');
 
     // Navigate back to the review workspace via the history row's own "Review" button —
-    // this calls App.jsx's openJob(), which sets activeJobId and switches activeView to
-    // 'review'. Clicking into "Listing History" above does NOT do this automatically, so
-    // without this click the review workspace never mounts at all.
-    await historyRow.getByRole('button', { name: 'Review' }).click();
+    // this calls App.jsx's handleOpenJob(), which sets activeJobId and switches
+    // activeView to 'review'. Clicking into "Listing History" above does NOT do this
+    // automatically, so without this click the review workspace never mounts at all.
+    await reviewButton.click();
 
-    // The review workspace defaults to the "Image Analysis" tab; the Listings panel
-    // (JobListingReview.jsx) is mounted but display:none until its tab is selected.
-    // Note: "Listings" is a workspace-tab-btn label, never an actual heading anywhere in
-    // the app, so asserting getByRole('heading', { name: 'Listings' }) here (as before)
-    // could never have matched even with the navigation fixed.
-    await page.getByRole('button', { name: 'Listings' }).click();
+    // The review workspace defaults to the "Analysis" tab; the Listings panel
+    // (ReviewView.jsx's ListingsTab) is mounted but hidden until its tab is selected.
+    // Shadcn's Tabs (Base UI underneath) render triggers with role="tab", not
+    // role="button".
+    await page.getByRole('tab', { name: 'Listings' }).click();
 
-    // JobListingReview.jsx loads listings on demand via its own button.
-    await page.getByRole('button', { name: 'Load listings' }).click();
+    // ListingsTab loads listings on demand via its own button.
+    await page.getByRole('button', { name: 'Load Listings' }).click();
 
     // Module 2 always produces exactly 3 variations (fine_art/aesthetic/gift — see
     // LISTING_VARIATIONS in backend/config/shop-conventions.js), each its own card.
-    await expect(page.getByRole('heading', { name: 'fine art' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'aesthetic' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'gift' })).toBeVisible();
+    // Shadcn's CardTitle renders a <div>, not a heading element, so these are matched
+    // by exact text rather than role=heading.
+    await expect(page.getByText('fine art', { exact: true })).toBeVisible();
+    await expect(page.getByText('aesthetic', { exact: true })).toBeVisible();
+    await expect(page.getByText('gift', { exact: true })).toBeVisible();
 
     // The fixture LLM provider's canned title for the fine_art angle — confirms actual
     // generated content made it all the way through the pipeline into the review UI,
     // not just that *some* listing rows happen to exist. Scoped to the fine_art card
-    // itself (by its heading text) since all three variation cards share the same
+    // itself (by its title text) since all three variation cards share the same
     // "Title" label, and page.getByDisplayValue() isn't a real Playwright API (it's a
-    // Testing Library method, not one Playwright's Page/Locator ever exposed).
-    const fineArtCard = page.locator('div.card.paper-card').filter({ hasText: 'fine art' });
+    // Testing Library method, not one Playwright's Page/Locator ever exposed). Card.jsx
+    // exposes a stable [data-slot="card"] hook for the outer card element.
+    const fineArtCard = page.locator('[data-slot="card"]').filter({ hasText: 'fine art' });
     await expect(fineArtCard.getByLabel('Title')).toHaveValue('fine art fixture title');
 
     // Copy-to-clipboard: click the fine-art card's own "Copy for Etsy" button and confirm
