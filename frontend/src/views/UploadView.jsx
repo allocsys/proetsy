@@ -141,7 +141,7 @@ export default function UploadView({ onNavigate, onJobsChanged }) {
       setUploadStep(null);
       toast.error(err.message || 'Upload failed');
     }
-  }, [files, pipelineOverrides]);
+  }, [files, pipelineOverrides, onJobsChanged]);
 
   // Navigate to review after single-job upload
   const handleGoToReview = useCallback(() => {
