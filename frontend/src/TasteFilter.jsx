@@ -227,8 +227,22 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
     if (category) formData.append('category', category);
     if (promptId) formData.append('prompt_id', promptId);
 
+    // No timeout on a plain fetch() means a connection that drops uncleanly (e.g. the
+    // backend crashing/restarting mid-request) can leave this promise pending forever --
+    // and with it the dropzone's loading skeleton, which only clears in the finally
+    // block below once the promise actually settles. 3 minutes covers a cold model load
+    // (see embeddings.js's ensureModelReady) with room to spare, while still guaranteeing
+    // the UI recovers on its own instead of needing a page reload.
+    const IMPORT_TIMEOUT_MS = 3 * 60 * 1000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), IMPORT_TIMEOUT_MS);
+
     try {
-      const res = await fetch('/api/taste-filter/import', { method: 'POST', body: formData });
+      const res = await fetch('/api/taste-filter/import', {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal,
+      });
       const data = await parseJsonResponse(res);
       data.candidates.forEach((c) => seenPathsRef.current.add(c.imagePath));
       setCandidates((prev) => [...data.candidates, ...prev]);
@@ -242,6 +256,7 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
       setStatus(`Import failed: ${msg}`);
       toast.error(msg);
     } finally {
+      clearTimeout(timeoutId);
       setImporting(false);
     }
   }
