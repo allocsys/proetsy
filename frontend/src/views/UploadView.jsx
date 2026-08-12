@@ -108,7 +108,7 @@ export default function UploadView({ onNavigate, onJobsChanged }) {
       // Step 1: Upload files
       const formData = new FormData();
       for (const file of files) {
-        formData.append('artworks', file);
+        formData.append('files', file);
       }
       const uploadResult = await api.artworks.upload(formData);
       if (uploadResult.error) {
