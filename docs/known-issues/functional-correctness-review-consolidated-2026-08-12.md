@@ -50,6 +50,15 @@ empty array and every upload attempt 400s.
 **Status: FIXED.** `formData.append('artworks', file)` changed to
 `formData.append('files', file)` in `UploadView.jsx` (commit `cc2c552`).
 
+### R5. API key creation sends the wrong payload key
+**Originally:** High — adding a new API key from Settings failed. The frontend's
+`ApiKeysTab.handleAddKey` sent `{ provider, key, label }`, but the backend route
+`POST /api/settings/api-keys` required `key_value`, so the request 400s every
+time.
+
+**Status: FIXED.** Frontend payload key changed from `key` to `key_value` in
+`SettingsView.jsx`'s `handleAddKey` (commit `2ea44cc`).
+
 ### R3. Mockup composer attempted every size, not just templated ones
 **Originally:** Low — `pipeline-runner.js` defaulted to `Object.keys(getProductSizes())`
 instead of filtering to sizes with a configured `mockup_template`, producing
@@ -97,39 +106,7 @@ re-verified against source.
 
 ## 🔴 OPEN — confirmed still broken
 
-### O2. API key creation sends the wrong payload key
-**Severity:** High — adding a new API key from Settings fails.
-
-**Where:** `frontend/src/views/SettingsView.jsx`, `ApiKeysTab.handleAddKey`:
-```js
-await api.apiKeys.add({
-  provider: newProvider,
-  key: newKeyValue.trim(),
-  label: newLabel.trim() || null,
-});
-```
-Backend (`backend/server.js`) — **note the real route is
-`POST /api/settings/api-keys`, not `/api/keys`** (the original doc had the route
-path wrong; the field-name bug itself is real):
-```js
-app.post('/api/settings/api-keys', (req, res) => {
-  const { provider, key_value, label } = req.body || {};
-  if (!provider || !key_value) {
-    return res.status(400).json({ error: 'provider and key_value are required' });
-  }
-  ...
-```
-Frontend never sends `key_value`, so this 400s every time.
-
-**Impact:** Users cannot add new API keys from Settings → API Keys. The form loads
-and lists existing (masked) keys fine — only submission fails.
-
-**Status: CONFIRMED STILL PRESENT** — re-checked directly against
-`SettingsView.jsx` and `server.js` on this branch.
-
-**Suggested fix:** change the payload key `key` → `key_value` in
-`SettingsView.jsx`'s `handleAddKey` (`api.apiKeys.add({ provider, key_value:
-newKeyValue.trim(), label: newLabel.trim() || null })`).
+None — all previously open issues have been fixed. See Summary below.
 
 ---
 
@@ -141,10 +118,10 @@ newKeyValue.trim(), label: newLabel.trim() || null })`).
 | R2 | Missing DELETE routes (tags/trends) | Fixed |
 | R3 | Mockup composer tries untemplated sizes | Fixed |
 | R4 | Upload field name (`artworks` vs `files`) | Fixed |
+| R5 | API key payload (`key` vs `key_value`) | Fixed |
 | X1 | Watch-folder key mismatch | Invalid (never real) |
 | X2 | Auto-mode key mismatch | Invalid (never real) |
 | X3 | Watcher `orientation` vs `category` | Invalid (never real) |
-| O2 | API key payload (`key` vs `key_value`) | **Open — High** |
 
-One real, high-impact bug remains open (O2), a regression from the frontend
-rewrite, a one-line fix on the frontend side.
+All known real issues from the original review passes have been fixed. No open
+items remain.
