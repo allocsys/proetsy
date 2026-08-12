@@ -190,7 +190,9 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
         setCategoryOptions(cats);
       })
       .catch(() => {});
-    api.prompts.list('portrait')
+    // Every orientation, not just one -- Taste Filter candidates aren't scoped to a
+    // single orientation, so filtering this list down would silently hide valid prompts.
+    api.prompts.list()
       .then((prompts) => setPromptOptions(Array.isArray(prompts) ? prompts : []))
       .catch(() => {});
   }, []);
@@ -406,7 +408,8 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
               <SelectItem value={NO_PROMPT}>None</SelectItem>
               {promptOptions.map((p) => (
                 <SelectItem key={p.id} value={String(p.id)}>
-                  {p.prompt_text ? p.prompt_text.slice(0, 60) : `Prompt #${p.id}`}
+                  {p.orientation ? `[${p.orientation}] ` : ''}
+                  {p.prompt_text ? p.prompt_text.slice(0, 50) : `Prompt #${p.id}`}
                 </SelectItem>
               ))}
             </SelectContent>
