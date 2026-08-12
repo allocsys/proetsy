@@ -126,7 +126,7 @@ function TagsSection() {
     async (tag) => {
       const ok = await confirm({
         title: 'Delete tag',
-        description: `Delete "${tag.tag}"? This cannot be undone.`,
+        description: `Delete "${tag.tag_text}"? This cannot be undone.`,
       });
       if (!ok) return;
       deleteTask.run(async () => {
@@ -286,7 +286,7 @@ function TagsSection() {
                   key={tag.id}
                   className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/30"
                 >
-                  <span className="flex-1 truncate text-sm text-foreground">{tag.tag}</span>
+                  <span className="flex-1 truncate text-sm text-foreground">{tag.tag_text}</span>
                   {tag.category && (
                     <Badge variant="outline" className="text-[10px] shrink-0">{tag.category}</Badge>
                   )}
@@ -295,7 +295,7 @@ function TagsSection() {
                     size="icon-xs"
                     onClick={() => handleDeleteTag(tag)}
                     disabled={deleteTask.pending}
-                    aria-label={`Delete ${tag.tag}`}
+                    aria-label={`Delete ${tag.tag_text}`}
                   >
                     <Trash2 className="size-3 text-muted-foreground" />
                   </Button>
