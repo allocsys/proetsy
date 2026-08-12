@@ -84,7 +84,7 @@ export const api = {
     },
   },
   prompts: {
-    list: (orientation) => fetch(`/api/prompts?orientation=${encodeURIComponent(orientation)}`).then(r => r.json()),
+    list: (orientation) => fetch(orientation ? `/api/prompts?orientation=${encodeURIComponent(orientation)}` : '/api/prompts').then(r => r.json()),
     generate: (payload) => fetch('/api/prompts/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(r => r.json()),
   },
   tasteFilter: {
