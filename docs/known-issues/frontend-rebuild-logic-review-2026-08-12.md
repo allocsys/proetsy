@@ -7,6 +7,8 @@
 
 All issues below were found during review and have since been fixed on this branch. No open issues remain as of this writing.
 
+**Verification:** each item below was independently re-checked directly against source on `feat/frontend-rebuild-tailwind-shadcn` (not taken on the reviewing agent's word alone) — reading the actual frontend call site and the actual backend route/schema/config it talks to, and confirming both sides now agree.
+
 ---
 
 ## Issues found (all fixed)
@@ -36,6 +38,11 @@ All issues below were found during review and have since been fixed on this bran
 - **Problem:** Defaulted to `Object.keys(getProductSizes())` instead of filtering to sizes with a configured `mockup_template`, causing predictable per-size failures on every run.
 - **Fix:** Default `sizeKeys` now filters to entries with a truthy `mockup_template`, mirroring the equivalent filter in `listing-generator/index.js`.
 
+### 6. Job-by-id fetch dropped the artwork file path
+- **File:** `backend/lib/jobs.js` (`getJobWithModules`)
+- **Problem:** Previously a bare `SELECT * FROM jobs`, so a job loaded by id (as opposed to the jobs-list endpoint) never carried `artwork_file_path`. Silently broke the Job Workspace artwork preview/filename in `App.jsx` whenever a job was opened directly.
+- **Fix:** Query now joins `artworks` and aliases `artworks.file_path AS artwork_file_path`, matching the field the jobs-list query already returns.
+
 ---
 
 ## Summary
@@ -47,5 +54,6 @@ All issues below were found during review and have since been fixed on this bran
 | 3 | `overall_status` stuck at `running` | Fixed |
 | 4 | Missing DELETE routes (tags/trends) | Fixed |
 | 5 | Mockup composer tries untemplated sizes | Fixed |
+| 6 | Job-by-id fetch missing `artwork_file_path` | Fixed |
 
 No logic/functional issues remain open on this branch. Remaining differences vs. `main` are the intended visual redesign (Tailwind CSS + Shadcn UI) and are not a correctness concern.
