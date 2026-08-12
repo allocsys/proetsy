@@ -8,7 +8,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+
+const NO_PROMPT = '__none__';
 
 const SCORE_STYLES = {
   'likely-keep': 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25',
@@ -357,35 +366,51 @@ function TasteFilter({ overrides, refreshJobs } = {}) {
           <Label htmlFor="taste-category" className="text-xs text-muted-foreground mb-1.5">
             Category
           </Label>
-          <Input
-            id="taste-category"
-            list="taste-category-options"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            placeholder="e.g. square-canvas"
-          />
-          <datalist id="taste-category-options">
-            {categoryOptions.map((c) => (
-              <option key={c} value={c} />
-            ))}
-          </datalist>
+          <div className="flex gap-2">
+            <Input
+              id="taste-category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder="e.g. square-canvas"
+              className="flex-1 min-w-0"
+            />
+            <Select
+              value={categoryOptions.includes(category) ? category : undefined}
+              onValueChange={setCategory}
+              disabled={categoryOptions.length === 0}
+            >
+              <SelectTrigger className="w-32 shrink-0" aria-label="Choose an existing category">
+                <SelectValue placeholder="Existing…" />
+              </SelectTrigger>
+              <SelectContent>
+                {categoryOptions.map((c) => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <div className="flex-1 w-full min-w-0">
           <Label htmlFor="taste-prompt-id" className="text-xs text-muted-foreground mb-1.5">
             Prompt ID
           </Label>
-          <Input
-            id="taste-prompt-id"
-            list="taste-prompt-id-options"
-            value={promptId}
-            onChange={(e) => setPromptId(e.target.value)}
-            placeholder="Links to Module 4"
-          />
-          <datalist id="taste-prompt-id-options">
-            {promptOptions.map((p) => (
-              <option key={p.id} value={p.id} label={p.prompt_text ? p.prompt_text.slice(0, 60) : undefined} />
-            ))}
-          </datalist>
+          <Select
+            value={promptId ? promptId : NO_PROMPT}
+            onValueChange={(v) => setPromptId(v === NO_PROMPT ? '' : v)}
+            disabled={promptOptions.length === 0}
+          >
+            <SelectTrigger id="taste-prompt-id" className="w-full" aria-label="Choose a prompt to link">
+              <SelectValue placeholder="Links to Module 4" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_PROMPT}>None</SelectItem>
+              {promptOptions.map((p) => (
+                <SelectItem key={p.id} value={String(p.id)}>
+                  {p.prompt_text ? p.prompt_text.slice(0, 60) : `Prompt #${p.id}`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <Button
           variant="outline"
