@@ -816,7 +816,7 @@ function ApiKeysTab() {
     addTask.run(async () => {
       await api.apiKeys.add({
         provider: newProvider,
-        key: newKeyValue.trim(),
+        key_value: newKeyValue.trim(),
         label: newLabel.trim() || null,
       });
       toast.success('API key added');
