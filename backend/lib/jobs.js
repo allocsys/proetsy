@@ -113,14 +113,22 @@ function finalizeJobStatus(db, jobId) {
   if (!current || current.overall_status === 'failed') return; // already terminal / a required module failed
 
   const modules = db
-    .prepare("SELECT status FROM job_modules WHERE job_id = ? AND status != 'skipped'")
+    .prepare("SELECT module_name, status FROM job_modules WHERE job_id = ? AND status != 'skipped'")
     .all(jobId);
 
   const allTerminal = modules.length > 0 && modules.every((m) => m.status === 'success' || m.status === 'failed');
   if (!allTerminal) return;
 
-  const anyFailed = modules.some((m) => m.status === 'failed');
-  db.prepare("UPDATE jobs SET overall_status = ? WHERE id = ?").run(anyFailed ? 'failed' : 'success', jobId);
+  // Only a REQUIRED module's failure should fail the whole job -- an optional module
+  // (e.g. image_analyzer, mockup_composer) reaching 'failed' is still a usable result,
+  // same as setModuleStatus()'s own `status === 'failed' && required` check above.
+  // Previously this counted a failure from *any* non-skipped module, required or not,
+  // which could flip a job to 'failed' purely because an optional module struggled even
+  // though every required module succeeded.
+  const { pipeline } = getPipelineConfig();
+  const requiredModuleNames = new Set(pipeline.filter((m) => m.required).map((m) => m.module));
+  const anyRequiredFailed = modules.some((m) => m.status === 'failed' && requiredModuleNames.has(m.module_name));
+  db.prepare("UPDATE jobs SET overall_status = ? WHERE id = ?").run(anyRequiredFailed ? 'failed' : 'success', jobId);
 }
 
 // Sets/replaces the manual-notes fallback input used by Module 2 when Module 1 is
