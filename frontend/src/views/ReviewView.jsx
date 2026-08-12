@@ -299,7 +299,7 @@ function AnalysisTab({ jobId }) {
             <div className="text-center">
               <p className="text-sm font-medium text-foreground">No analysis yet for this artwork</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Click "Run Image Analyzer" to generate one.
+                Click &ldquo;Run Image Analyzer&rdquo; to generate one.
               </p>
             </div>
           </CardContent>
