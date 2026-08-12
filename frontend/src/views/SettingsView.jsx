@@ -97,7 +97,8 @@ function TagsSection() {
     }
     saveTask.run(async () => {
       await api.tags.bulk({
-        tags: lines.map((tag) => ({ tag, category: newCategory.trim() || null })),
+        tags: lines,
+        category: newCategory.trim() || null,
       });
       toast.success(`${lines.length} tag(s) saved`);
       setNewTags('');
