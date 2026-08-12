@@ -1039,21 +1039,24 @@ function WatchFolderSection() {
 
   const handleToggleWatch = useCallback((checked) => {
     saveTask.run(async () => {
-      await api.settings.patch({ watch_folder_enabled: checked });
-      setSettings((prev) => ({ ...prev, watch_folder_enabled: checked }));
+      await api.settings.patch({ taste_filter_watch_enabled: checked });
+      setSettings((prev) => ({ ...prev, taste_filter_watch_enabled: String(checked) }));
       toast.success(`Watch folder ${checked ? 'enabled' : 'disabled'}`);
     });
   }, [saveTask]);
 
-  const handleSavePath = useCallback(() => {
+  const handleSaveConfig = useCallback(() => {
     saveTask.run(async () => {
-      await api.settings.patch({ watch_folder_path: settings.watch_folder_path || null });
-      toast.success('Watch folder path saved');
+      await api.settings.patch({
+        taste_filter_watch_folder: settings.taste_filter_watch_folder || null,
+        taste_filter_watch_category: settings.taste_filter_watch_category || null,
+      });
+      toast.success('Watch folder settings saved');
     });
-  }, [settings.watch_folder_path, saveTask]);
+  }, [settings.taste_filter_watch_folder, settings.taste_filter_watch_category, saveTask]);
 
   const handleUseDefault = useCallback(() => {
-    setSettings((prev) => ({ ...prev, watch_folder_path: '/watch' }));
+    setSettings((prev) => ({ ...prev, taste_filter_watch_folder: '/watch' }));
   }, []);
 
   return (
@@ -1066,7 +1069,7 @@ function WatchFolderSection() {
               Watch Folder
             </CardTitle>
             <Switch
-              checked={settings.watch_folder_enabled ?? false}
+              checked={settings.taste_filter_watch_enabled === 'true'}
               onCheckedChange={handleToggleWatch}
               disabled={saveTask.pending}
               aria-label="Enable watch folder"
@@ -1082,8 +1085,8 @@ function WatchFolderSection() {
               <Label htmlFor="watch-path" className="text-xs text-muted-foreground">Folder Path</Label>
               <Input
                 id="watch-path"
-                value={settings.watch_folder_path || ''}
-                onChange={(e) => setSettings((prev) => ({ ...prev, watch_folder_path: e.target.value }))}
+                value={settings.taste_filter_watch_folder || ''}
+                onChange={(e) => setSettings((prev) => ({ ...prev, taste_filter_watch_folder: e.target.value }))}
                 placeholder="/path/to/watch/folder"
                 className="font-mono text-sm"
               />
@@ -1091,7 +1094,18 @@ function WatchFolderSection() {
             <Button variant="outline" size="sm" onClick={handleUseDefault} className="shrink-0">
               Use Default
             </Button>
-            <Button size="sm" onClick={handleSavePath} disabled={saveTask.pending} className="gap-1.5 shrink-0">
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <div className="flex-1 space-y-1.5">
+              <Label htmlFor="watch-category" className="text-xs text-muted-foreground">Category (optional)</Label>
+              <Input
+                id="watch-category"
+                value={settings.taste_filter_watch_category || ''}
+                onChange={(e) => setSettings((prev) => ({ ...prev, taste_filter_watch_category: e.target.value }))}
+                placeholder="e.g. botanical"
+              />
+            </div>
+            <Button size="sm" onClick={handleSaveConfig} disabled={saveTask.pending} className="gap-1.5 shrink-0">
               {saveTask.pending ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3.5" />}
               Save
             </Button>
@@ -1117,8 +1131,8 @@ function WatchFolderSection() {
             <div className="space-y-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Status</span>
-                <Badge variant={watchStatus.watching ? 'default' : 'outline'} className="text-[10px]">
-                  {watchStatus.watching ? 'Watching' : 'Idle'}
+                <Badge variant={watchStatus.active ? 'default' : 'outline'} className="text-[10px]">
+                  {watchStatus.active ? 'Watching' : 'Idle'}
                 </Badge>
               </div>
               {watchStatus.folder && (
@@ -1127,16 +1141,22 @@ function WatchFolderSection() {
                   <span className="font-mono text-xs text-foreground">{watchStatus.folder}</span>
                 </div>
               )}
-              {watchStatus.last_scan && (
+              {watchStatus.category && (
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Last Scan</span>
-                  <span className="text-xs text-foreground">{new Date(watchStatus.last_scan).toLocaleString()}</span>
+                  <span className="text-muted-foreground">Category</span>
+                  <span className="text-xs text-foreground">{watchStatus.category}</span>
                 </div>
               )}
-              {watchStatus.files_found !== undefined && (
+              {watchStatus.pendingCount !== undefined && (
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Files Found</span>
-                  <span className="text-foreground">{watchStatus.files_found}</span>
+                  <span className="text-muted-foreground">Pending Candidates</span>
+                  <span className="text-foreground">{watchStatus.pendingCount}</span>
+                </div>
+              )}
+              {watchStatus.lastError && (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Last Error</span>
+                  <span className="text-right text-xs text-destructive">{watchStatus.lastError}</span>
                 </div>
               )}
             </div>
@@ -1266,8 +1286,8 @@ function TasteFilterAutoSection() {
 
   const handleToggleAuto = useCallback((checked) => {
     saveTask.run(async () => {
-      await api.settings.patch({ taste_filter_auto: checked });
-      setSettings((prev) => ({ ...prev, taste_filter_auto: checked }));
+      await api.settings.patch({ taste_filter_auto_enabled: checked });
+      setSettings((prev) => ({ ...prev, taste_filter_auto_enabled: String(checked) }));
       toast.success(`Taste filter auto mode ${checked ? 'enabled' : 'disabled'}`);
     });
   }, [saveTask]);
@@ -1288,7 +1308,7 @@ function TasteFilterAutoSection() {
             Taste Filter Auto Mode
           </CardTitle>
           <Switch
-            checked={settings.taste_filter_auto ?? false}
+            checked={settings.taste_filter_auto_enabled === 'true'}
             onCheckedChange={handleToggleAuto}
             disabled={saveTask.pending}
             aria-label="Enable taste filter auto mode"
