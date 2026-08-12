@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Loader2, Download, RotateCcw, Check, AlertCircle, RefreshCw } from 'lucide-react';
+import { Loader2, Download, RotateCcw, AlertCircle, RefreshCw } from 'lucide-react';
 import StatusBadge from '@/components/layout/StatusBadge';
 import { Button } from '@/components/ui/button';
 
