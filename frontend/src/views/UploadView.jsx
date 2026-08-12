@@ -42,12 +42,15 @@ export default function UploadView({ onNavigate, onJobsChanged }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Build pipeline_overrides from toggle state
+  // Build pipeline_overrides from toggle state. backend/lib/jobs.js's
+  // createJob/createJobsBulk read this as a plain object keyed by module name
+  // (`overrides[moduleName]`) -- see its own doc comment: "overrides (optional):
+  // { [module_name]: boolean }". App.jsx's tasteFilterOverrides builds the same
+  // shape via Object.fromEntries for the same reason.
   const pipelineOverrides = useMemo(() => {
-    return pipelineModules.map((mod) => ({
-      module: mod.module,
-      enabled: overrides[mod.module] ?? mod.enabled,
-    }));
+    return Object.fromEntries(
+      pipelineModules.map((mod) => [mod.module, overrides[mod.module] ?? mod.enabled])
+    );
   }, [pipelineModules, overrides]);
 
   // Handle toggle change
