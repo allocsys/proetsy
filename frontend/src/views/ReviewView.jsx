@@ -498,7 +498,12 @@ function ListingCard({ listing, conventions, onSaved }) {
             {saveTask.pending ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
             Save
           </Button>
-          <Button variant="outline" onClick={handleCopyForEtsy} className="gap-1.5">
+          <Button
+            variant="outline"
+            onClick={handleCopyForEtsy}
+            data-testid="copy-for-etsy"
+            className="gap-1.5"
+          >
             {copied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
             {copied ? 'Copied!' : 'Copy for Etsy'}
           </Button>
