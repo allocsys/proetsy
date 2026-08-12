@@ -34,7 +34,7 @@ test.describe('critical path: upload → generate listing → review → copy-to
     // headless Chromium's real OS-clipboard integration, which can hang indefinitely on
     // minimal CI runners (no clipboard backend/display service) even with
     // clipboard-read/clipboard-write permissions granted. This test's goal is verifying
-    // JobListingReview.jsx's copy-to-Etsy code path (writeText called with the right
+    // ReviewView.jsx's copy-to-Etsy code path (writeText called with the right
     // content, UI reflects success), not Chromium's OS clipboard plumbing -- addInitScript
     // runs before any page script, so copyForEtsy()'s real call still exercises the same
     // code path, just against a stub that always resolves.
