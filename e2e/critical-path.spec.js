@@ -87,9 +87,18 @@ test.describe('critical path: upload → generate listing → review → copy-to
     // render at once in this test's default viewport.
     await page.getByRole('button', { name: 'Listing History' }).click();
 
-    // HistoryView.jsx is a card/list layout (BatchGroup/JobRow), not a table -- with a
-    // single job in this run, its own "Review" button is the simplest stable anchor.
-    const reviewButton = page.getByRole('button', { name: 'Review' });
+    // HistoryView.jsx is a card/list layout (BatchGroup/JobRow), not a table. The plain
+    // name 'Review' (non-exact) also matches the sidebar's "Review a Job" nav button via
+    // substring, so this needs exact:true to isolate the JobRow buttons.
+    //
+    // This also can't assume exactly one job exists: playwright.config.js runs a single
+    // backend webServer (and DB file) for the whole test invocation, and CI retries
+    // reuse that same running server/DB rather than starting fresh, so a failed first
+    // attempt's job is still present when a retry creates its own. Jobs from this test
+    // never carry a batch_id, so they always land in HistoryView's soloJobs list, sorted
+    // created_at descending -- the just-created job's Review button is therefore always
+    // the first match, no matter how many older jobs are still around.
+    const reviewButton = page.getByRole('button', { name: 'Review', exact: true }).first();
     await expect(reviewButton).toBeVisible();
     await expect(page.locator('main')).not.toContainText('Failed');
 
