@@ -16,7 +16,7 @@ const MODULE_LABELS = {
   'taste-filter': { name: 'Taste Filter', description: 'Ranks results against your shop style profile' },
 };
 
-export default function UploadView({ onNavigate }) {
+export default function UploadView({ onNavigate, onJobsChanged }) {
   const [files, setFiles] = useState([]);
   const [pipelineModules, setPipelineModules] = useState([]);
   const [overrides, setOverrides] = useState({});
@@ -124,10 +124,12 @@ export default function UploadView({ onNavigate }) {
       });
       const jobIds = createResult.jobs.map((j) => j.id);
       setCreatedJobIds(jobIds);
+      onJobsChanged?.();
 
       // Step 3: Run pipeline
       setUploadStep('running');
       await api.jobs.runBatch({ job_ids: jobIds });
+      onJobsChanged?.();
 
       // Done
       setUploadStep('done');
