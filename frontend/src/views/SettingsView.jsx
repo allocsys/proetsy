@@ -1256,7 +1256,8 @@ function TasteFilterAutoSection() {
       const data = await api.settings.get();
       setSettings(data || {});
       if (data?.taste_filter_auto_threshold !== undefined) {
-        setThreshold(data.taste_filter_auto_threshold);
+        const parsed = Number(data.taste_filter_auto_threshold);
+        setThreshold(Number.isFinite(parsed) ? parsed : 0.5);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
