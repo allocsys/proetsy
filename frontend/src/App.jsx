@@ -30,13 +30,20 @@ function AppShell() {
   const [pipelineConfig, setPipelineConfig] = useState(null);
   const [selectedJobId, setSelectedJobId] = useState(null);
 
+  // Re-fetches the jobs list so the sidebar's status counts (derived from
+  // `jobs` below) stay current. Exposed to views that create/mutate jobs
+  // (e.g. UploadView) since nothing else notifies AppShell when that happens.
+  const refreshJobs = useCallback(() => {
+    api.jobs.list().then(setJobs).catch(() => setJobs([]));
+  }, []);
+
   // Fetch health, setup, jobs, pipeline config on mount
   useEffect(() => {
     api.health().then(setHealth).catch(() => setHealth({ status: 'error' }));
     api.setupStatus().then(setSetupStatus).catch(() => {});
-    api.jobs.list().then(setJobs).catch(() => setJobs([]));
+    refreshJobs();
     api.pipelineConfig().then(setPipelineConfig).catch(() => {});
-  }, []);
+  }, [refreshJobs]);
 
   // Compute status counts from jobs
   const statusCounts = useMemo(() => {
@@ -90,7 +97,7 @@ function AppShell() {
   // View routing
   const viewComponent = (() => {
     switch (activeView) {
-      case 'upload': return UploadView && <UploadView onNavigate={handleNavigate} />;
+      case 'upload': return UploadView && <UploadView onNavigate={handleNavigate} onJobsChanged={refreshJobs} />;
       case 'mockup-templates': return MockupTemplates && <MockupTemplates />;
       case 'history': return HistoryView && <HistoryView onOpenJob={handleOpenJob} />;
       case 'review': return ReviewView && <ReviewView jobId={selectedJobId} />;
