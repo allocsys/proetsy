@@ -33,7 +33,10 @@ export default function Header({
               isHealthy ? 'bg-emerald-500' : 'bg-red-500'
             )}
           />
-          <span className="text-xs text-muted-foreground">
+          <span
+            data-testid="backend-status"
+            className="text-xs text-muted-foreground"
+          >
             {isHealthy ? 'Backend OK' : 'Backend Down'}
           </span>
           {!isHealthy && (
