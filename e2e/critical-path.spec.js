@@ -51,7 +51,7 @@ test.describe('critical path: upload → generate listing → review → copy-to
     // Confirm the backend is actually reachable before doing anything real — a much
     // clearer failure point than the upload step silently hanging if the webServer
     // didn't come up in time.
-    await expect(page.getByText('Backend:')).toContainText('ok', { timeout: 15000 });
+    await expect(page.getByTestId('backend-status')).toContainText('Backend OK', { timeout: 15000 });
 
     const artworkPath = writeTestArtwork();
     // The direct-upload Pipeline lane (including #section-pipeline and its "Done."
