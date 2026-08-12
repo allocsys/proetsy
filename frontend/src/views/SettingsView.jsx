@@ -20,7 +20,6 @@ import {
   RefreshCw,
   Gauge,
   Wand2,
-  ChevronRight,
   Save,
 } from 'lucide-react';
 import { api } from '@/hooks/useApi';
@@ -477,7 +476,7 @@ function TagsAndTrendsTab() {
 
 // ─── Sub-tab 2: Shop & Pipeline ──────────────────────────────────────────
 
-function ShopDefaultsSection({ settings, onSettingsChange, saveTask }) {
+function ShopDefaultsSection({ settings, onSettingsChange }) {
   return (
     <Card>
       <CardHeader>
@@ -519,7 +518,7 @@ function ShopDefaultsSection({ settings, onSettingsChange, saveTask }) {
   );
 }
 
-function PipelineModulesSection({ pipelineConfig, onToggleModule, saveTask }) {
+function PipelineModulesSection({ pipelineConfig, onToggleModule }) {
   const MODULE_LABELS = {
     'image-analyzer': { name: 'Image Analyzer', desc: 'Analyzes artwork for colors, style, and composition' },
     'listing-generator': { name: 'Listing Generator', desc: 'Creates Etsy-optimized titles, descriptions, and tags' },
