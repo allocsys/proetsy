@@ -57,8 +57,12 @@ function AppShell() {
   const statusCounts = useMemo(() => {
     const counts = { pending: 0, completed: 0, running: 0, failed: 0 };
     for (const job of jobs) {
-      const s = job.status || 'pending';
-      if (s in counts) counts[s]++;
+      // jobs.overall_status is the real column (see backend/lib/jobs.js) -- 'success'
+      // is its terminal-success value, mapped to 'completed' to match Sidebar.jsx's
+      // statusColors/label keys.
+      const raw = job.overall_status || 'pending';
+      const key = raw === 'success' ? 'completed' : raw;
+      if (key in counts) counts[key]++;
     }
     return counts;
   }, [jobs]);
