@@ -41,6 +41,15 @@ Both follow the standard 404-if-missing / 204-on-success pattern. Frontend's
 `api.tags.delete` / `api.trends.delete` (in `hooks/useApi.js`) target the correct
 paths.
 
+### R4. Artwork upload sends the wrong multipart field name
+**Originally:** Critical — no artwork could be uploaded via the dashboard at all.
+`UploadView.jsx:111` appended files under the `artworks` field, but the backend
+(`upload.array('files', 50)`) expected `files`, so `multer` always populated an
+empty array and every upload attempt 400s.
+
+**Status: FIXED.** `formData.append('artworks', file)` changed to
+`formData.append('files', file)` in `UploadView.jsx` (commit `cc2c552`).
+
 ### R3. Mockup composer attempted every size, not just templated ones
 **Originally:** Low — `pipeline-runner.js` defaulted to `Object.keys(getProductSizes())`
 instead of filtering to sizes with a configured `mockup_template`, producing
@@ -88,33 +97,6 @@ re-verified against source.
 
 ## 🔴 OPEN — confirmed still broken
 
-### O1. Artwork upload sends the wrong multipart field name
-**Severity:** Critical — no artwork can be uploaded via the dashboard at all.
-
-**Where:** `frontend/src/views/UploadView.jsx:111`
-```js
-formData.append('artworks', file);
-```
-Backend (`backend/server.js`):
-```js
-app.post('/api/artworks/upload', upload.array('files', 50), (req, res) => {
-  const files = req.files || [];
-  if (!files.length) return res.status(400).json({ error: 'No files uploaded (expected multipart field "files")' });
-  ...
-```
-Field name mismatch (`artworks` vs `files`) means `multer` always populates an
-empty array, so every upload attempt 400s.
-
-**Impact:** Blocks the pipeline's entry point entirely. Nothing downstream (image
-analysis, listing generation, mockup composition) can run.
-
-**Status: CONFIRMED STILL PRESENT** — re-checked directly against
-`UploadView.jsx` on this branch. `TasteFilter.jsx`'s separate upload path (line
-226) correctly uses `'files'` already — only `UploadView.jsx` has the bug.
-
-**Suggested fix:** change `formData.append('artworks', file)` →
-`formData.append('files', file)` in `UploadView.jsx:111`.
-
 ### O2. API key creation sends the wrong payload key
 **Severity:** High — adding a new API key from Settings fails.
 
@@ -158,11 +140,11 @@ newKeyValue.trim(), label: newLabel.trim() || null })`).
 | R1 | `overall_status` stuck at `running` | Fixed |
 | R2 | Missing DELETE routes (tags/trends) | Fixed |
 | R3 | Mockup composer tries untemplated sizes | Fixed |
+| R4 | Upload field name (`artworks` vs `files`) | Fixed |
 | X1 | Watch-folder key mismatch | Invalid (never real) |
 | X2 | Auto-mode key mismatch | Invalid (never real) |
 | X3 | Watcher `orientation` vs `category` | Invalid (never real) |
-| O1 | Upload field name (`artworks` vs `files`) | **Open — Critical** |
 | O2 | API key payload (`key` vs `key_value`) | **Open — High** |
 
-Two real, high-impact bugs remain open (O1, O2), both regressions from the
-frontend rewrite, both one-line fixes on the frontend side.
+One real, high-impact bug remains open (O2), a regression from the frontend
+rewrite, a one-line fix on the frontend side.
