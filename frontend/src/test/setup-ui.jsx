@@ -1,6 +1,9 @@
 // Shared mocks for shadcn/ui components that use base-ui (incompatible with jsdom).
 // Loaded via vitest.config.js setupFiles so all test files get these automatically.
 
+import React from 'react';
+import { vi } from 'vitest';
+
 // ─── ConfirmContext: provide a mock confirm that auto-resolves ──
 vi.mock('@/contexts/ConfirmContext.jsx', () => ({
   ConfirmProvider: ({ children }) => <>{children}</>,
@@ -15,30 +18,23 @@ vi.mock('@/components/ui/button.jsx', () => ({
   ),
 }));
 
-vi.mock('@/components/ui/input.jsx', () => {
-  const React = require('react');
-  return {
-    Input: React.forwardRef(({ value, onChange, ...props }, ref) => (
-      <input ref={ref} value={value} onChange={onChange} {...props} />
-    )),
-  };
-});
+vi.mock('@/components/ui/input.jsx', () => ({
+  Input: React.forwardRef(function Input({ value, onChange, ...props }, ref) {
+    return <input ref={ref} value={value} onChange={onChange} {...props} />;
+  }),
+}));
 
 vi.mock('@/components/ui/label.jsx', () => ({
   Label: ({ children, ...props }) => <label {...props}>{children}</label>,
 }));
 
-vi.mock('@/components/ui/textarea.jsx', () => {
-  const React = require('react');
-  return {
-    Textarea: React.forwardRef(({ value, onChange, ...props }, ref) => (
-      <textarea ref={ref} value={value} onChange={onChange} {...props} />
-    )),
-  };
-});
+vi.mock('@/components/ui/textarea.jsx', () => ({
+  Textarea: React.forwardRef(function Textarea({ value, onChange, ...props }, ref) {
+    return <textarea ref={ref} value={value} onChange={onChange} {...props} />;
+  }),
+}));
 
 vi.mock('@/components/ui/select.jsx', () => {
-  const React = require('react');
   const Ctx = React.createContext(() => {});
   return {
     Select: ({ children, value, onValueChange }) => (
@@ -82,7 +78,6 @@ vi.mock('@/components/ui/card.jsx', () => ({
 }));
 
 vi.mock('@/components/ui/tabs.jsx', () => {
-  const React = require('react');
   const Ctx = React.createContext(() => {});
   return {
     Tabs: ({ children, value, onValueChange }) => (
