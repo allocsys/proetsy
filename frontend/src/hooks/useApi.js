@@ -1,5 +1,6 @@
 // Shared fetch utilities with friendly error handling
 export function friendlyErrorMessage(err) {
+  if (err.name === 'AbortError') return 'The request timed out. The server may be slow to respond — please try again.';
   if (err instanceof TypeError) return 'Could not reach the server — check your connection and try again.';
   return err.message;
 }
