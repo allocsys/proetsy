@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import { RefreshCw, Upload, ChevronDown, ChevronRight, ThumbsUp, ThumbsDown, Send, ImageOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, parseJsonResponse, friendlyErrorMessage } from '@/hooks/useApi';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
