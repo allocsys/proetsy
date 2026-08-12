@@ -62,7 +62,12 @@ function findPhraseHits(text, phrases) {
 // ─── Job Picker ───────────────────────────────────────────────────────────
 
 function JobPicker({ initialJobId, onLoadJob }) {
-  const [inputValue, setInputValue] = useState(initialJobId || '');
+  // jobs.id is an INTEGER PRIMARY KEY (see backend/db/schema.sql), not a UUID string --
+  // initialJobId arrives as a number from App.jsx's selectedJobId. Normalize to a string
+  // once here so inputValue (a controlled text input's value) is always a string; every
+  // downstream .trim()/comparison on it depends on that.
+  const initialJobIdStr = initialJobId != null ? String(initialJobId) : '';
+  const [inputValue, setInputValue] = useState(initialJobIdStr);
   const [job, setJob] = useState(null);
   const loadTask = useAsyncTask();
 
@@ -78,18 +83,18 @@ function JobPicker({ initialJobId, onLoadJob }) {
 
   // Sync with external jobId changes (e.g. navigating from history)
   useEffect(() => {
-    if (initialJobId && initialJobId !== inputValue) {
-      setInputValue(initialJobId);
+    if (initialJobIdStr && initialJobIdStr !== inputValue) {
+      setInputValue(initialJobIdStr);
       // Auto-load if we got a job ID from navigation
       loadTask.run(async () => {
-        const data = await api.jobs.get(initialJobId);
+        const data = await api.jobs.get(initialJobIdStr);
         setJob(data);
-        onLoadJob(initialJobId, data);
+        onLoadJob(initialJobIdStr, data);
       });
     }
     // Only run on initialJobId changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialJobId]);
+  }, [initialJobIdStr]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter') handleLoad();
@@ -115,7 +120,7 @@ function JobPicker({ initialJobId, onLoadJob }) {
         {job && (
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="font-mono text-xs">
-              Job #{job.id?.slice(0, 8)}
+              Job #{String(job.id ?? '').slice(0, 8)}
             </Badge>
             <StatusBadge status={job.overall_status || job.status} />
           </div>
