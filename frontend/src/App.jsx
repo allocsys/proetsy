@@ -37,6 +37,14 @@ function AppShell() {
     api.jobs.list().then(setJobs).catch(() => setJobs([]));
   }, []);
 
+  // Keep + Pipeline (Taste Filter) needs pipeline_overrides in `{ module: enabled }`
+  // shape (see backend/lib/jobs.js createJob) -- derived from the fetched pipeline
+  // defaults since this flow has no per-session toggle UI of its own to source from.
+  const tasteFilterOverrides = useMemo(() => {
+    if (!pipelineConfig?.pipeline) return {};
+    return Object.fromEntries(pipelineConfig.pipeline.map((m) => [m.module, m.enabled]));
+  }, [pipelineConfig]);
+
   // Fetch health, setup, jobs, pipeline config on mount
   useEffect(() => {
     api.health().then(setHealth).catch(() => setHealth({ status: 'error' }));
@@ -102,7 +110,7 @@ function AppShell() {
       case 'history': return HistoryView && <HistoryView onOpenJob={handleOpenJob} />;
       case 'review': return ReviewView && <ReviewView jobId={selectedJobId} />;
       case 'prompt-helper': return PromptHelper && <PromptHelper />;
-      case 'taste-filter': return TasteFilter && <TasteFilter />;
+      case 'taste-filter': return TasteFilter && <TasteFilter overrides={tasteFilterOverrides} refreshJobs={refreshJobs} />;
       case 'settings': return SettingsView && <SettingsView onBack={() => setActiveView(previousView)} />;
       default: return null;
     }
