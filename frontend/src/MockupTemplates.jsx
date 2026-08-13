@@ -126,7 +126,7 @@ function ConfiguredTemplateCard({ row, onSave, onRemove }) {
   );
 }
 
-export default function MockupTemplates() {
+export default function MockupTemplates({ onSetupStatusChange }) {
   const [folder, setFolder] = useState('');
   const [scanFiles, setScanFiles] = useState([]);
   const [selected, setSelected] = useState({});
@@ -249,6 +249,7 @@ export default function MockupTemplates() {
       setSelected({});
       refreshConfigured();
       handleScan();
+      if (succeeded > 0) onSetupStatusChange?.();
     });
   }
 
@@ -266,6 +267,7 @@ export default function MockupTemplates() {
       toast.success(`Saved ${row.size_key}`);
       refreshConfigured();
       setConfiguredKey((k) => k + 1);
+      onSetupStatusChange?.();
     } catch (err) {
       toast.error(`Save failed: ${err.message}`);
     }
@@ -283,6 +285,7 @@ export default function MockupTemplates() {
       await api.mockups.templates.delete(sizeKey);
       toast.success(`Removed ${sizeKey}`);
       refreshConfigured();
+      onSetupStatusChange?.();
     } catch (err) {
       toast.error(`Remove failed: ${err.message}`);
     }

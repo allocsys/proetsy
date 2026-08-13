@@ -17,7 +17,7 @@ vi.mock('@/components/layout/Header.jsx', () => ({
 vi.mock('@/components/layout/SetupBanner.jsx', () => ({
   default: ({ setupStatus }) => {
     if (!setupStatus) return null;
-    const incomplete = !setupStatus.geminiApiKey || !setupStatus.tagLibraryReady || !setupStatus.productSizesReady;
+    const incomplete = !setupStatus.geminiKeyConfigured || !setupStatus.hasTagLibrary || !setupStatus.hasProductSize;
     if (!incomplete) return null;
     return <div>Setup Incomplete <span>Gemini API Key</span> <span>Tag Library</span></div>;
   },
@@ -59,15 +59,15 @@ vi.mock('@/components/layout/StatusBadge.jsx', () => ({
 import App from './App.jsx';
 
 const SETUP_STATUS_READY = {
-  geminiApiKey: true,
-  tagLibraryReady: true,
-  productSizesReady: true,
+  geminiKeyConfigured: true,
+  hasTagLibrary: true,
+  hasProductSize: true,
 };
 
 const SETUP_STATUS_INCOMPLETE = {
-  geminiApiKey: false,
-  tagLibraryReady: false,
-  productSizesReady: true,
+  geminiKeyConfigured: false,
+  hasTagLibrary: false,
+  hasProductSize: true,
 };
 
 const PIPELINE_CONFIG = {
