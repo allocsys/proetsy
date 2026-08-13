@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+## [0.11.1] - 2026-08-13
+### Fixed
+- Startup-crashing DB migration ordering bug: the `image_preferences` dedup DELETE now runs after its `ALTER TABLE` migration and before the `idx_image_preferences_image_path` unique index is created (#76).
+- Unkeyed list in `ReviewView`'s `AnalysisGrid` (`.map()` now uses a named `Fragment` import with a real `key`) (#76).
+- Frontend API client (`useApi.js`): every method now checks HTTP status and parses JSON consistently, and short-circuits on `204 No Content` instead of throwing (#77).
+- `SettingsView`'s `PipelineModulesSection`: `MODULE_LABELS` rekeyed to match `pipeline.config.json` (`image_analyzer` / `listing_generator` / `mockup_composer`); dropped a dead `taste-filter` entry (#78).
+- `UploadView`'s `MODULE_LABELS` keys corrected to match the same real pipeline module names; skeleton loading state now renders 3 placeholder rows, matching the actual pipeline (#7).
+- Flaky `taste-filter` watcher route test: its inline poll loop no longer eats the full global test timeout (#79).
+
 ## [0.11.0] - 2026-08-13
 ### Added
 - Proper dropdown selects (Category and Prompt ID) in Taste Filter, replacing free-text/hardcoded fields.
