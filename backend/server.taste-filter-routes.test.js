@@ -364,7 +364,9 @@ describe('GET /api/taste-filter/pending + /watch-status (Module 7 -> "Auto-impor
     expect(res.body.candidates).toEqual([]);
   });
 
-  it('enabling the watcher via PATCH /api/settings picks up a dropped file, surfaced via GET /pending, and labeling it clears the queue', async () => {
+  it(
+    'enabling the watcher via PATCH /api/settings picks up a dropped file, surfaced via GET /pending, and labeling it clears the queue',
+    async () => {
     const watchFolder = fs.mkdtempSync(path.join(tmpRoot, 'watch-'));
 
     const patchRes = await request(app).patch('/api/settings').send({
@@ -382,7 +384,11 @@ describe('GET /api/taste-filter/pending + /watch-status (Module 7 -> "Auto-impor
 
     let candidate;
     const start = Date.now();
-    while (Date.now() - start < 15000) {
+    // Capped below the global testTimeout (15000ms, see vitest.config.js) so this poll
+    // fails fast with a clear message instead of silently eating the rest of the test's
+    // budget -- the label POST, follow-up GET /pending, and closing PATCH below still
+    // need to run afterward. See this test's explicit 20000ms timeout override.
+    while (Date.now() - start < 10000) {
       const pendingRes = await request(app).get('/api/taste-filter/pending');
       if (pendingRes.body.candidates.length > 0) {
         candidate = pendingRes.body.candidates[0];
@@ -407,7 +413,9 @@ describe('GET /api/taste-filter/pending + /watch-status (Module 7 -> "Auto-impor
 
     // Turn the watcher back off so it doesn't linger past this test.
     await request(app).patch('/api/settings').send({ taste_filter_watch_enabled: 'false' });
-  });
+    },
+    20000
+  );
 
   it(
     'GET /pending/stream sends already-pending candidates immediately, then pushes newly-detected ones live, without touching GET /pending',
