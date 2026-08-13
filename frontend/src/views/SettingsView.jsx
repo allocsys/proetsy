@@ -56,7 +56,7 @@ import ShopConventions from '@/ShopConventions';
 
 // ─── Sub-tab 1: Tags & Trends ────────────────────────────────────────────
 
-function TagsSection() {
+function TagsSection({ onSetupStatusChange }) {
   const [tags, setTags] = useState([]);
   const [newTags, setNewTags] = useState('');
   const [newCategory, setNewCategory] = useState('');
@@ -103,8 +103,9 @@ function TagsSection() {
       setNewTags('');
       setNewCategory('');
       loadTags();
+      onSetupStatusChange?.();
     });
-  }, [newTags, newCategory, saveTask, loadTags]);
+  }, [newTags, newCategory, saveTask, loadTags, onSetupStatusChange]);
 
   const handleCsvImport = useCallback((e) => {
     const file = e.target.files?.[0];
@@ -116,11 +117,12 @@ function TagsSection() {
         const data = await api.tags.csv(csv);
         toast.success(data.message || 'CSV imported');
         loadTags();
+        onSetupStatusChange?.();
       });
     };
     reader.readAsText(file);
     e.target.value = '';
-  }, [csvTask, loadTags]);
+  }, [csvTask, loadTags, onSetupStatusChange]);
 
   const handleDeleteTag = useCallback(
     async (tag) => {
@@ -133,9 +135,10 @@ function TagsSection() {
         await api.tags.delete(tag.id);
         toast.success('Tag deleted');
         loadTags();
+        onSetupStatusChange?.();
       });
     },
-    [confirm, deleteTask, loadTags]
+    [confirm, deleteTask, loadTags, onSetupStatusChange]
   );
 
   const handleBackfillPreview = useCallback(() => {
@@ -452,7 +455,7 @@ function TrendsSection() {
   );
 }
 
-function TagsAndTrendsTab() {
+function TagsAndTrendsTab({ onSetupStatusChange }) {
   return (
     <div className="space-y-8">
       <div>
@@ -461,7 +464,7 @@ function TagsAndTrendsTab() {
           Manage your tag library for listing generation.
         </p>
       </div>
-      <TagsSection />
+      <TagsSection onSetupStatusChange={onSetupStatusChange} />
       <Separator />
       <div>
         <h3 className="text-base font-semibold text-foreground">Trends</h3>
@@ -786,7 +789,7 @@ function ShopAndPipelineTab() {
 
 // ─── Sub-tab 3: API Keys ─────────────────────────────────────────────────
 
-function ApiKeysTab() {
+function ApiKeysTab({ onSetupStatusChange }) {
   const [keys, setKeys] = useState([]);
   const [newProvider, setNewProvider] = useState('');
   const [newKeyValue, setNewKeyValue] = useState('');
@@ -826,8 +829,9 @@ function ApiKeysTab() {
       setNewKeyValue('');
       setNewLabel('');
       loadKeys();
+      onSetupStatusChange?.();
     });
-  }, [newProvider, newKeyValue, newLabel, addTask, loadKeys]);
+  }, [newProvider, newKeyValue, newLabel, addTask, loadKeys, onSetupStatusChange]);
 
   const handleToggleKey = useCallback((id, enabled) => {
     toggleTask.run(async () => {
@@ -850,9 +854,10 @@ function ApiKeysTab() {
         await api.apiKeys.delete(key.id);
         toast.success('API key deleted');
         loadKeys();
+        onSetupStatusChange?.();
       });
     },
-    [confirm, deleteTask, loadKeys]
+    [confirm, deleteTask, loadKeys, onSetupStatusChange]
   );
 
   function maskKey(key) {
@@ -1377,7 +1382,7 @@ function AutomationDiagnosticsTab() {
 
 // ─── Main SettingsView ───────────────────────────────────────────────────
 
-export default function SettingsView({ onBack }) {
+export default function SettingsView({ onBack, onSetupStatusChange }) {
   return (
     <div className="space-y-6">
       {/* Page header with back button */}
@@ -1426,7 +1431,7 @@ export default function SettingsView({ onBack }) {
         </TabsList>
 
         <TabsContent value="tags-trends" className="mt-6">
-          <TagsAndTrendsTab />
+          <TagsAndTrendsTab onSetupStatusChange={onSetupStatusChange} />
         </TabsContent>
 
         <TabsContent value="shop-pipeline" className="mt-6">
@@ -1434,7 +1439,7 @@ export default function SettingsView({ onBack }) {
         </TabsContent>
 
         <TabsContent value="api-keys" className="mt-6">
-          <ApiKeysTab />
+          <ApiKeysTab onSetupStatusChange={onSetupStatusChange} />
         </TabsContent>
 
         <TabsContent value="automation" className="mt-6">
