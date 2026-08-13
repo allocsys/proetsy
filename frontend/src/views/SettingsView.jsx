@@ -519,11 +519,14 @@ function ShopDefaultsSection({ settings, onSettingsChange }) {
 }
 
 function PipelineModulesSection({ pipelineConfig, onToggleModule }) {
+  // Keys must match the module names in backend/config/pipeline.config.json
+  // (image_analyzer, listing_generator, mockup_composer), not display-friendly
+  // slugs -- mod.module from GET /api/config/pipeline is looked up directly
+  // against this object below. See docs/known-issues/frontend-rebuild-logic-review-2026-08-12.md #7.
   const MODULE_LABELS = {
-    'image-analyzer': { name: 'Image Analyzer', desc: 'Analyzes artwork for colors, style, and composition' },
-    'listing-generator': { name: 'Listing Generator', desc: 'Creates Etsy-optimized titles, descriptions, and tags' },
-    'mockup-generator': { name: 'Mockup Generator', desc: 'Generates product mockups using PSD templates' },
-    'taste-filter': { name: 'Taste Filter', desc: 'Ranks results against your shop style profile' },
+    image_analyzer: { name: 'Image Analyzer', desc: 'Analyzes artwork for colors, style, and composition' },
+    listing_generator: { name: 'Listing Generator', desc: 'Creates Etsy-optimized titles, descriptions, and tags' },
+    mockup_composer: { name: 'Mockup Composer', desc: 'Generates product mockups using PSD templates' },
   };
 
   if (!pipelineConfig || !pipelineConfig.pipeline) {
