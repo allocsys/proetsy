@@ -58,11 +58,6 @@ function runDefensiveMigrations(db) {
     // Mockup categories (plan.md -> "Mockup categories") -- tags a product_sizes row as
     // "bedroom," "hallway," "mug," etc. See schema.sql's category comment.
     'ALTER TABLE product_sizes ADD COLUMN category TEXT',
-    // One row per image -- see the dedup cleanup run just above this array (this index
-    // enforces the fix for a prior bug where relabeling could insert a duplicate,
-    // contradictory row instead of updating the existing one). IF NOT EXISTS makes this
-    // idempotent across repeated startups the same way idx_jobs_batch_id above already is.
-    'CREATE UNIQUE INDEX IF NOT EXISTS idx_image_preferences_image_path ON image_preferences(image_path)',
   ];
 
   for (const sql of migrations) {
@@ -73,7 +68,7 @@ function runDefensiveMigrations(db) {
     }
   }
 
-  // One-time cleanup ahead of the idx_image_preferences_image_path unique index above.
+  // One-time cleanup ahead of the idx_image_preferences_image_path unique index below.
   // A DB created before that index existed may already hold duplicate image_path rows --
   // e.g. a manual Keep/Discard
   // that "corrected" an auto-labeled candidate before this fix, which inserted a second,
@@ -102,4 +97,13 @@ function runDefensiveMigrations(db) {
       WHERE rn = 1
     );
   `);
+
+  // One row per image -- must run AFTER the dedup DELETE above, not as part of the
+  // migrations loop: creating a unique index over data that still has duplicates fails
+  // immediately with "UNIQUE constraint failed", before the DELETE ever gets a chance to
+  // clean them up. This index enforces the fix for a prior bug where relabeling could
+  // insert a duplicate, contradictory row instead of updating the existing one.
+  // IF NOT EXISTS makes this idempotent across repeated startups the same way
+  // idx_jobs_batch_id above already is.
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_image_preferences_image_path ON image_preferences(image_path)');
 }
