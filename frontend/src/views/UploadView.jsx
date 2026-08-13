@@ -117,9 +117,6 @@ export default function UploadView({ onNavigate, onJobsChanged }) {
         formData.append('files', file);
       }
       const uploadResult = await api.artworks.upload(formData);
-      if (uploadResult.error) {
-        throw new Error(uploadResult.error);
-      }
       const artworkIds = uploadResult.artworks.map((a) => a.id);
 
       // Step 2: Create jobs
