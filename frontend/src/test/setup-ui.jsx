@@ -7,7 +7,7 @@ import { vi } from 'vitest';
 // ─── ConfirmContext: provide a mock confirm that auto-resolves ──
 vi.mock('@/contexts/ConfirmContext.jsx', () => ({
   ConfirmProvider: ({ children }) => <>{children}</>,
-  useConfirm: () => async (options) => true,
+  useConfirm: () => async (_options) => true,
 }));
 
 // ─── shadcn/ui component mocks (base-ui is incompatible with jsdom) ──
@@ -37,7 +37,7 @@ vi.mock('@/components/ui/textarea.jsx', () => ({
 vi.mock('@/components/ui/select.jsx', () => {
   const Ctx = React.createContext(() => {});
   return {
-    Select: ({ children, value, onValueChange }) => (
+    Select: ({ children, value: _value, onValueChange }) => (
       <Ctx.Provider value={onValueChange}>{children}</Ctx.Provider>
     ),
     SelectContent: ({ children }) => <div>{children}</div>,
@@ -61,7 +61,7 @@ vi.mock('@/components/ui/badge.jsx', () => ({
 }));
 
 vi.mock('@/components/ui/skeleton.jsx', () => ({
-  Skeleton: (props) => <div data-testid="skeleton" {...props} />,  // eslint-disable-line
+  Skeleton: (props) => <div data-testid="skeleton" {...props} />,
 }));
 
 vi.mock('@/components/ui/separator.jsx', () => ({
@@ -80,7 +80,7 @@ vi.mock('@/components/ui/card.jsx', () => ({
 vi.mock('@/components/ui/tabs.jsx', () => {
   const Ctx = React.createContext(() => {});
   return {
-    Tabs: ({ children, value, onValueChange }) => (
+    Tabs: ({ children, value: _value, onValueChange }) => (
       <Ctx.Provider value={onValueChange}>{children}</Ctx.Provider>
     ),
     TabsList: ({ children, ...props }) => <div role="tablist" {...props}>{children}</div>,
@@ -104,7 +104,7 @@ vi.mock('@/components/ui/scroll-area.jsx', () => ({
 }));
 
 vi.mock('@/components/ui/dialog.jsx', () => ({
-  Dialog: ({ children, open, onOpenChange }) => open ? <div role="dialog" data-open>{children}</div> : null,
+  Dialog: ({ children, open, onOpenChange: _onOpenChange }) => open ? <div role="dialog" data-open>{children}</div> : null,
   DialogContent: ({ children, ...props }) => <div {...props}>{children}</div>,
   DialogHeader: ({ children, ...props }) => <div {...props}>{children}</div>,
   DialogTitle: ({ children, ...props }) => <h2 {...props}>{children}</h2>,
@@ -113,7 +113,7 @@ vi.mock('@/components/ui/dialog.jsx', () => ({
 }));
 
 vi.mock('@/components/ui/sheet.jsx', () => ({
-  Sheet: ({ children, open, onOpenChange }) => open ? <div>{children}</div> : null,
+  Sheet: ({ children, open, onOpenChange: _onOpenChange }) => open ? <div>{children}</div> : null,
   SheetContent: ({ children, ...props }) => <div {...props}>{children}</div>,
   SheetHeader: ({ children, ...props }) => <div {...props}>{children}</div>,
   SheetTitle: ({ children, ...props }) => <h2 {...props}>{children}</h2>,
