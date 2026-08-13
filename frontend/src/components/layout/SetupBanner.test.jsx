@@ -15,9 +15,12 @@ const READY = {
 };
 
 describe('SetupBanner', () => {
-  it('renders nothing when setupStatus is null (not yet loaded)', () => {
-    const { container } = render(<SetupBanner setupStatus={null} />);
-    expect(container).toBeEmptyDOMElement();
+  it('treats a null setupStatus (not yet loaded) as incomplete', () => {
+    // isSetupIncomplete() explicitly returns true for a falsy setupStatus --
+    // an unknown state is treated as "show the banner", not hidden.
+    render(<SetupBanner setupStatus={null} />);
+    expect(screen.getByText('Setup Incomplete')).toBeInTheDocument();
+    expect(screen.getAllByText('Action Required')).toHaveLength(3);
   });
 
   it('renders nothing once every real backend field is true', () => {
@@ -47,7 +50,7 @@ describe('SetupBanner', () => {
       />
     );
 
-    expect(screen.getByText('1 item needs action')).toBeInTheDocument();
+    expect(screen.getByText('1 item need action')).toBeInTheDocument();
     expect(screen.getAllByText('Ready')).toHaveLength(2);
     expect(screen.getAllByText('Action Required')).toHaveLength(1);
   });
