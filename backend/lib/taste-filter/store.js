@@ -48,8 +48,7 @@ function blobToVector(blob) {
  * @param {'keep' | 'discard'} params.label
  * @param {string | null} [params.category] - Module 7's own freeform curation grouping
  *   (e.g. "square-canvas", "bedroom") — a distinct concept from Module 4's `orientation`
- *   (portrait/landscape/square); see docs/known-issues/category-vs-orientation-naming.md.
- *   Stored in the `image_preferences.category` DB column.
+ *   (portrait/landscape/square). Stored in the `image_preferences.category` DB column.
  * @param {number | null} [params.promptId] - links to the `prompts` row that generated this candidate, if any
  * @param {boolean} [params.autoLabeled] - true when this row was written by the auto-compute
  *   decision rule (plan.md Part 2) rather than a manual Keep/Discard click. Defaults to
