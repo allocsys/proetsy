@@ -108,7 +108,7 @@ jobs:
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: proetsy-${{ github.ref_name }}.tar.gz
           generate_release_notes: true
@@ -176,7 +176,7 @@ jobs:
 
       - name: Upload packaged app for inspection
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: electron-package-debug
           path: release-builds/
@@ -189,7 +189,7 @@ jobs:
       # hardcoding a version string here.
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           # latest.yml is the update-feed manifest electron-updater's GitHub provider
           # polls to detect new versions -- it must be attached alongside the
