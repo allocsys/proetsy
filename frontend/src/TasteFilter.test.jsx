@@ -65,8 +65,11 @@ function makeFile(name = 'candidate.png') {
 const MOUNT_TIME_CALLS = 2;
 
 describe('TasteFilter', () => {
-  it('renders the empty state with no candidates', () => {
+  it('renders the empty state with no candidates', async () => {
     render(<TasteFilter />);
+    // Flush the mount-time centroids/prompts fetches (see beforeEach) before asserting,
+    // so their state updates don't land outside act() after this test has returned.
+    await act(async () => {});
     expect(screen.getByText('No candidates yet.')).toBeInTheDocument();
     expect(screen.getByText('Drag & drop candidate images here')).toBeInTheDocument();
     expect(screen.queryByText('Keep')).not.toBeInTheDocument();
@@ -325,8 +328,9 @@ describe('TasteFilter — watched-folder auto-import via SSE (Module 7 -> "Auto-
   // global.EventSource and sourceInstances come from the shared outer beforeEach above --
   // every test mounts TasteFilter, which always opens this connection, not just this block.
 
-  it('opens a stream connection to /api/taste-filter/pending/stream on mount', () => {
+  it('opens a stream connection to /api/taste-filter/pending/stream on mount', async () => {
     render(<TasteFilter />);
+    await act(async () => {});
     const urls = sourceInstances.map((s) => s.url);
     expect(urls).toContain('/api/taste-filter/pending/stream');
   });
@@ -362,6 +366,7 @@ describe('TasteFilter — watched-folder auto-import via SSE (Module 7 -> "Auto-
 
   it('ignores a malformed message instead of throwing', async () => {
     render(<TasteFilter />);
+    await act(async () => {});
     const [source] = sourceInstances;
 
     expect(() => {
@@ -397,14 +402,16 @@ describe('TasteFilter — CLIP model download progress bar', () => {
     expect(source.closed).toBe(true);
   });
 
-  it('renders nothing before the stream delivers a first message', () => {
+  it('renders nothing before the stream delivers a first message', async () => {
     render(<TasteFilter />);
+    await act(async () => {});
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
   });
 
   it('renders nothing once status is ready', async () => {
     render(<TasteFilter />);
+    await act(async () => {});
     act(() => {
       modelStatusSource().onmessage({
         data: JSON.stringify({ status: 'ready', bytesDownloaded: 0, totalBytes: null, error: null }),

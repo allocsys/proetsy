@@ -54,7 +54,7 @@ function TemplatePreview({ url, alt }) {
   );
 }
 
-function ConfiguredTemplateCard({ row, categoryOptions, onSave, onRemove }) {
+function ConfiguredTemplateCard({ row, onSave, onRemove }) {
   const [edits, setEdits] = useState({});
   const isPsd = row.mockup_template_path?.toLowerCase().endsWith('.psd');
 
@@ -510,7 +510,6 @@ export default function MockupTemplates() {
                 <ConfiguredTemplateCard
                   key={`${row.size_key}-${configuredKey}`}
                   row={row}
-                  categoryOptions={categoryOptions}
                   onSave={handleConfiguredSave}
                   onRemove={handleConfiguredRemove}
                 />

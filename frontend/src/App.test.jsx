@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 // ─── Mock layout components to avoid base-ui issues and duplicate elements ──
 vi.mock('@/components/layout/MobileNav.jsx', () => ({ default: () => null }));
 vi.mock('@/components/layout/Header.jsx', () => ({
-  default: ({ health, onSettingsToggle, isInSettings }) => (
+  default: ({ health, onSettingsToggle, isInSettings: _isInSettings }) => (
     <header>
       <span>ProEtsy</span>
       {health?.status === 'ok' && <span>Backend OK</span>}
@@ -115,7 +115,7 @@ describe('AppShell', () => {
     mockFetchByUrl();
     render(<App />);
 
-    expect(screen.getByText('ProEtsy')).toBeInTheDocument();
+    expect(await screen.findByText('ProEtsy')).toBeInTheDocument();
   });
 
   it('shows Backend OK when health is ok', async () => {

@@ -90,7 +90,6 @@ async function cascade(callFn, options = {}) {
       }
       try {
         // 2 + 3. Queue slot (spacing/jitter/concurrency), then the actual call.
-        // eslint-disable-next-line no-await-in-loop
         const result = await withRequestSlot(keyIndex, () => callFn(key, model));
         madeALiveAttempt = true;
         recordSuccess(keyIndex, model);

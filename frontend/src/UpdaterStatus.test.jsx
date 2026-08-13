@@ -7,7 +7,7 @@ import UpdaterStatus from './UpdaterStatus.jsx';
 // which resolves differently when imported from UpdaterStatus.test.jsx.
 // Mock it here to be safe.
 vi.mock('./components/layout/StatusBadge.jsx', () => ({
-  default: ({ status, children }) => <span data-testid="status-badge">{children}</span>,
+  default: ({ status: _status, children }) => <span data-testid="status-badge">{children}</span>,
 }));
 
 function makeUpdaterAPI(overrides = {}) {
