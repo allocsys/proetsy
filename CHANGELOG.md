@@ -1,5 +1,19 @@
 ## [Unreleased]
 
+## [0.11.0] - 2026-08-13
+### Added
+- Proper dropdown selects (Category and Prompt ID) in Taste Filter, replacing free-text/hardcoded fields.
+
+### Changed
+- Frontend rebuilt on Tailwind CSS 4 + shadcn/ui.
+- Renamed `mj_aspectRatioByCategory` settings key to `mj_aspectRatioByOrientation`.
+
+### Fixed
+- Taste Filter's Prompt ID dropdown no longer hardcoded to orientation='portrait'; `api.prompts.list()` can fetch across all orientations.
+- Tag Library list now reads the correct `/api/tags` response shape.
+- Taste-filter import request now times out instead of leaving the dropzone skeleton stuck indefinitely.
+- Numerous stale test/selector and lint fixes following the frontend rebuild.
+
 ## [0.9.0] - 2026-08-10
 ### Added
 - Dashboard-editable Shop Conventions: shop and Midjourney conventions now live in the DB and are editable from Settings instead of being hardcoded.
