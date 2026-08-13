@@ -29,7 +29,7 @@ function formatMB(bytes) {
   return (bytes / (1024 * 1024)).toFixed(0);
 }
 
-function ScoreBadge({ label, score, confident, prefix }) {
+function ScoreBadge({ label, score, confident, prefix: _prefix }) {
   if (score === null || score === undefined) return null;
   return (
     <span
