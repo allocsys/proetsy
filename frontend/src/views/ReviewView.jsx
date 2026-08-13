@@ -152,14 +152,14 @@ function AnalysisGrid({ analysis }) {
   return (
     <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-[auto_1fr]">
       {ANALYSIS_FIELDS.map(({ key, label, isArray }) => (
-        <>
+        <React.Fragment key={key}>
           <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             {label}
           </dt>
           <dd className="text-sm text-foreground">
             {isArray ? listOrDash(analysis[key]) : (analysis[key] || '—')}
           </dd>
-        </>
+        </React.Fragment>
       ))}
     </div>
   );
