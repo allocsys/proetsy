@@ -969,7 +969,7 @@ function ApiKeysTab({ onSetupStatusChange }) {
                     <TableCell className="font-medium">{key.provider}</TableCell>
                     <TableCell>{key.label || '—'}</TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">
-                      {maskKey(key.key_masked || key.key)}
+                      {maskKey(key.maskedKey)}
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -1240,28 +1240,36 @@ function RateLimitsSection() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Provider</TableHead>
+                <TableHead>Key</TableHead>
                 <TableHead>Model</TableHead>
-                <TableHead>Requests Remaining</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Reset In</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {limits.map((limit, i) => (
                 <TableRow key={i}>
-                  <TableCell className="font-medium">{limit.provider || '—'}</TableCell>
+                  <TableCell className="font-medium">
+                    {limit.keyIndex !== undefined ? `Key ${limit.keyIndex}` : '—'}
+                  </TableCell>
                   <TableCell className="font-mono text-xs">{limit.model || '—'}</TableCell>
                   <TableCell>
-                    <span className={cn(
-                      'tabular-nums',
-                      (limit.remaining ?? 0) < 20 && 'font-medium text-amber-400',
-                      (limit.remaining ?? 0) < 5 && 'text-destructive'
-                    )}>
-                      {limit.remaining ?? '—'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={limit.currentlyLimited ? 'destructive' : 'default'}
+                        className="text-[10px]"
+                      >
+                        {limit.currentlyLimited ? 'Limited' : 'OK'}
+                      </Badge>
+                      {limit.consecutiveHits > 0 && (
+                        <span className="text-xs text-muted-foreground">
+                          {limit.consecutiveHits} hit{limit.consecutiveHits === 1 ? '' : 's'}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {formatResetTime(limit.reset_at)}
+                    {limit.currentlyLimited ? formatResetTime(limit.limitedUntil) : '—'}
                   </TableCell>
                 </TableRow>
               ))}
