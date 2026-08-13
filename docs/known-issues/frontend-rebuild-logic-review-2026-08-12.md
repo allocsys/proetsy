@@ -5,9 +5,9 @@
 **Date:** 2026-08-12
 **Context:** This branch is a full frontend visual rewrite (Tailwind + Shadcn), done independently of the parallel rewrite on `main`. This review compares the two branches to separate intentional style/markup changes from actual logic/functional regressions introduced during the rewrite.
 
-All issues below were found during review and have since been fixed on this branch. No open issues remain as of this writing.
+Issues #1-6 below were found during the original review and were fixed at the time. A follow-up review on 2026-08-13 independently re-verified each of them directly against current source and confirmed all six are still genuinely fixed — but it also found one new open issue (#7) that this document had not previously caught. Treat "no open issues" claims in a doc like this as a thing to re-verify, not take on trust, including this one.
 
-**Verification:** each item below was independently re-checked directly against source on `feat/frontend-rebuild-tailwind-shadcn` (not taken on the reviewing agent's word alone) — reading the actual frontend call site and the actual backend route/schema/config it talks to, and confirming both sides now agree.
+**Verification:** issues #1-6 were independently re-checked directly against current source on `main` (not taken on the original reviewing agent's word alone) — reading the actual frontend call site and the actual backend route/schema/config it talks to, and confirming both sides still agree as of 2026-08-13.
 
 ---
 
@@ -45,6 +45,15 @@ All issues below were found during review and have since been fixed on this bran
 
 ---
 
+### 7. Pipeline module labels never match their config keys (OPEN)
+- **File:** `frontend/src/views/UploadView.jsx`
+- **Problem:** `MODULE_LABELS` is keyed with hyphenated, partly-wrong names: `'image-analyzer'`, `'listing-generator'`, `'mockup-generator'`, `'taste-filter'`. The actual pipeline module names, per `backend/config/pipeline.config.json`, are underscored and one doesn't match in wording at all: `image_analyzer`, `listing_generator`, `mockup_composer` (not "mockup-generator"). `taste-filter` isn't a pipeline module in that config at all, so that entry is dead.
+- **Effect:** `MODULE_LABELS[mod.module]` never matches any real module, so every toggle in the Pipeline Configuration section on the Upload screen falls back to the generic `{ name: mod.module, description: 'Pipeline module' }` — users see raw internal strings like `image_analyzer` instead of "Image Analyzer / Analyzes artwork for colors, style, and composition." Not data-corrupting, but a real, currently-shipping display bug on a user-facing screen.
+- **Suggested fix:** rekey `MODULE_LABELS` to `image_analyzer`, `listing_generator`, `mockup_composer`; drop the unused `taste-filter` entry.
+- **Status:** Open as of 2026-08-13.
+
+---
+
 ## Summary
 
 | # | Issue | Status |
@@ -55,5 +64,6 @@ All issues below were found during review and have since been fixed on this bran
 | 4 | Missing DELETE routes (tags/trends) | Fixed |
 | 5 | Mockup composer tries untemplated sizes | Fixed |
 | 6 | Job-by-id fetch missing `artwork_file_path` | Fixed |
+| 7 | Module label keys don't match pipeline config | **Open** |
 
-No logic/functional issues remain open on this branch. Remaining differences vs. `main` are the intended visual redesign (Tailwind CSS + Shadcn UI) and are not a correctness concern.
+Issues #1-6 remain fixed as of the 2026-08-13 follow-up review. Issue #7 is a newly-identified open item — see above for details and suggested fix. Remaining differences vs. the pre-rewrite frontend are the intended visual redesign (Tailwind CSS + Shadcn UI) and are not a correctness concern.
