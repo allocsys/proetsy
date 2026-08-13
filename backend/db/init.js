@@ -58,23 +58,31 @@ function runDefensiveMigrations(db) {
     // Mockup categories (plan.md -> "Mockup categories") -- tags a product_sizes row as
     // "bedroom," "hallway," "mug," etc. See schema.sql's category comment.
     'ALTER TABLE product_sizes ADD COLUMN category TEXT',
-    // One row per image -- see the dedup cleanup run just above this array (this index
-    // enforces the fix for a prior bug where relabeling could insert a duplicate,
-    // contradictory row instead of updating the existing one). IF NOT EXISTS makes this
-    // idempotent across repeated startups the same way idx_jobs_batch_id above already is.
-    'CREATE UNIQUE INDEX IF NOT EXISTS idx_image_preferences_image_path ON image_preferences(image_path)',
   ];
+
+  for (const sql of migrations) {
+    try {
+      db.exec(sql);
+    } catch (err) {
+      if (!/duplicate column/i.test(err.message)) throw err;
+    }
+  }
 
   // One-time cleanup ahead of the idx_image_preferences_image_path unique index below.
   // A DB created before that index existed may already hold duplicate image_path rows --
   // e.g. a manual Keep/Discard
   // that "corrected" an auto-labeled candidate before this fix, which inserted a second,
-  // contradictory row instead of updating the first. Creating the unique index below
+  // contradictory row instead of updating the first. Creating the unique index above
   // would fail against any such DB, so duplicates must be resolved first. For each
   // image_path with more than one row, keep exactly one: prefer a manually-labeled row
   // (auto_labeled = 0) over an auto-labeled one, then the most recently created, then
   // the highest id as a final tiebreak; delete the rest. A no-op (0 rows affected) on a
   // DB that's never had a duplicate, so safe to run on every startup.
+  //
+  // This must run AFTER the migrations loop above, not before: the ORDER BY references
+  // auto_labeled, which on a pre-existing DB only exists once its ALTER TABLE (in the
+  // loop above) has run. Running the DELETE first throws "no such column: auto_labeled"
+  // on any such DB, which is unhandled and crashes the backend on startup.
   db.exec(`
     DELETE FROM image_preferences
     WHERE id NOT IN (
@@ -89,11 +97,13 @@ function runDefensiveMigrations(db) {
       WHERE rn = 1
     );
   `);
-  for (const sql of migrations) {
-    try {
-      db.exec(sql);
-    } catch (err) {
-      if (!/duplicate column/i.test(err.message)) throw err;
-    }
-  }
+
+  // One row per image -- must run AFTER the dedup DELETE above, not as part of the
+  // migrations loop: creating a unique index over data that still has duplicates fails
+  // immediately with "UNIQUE constraint failed", before the DELETE ever gets a chance to
+  // clean them up. This index enforces the fix for a prior bug where relabeling could
+  // insert a duplicate, contradictory row instead of updating the existing one.
+  // IF NOT EXISTS makes this idempotent across repeated startups the same way
+  // idx_jobs_batch_id above already is.
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_image_preferences_image_path ON image_preferences(image_path)');
 }
