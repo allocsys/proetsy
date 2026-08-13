@@ -37,6 +37,14 @@ function AppShell() {
     api.jobs.list().then(setJobs).catch(() => setJobs([]));
   }, []);
 
+  // Re-fetches setup status so SetupBanner reflects changes made in Settings
+  // (API key added, tags saved) or Mockup Templates (product size configured)
+  // without requiring a full page reload. Exposed the same way refreshJobs is,
+  // since nothing else notifies AppShell when those views mutate their data.
+  const refreshSetupStatus = useCallback(() => {
+    api.setupStatus().then(setSetupStatus).catch(() => {});
+  }, []);
+
   // Keep + Pipeline (Taste Filter) needs pipeline_overrides in `{ module: enabled }`
   // shape (see backend/lib/jobs.js createJob) -- derived from the fetched pipeline
   // defaults since this flow has no per-session toggle UI of its own to source from.
@@ -110,12 +118,12 @@ function AppShell() {
   const viewComponent = (() => {
     switch (activeView) {
       case 'upload': return UploadView && <UploadView onNavigate={handleNavigate} onJobsChanged={refreshJobs} />;
-      case 'mockup-templates': return MockupTemplates && <MockupTemplates />;
+      case 'mockup-templates': return MockupTemplates && <MockupTemplates onSetupStatusChange={refreshSetupStatus} />;
       case 'history': return HistoryView && <HistoryView onOpenJob={handleOpenJob} />;
       case 'review': return ReviewView && <ReviewView jobId={selectedJobId} />;
       case 'prompt-helper': return PromptHelper && <PromptHelper />;
       case 'taste-filter': return TasteFilter && <TasteFilter overrides={tasteFilterOverrides} refreshJobs={refreshJobs} />;
-      case 'settings': return SettingsView && <SettingsView onBack={() => setActiveView(previousView)} />;
+      case 'settings': return SettingsView && <SettingsView onBack={() => setActiveView(previousView)} onSetupStatusChange={refreshSetupStatus} />;
       default: return null;
     }
   })();
