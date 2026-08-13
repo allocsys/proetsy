@@ -6,6 +6,13 @@ export function friendlyErrorMessage(err) {
 }
 
 export async function parseJsonResponse(res) {
+  // DELETE routes in this app return 204 with an empty body on success (see
+  // backend/server.js's res.status(204).end() calls) -- res.json() would throw a
+  // SyntaxError on that empty body, so short-circuit before attempting to parse.
+  if (res.status === 204) {
+    if (!res.ok) throw new Error(`Request failed (HTTP ${res.status})`);
+    return null;
+  }
   let data;
   try {
     data = await res.json();
