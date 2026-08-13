@@ -47,6 +47,7 @@
 ## [0.1.0] - 2026-08-02
 - Initial release.
 
-[Unreleased]: https://github.com/allocsys/proetsy/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/allocsys/proetsy/compare/v0.11.1...HEAD
+[0.11.1]: https://github.com/allocsys/proetsy/compare/v0.11.0...v0.11.1
 [0.9.0]: https://github.com/allocsys/proetsy/compare/v0.1.0...v0.9.0
 [0.1.0]: https://github.com/allocsys/proetsy/releases/tag/v0.1.0
