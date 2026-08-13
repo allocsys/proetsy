@@ -1,21 +1,25 @@
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// Field names here must match GET /api/setup-status's actual response shape
+// (backend/server.js) -- geminiKeyConfigured / hasTagLibrary / hasProductSize,
+// not display-friendly guesses. See server.core-routes.test.js for the
+// authoritative shape.
 const checks = [
   {
     key: 'geminiApiKey',
     label: 'Gemini API Key',
-    ready: (s) => !!s?.geminiApiKey,
+    ready: (s) => !!s?.geminiKeyConfigured,
   },
   {
     key: 'tagLibrary',
     label: 'Tag Library',
-    ready: (s) => !!s?.tagLibraryReady,
+    ready: (s) => !!s?.hasTagLibrary,
   },
   {
     key: 'productSizes',
     label: 'Product Sizes',
-    ready: (s) => !!s?.productSizesReady,
+    ready: (s) => !!s?.hasProductSize,
   },
 ];
 
