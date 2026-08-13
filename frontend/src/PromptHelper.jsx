@@ -156,7 +156,6 @@ export default function PromptHelper() {
         trend_id: selectedTrendId ? Number(selectedTrendId) : null,
         orientation,
       });
-      if (data.error) throw new Error(data.error);
       setGenerated(data.prompts || []);
       toast.success(`Generated ${(data.prompts || []).length} prompt${(data.prompts || []).length === 1 ? '' : 's'}`);
       await loadHistory(orientation);
