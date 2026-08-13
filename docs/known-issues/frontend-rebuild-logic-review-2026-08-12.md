@@ -45,12 +45,12 @@ Issues #1-6 below were found during the original review and were fixed at the ti
 
 ---
 
-### 7. Pipeline module labels never match their config keys (OPEN)
+### 7. Pipeline module labels never match their config keys
 - **File:** `frontend/src/views/UploadView.jsx`
-- **Problem:** `MODULE_LABELS` is keyed with hyphenated, partly-wrong names: `'image-analyzer'`, `'listing-generator'`, `'mockup-generator'`, `'taste-filter'`. The actual pipeline module names, per `backend/config/pipeline.config.json`, are underscored and one doesn't match in wording at all: `image_analyzer`, `listing_generator`, `mockup_composer` (not "mockup-generator"). `taste-filter` isn't a pipeline module in that config at all, so that entry is dead.
-- **Effect:** `MODULE_LABELS[mod.module]` never matches any real module, so every toggle in the Pipeline Configuration section on the Upload screen falls back to the generic `{ name: mod.module, description: 'Pipeline module' }` — users see raw internal strings like `image_analyzer` instead of "Image Analyzer / Analyzes artwork for colors, style, and composition." Not data-corrupting, but a real, currently-shipping display bug on a user-facing screen.
-- **Suggested fix:** rekey `MODULE_LABELS` to `image_analyzer`, `listing_generator`, `mockup_composer`; drop the unused `taste-filter` entry.
-- **Status:** Open as of 2026-08-13.
+- **Problem:** `MODULE_LABELS` was keyed with hyphenated, partly-wrong names: `'image-analyzer'`, `'listing-generator'`, `'mockup-generator'`, `'taste-filter'`. The actual pipeline module names, per `backend/config/pipeline.config.json`, are underscored and one didn't match in wording at all: `image_analyzer`, `listing_generator`, `mockup_composer` (not "mockup-generator"). `taste-filter` isn't a pipeline module in that config at all, so that entry was dead.
+- **Effect:** `MODULE_LABELS[mod.module]` never matched any real module, so every toggle in the Pipeline Configuration section on the Upload screen fell back to the generic `{ name: mod.module, description: 'Pipeline module' }` — users saw raw internal strings like `image_analyzer` instead of "Image Analyzer / Analyzes artwork for colors, style, and composition."
+- **Fix:** `MODULE_LABELS` rekeyed to `image_analyzer`, `listing_generator`, `mockup_composer`; unused `taste-filter` entry dropped (commit `b64ace4`). While in the same file, also fixed the loading-skeleton row count (`[...Array(4)]` → `[...Array(3)]`) to match the actual 3 pipeline modules (commit `63e1cbc`).
+- **Status:** Fixed 2026-08-13.
 
 ---
 
