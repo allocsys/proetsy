@@ -64,6 +64,6 @@ Issues #1-6 below were found during the original review and were fixed at the ti
 | 4 | Missing DELETE routes (tags/trends) | Fixed |
 | 5 | Mockup composer tries untemplated sizes | Fixed |
 | 6 | Job-by-id fetch missing `artwork_file_path` | Fixed |
-| 7 | Module label keys don't match pipeline config | **Open** |
+| 7 | Module label keys don't match pipeline config | Fixed |
 
-Issues #1-6 remain fixed as of the 2026-08-13 follow-up review. Issue #7 is a newly-identified open item — see above for details and suggested fix. Remaining differences vs. the pre-rewrite frontend are the intended visual redesign (Tailwind CSS + Shadcn UI) and are not a correctness concern.
+No logic/functional issues remain open as of 2026-08-13. Issue #7 was found by the 2026-08-13 follow-up review and fixed the same day. Remaining differences vs. the pre-rewrite frontend are the intended visual redesign (Tailwind CSS + Shadcn UI) and are not a correctness concern.
