@@ -115,7 +115,7 @@ describe('AppShell', () => {
     mockFetchByUrl();
     render(<App />);
 
-    expect(screen.getByText('ProEtsy')).toBeInTheDocument();
+    expect(await screen.findByText('ProEtsy')).toBeInTheDocument();
   });
 
   it('shows Backend OK when health is ok', async () => {
