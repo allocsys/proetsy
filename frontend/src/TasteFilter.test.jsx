@@ -88,12 +88,22 @@ describe('TasteFilter', () => {
   });
 
   it('sends the category and prompt ID fields along with an import', async () => {
-    fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ candidates: [] }) });
+    // Override the mount-time centroids/prompts calls queued in beforeEach: the prompt
+    // Select is disabled when promptOptions is empty, so this test needs a real option
+    // to select rather than the default empty /api/prompts response.
+    fetch.mockReset();
+    fetch.mockResolvedValueOnce({ ok: true, json: async () => [] }); // /api/taste-filter/centroids
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [{ id: 17, orientation: null, prompt_text: 'Test prompt text' }],
+    }); // /api/prompts
+    fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ candidates: [] }) }); // import
+
     const user = userEvent.setup();
     render(<TasteFilter />);
 
     await user.type(screen.getByPlaceholderText('e.g. square-canvas'), 'square-canvas');
-    await user.type(screen.getByPlaceholderText('Links to Module 4'), '17');
+    await user.click(await screen.findByText('Test prompt text'));
 
     const input = document.querySelector('input[type="file"]');
     await user.upload(input, makeFile());
