@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+## [0.11.4] - 2026-08-17
+### Fixed
+- `generateMockupForJob()` no longer leaves an orphaned mockup file on disk if the `product_sizes`/`mockups` DB upsert fails after the file was already written -- the file(s) are now deleted before the error is re-thrown (#85).
+- `SetupBanner` no longer disagrees with the backend on when setup is complete: "Setup Incomplete" now follows `/api/setup-status`'s own `readyToRun` flag (`geminiKeyConfigured && hasTagLibrary`) instead of independently requiring Product Sizes too, which the backend has never required to run (#85).
+
 ## [0.11.1] - 2026-08-13
 ### Fixed
 - Startup-crashing DB migration ordering bug: the `image_preferences` dedup DELETE now runs after its `ALTER TABLE` migration and before the `idx_image_preferences_image_path` unique index is created (#76).
