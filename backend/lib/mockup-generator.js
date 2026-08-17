@@ -456,54 +456,75 @@ export async function generateMockupForJob(jobId, sizeKey) {
 
   const { outputPath, aiExtendedPath, warnings } = await composeMockup(artwork.file_path, sizeKey);
 
-  const productSizesConfig = getProductSizes();
-  const sizeEntry = productSizesConfig[sizeKey];
+  // From here on, two files may already be sitting on disk (outputPath, and
+  // aiExtendedPath if an outpaint fallback ran). If any DB write below throws, remove
+  // whatever we just wrote rather than leaving an orphaned file with no `mockups` row
+  // pointing at it -- see debug notes on this function's file-then-DB write ordering.
+  // This only guards a JS-level error during the upsert (bad data, constraint violation,
+  // etc.); it can't protect against the process being killed mid-write, which is a much
+  // rarer, lower-stakes failure (a stray file, not a corrupt DB row) not worth the extra
+  // complexity of a two-phase write to fully close.
+  try {
+    const productSizesConfig = getProductSizes();
+    const sizeEntry = productSizesConfig[sizeKey];
 
-  const upsertProductSize = db.prepare(`
-    INSERT INTO product_sizes (size_key, dimensions, dpi, orientation, mockup_template_path, placement_layer)
-    VALUES (@size_key, @dimensions, @dpi, @orientation, @mockup_template_path, @placement_layer)
-    ON CONFLICT(size_key) DO UPDATE SET
-      dimensions = excluded.dimensions,
-      dpi = excluded.dpi,
-      orientation = excluded.orientation,
-      mockup_template_path = excluded.mockup_template_path,
-      placement_layer = excluded.placement_layer
-  `);
-  upsertProductSize.run({
-    size_key: sizeKey,
-    dimensions: sizeEntry.dimensions || null,
-    dpi: sizeEntry.dpi || null,
-    orientation: sizeEntry.orientation || null,
-    mockup_template_path: sizeEntry.mockup_template,
-    // Nullable — only meaningful for .psd templates, see ARCHITECTURE.md -> Module 3 ->
-    // "Template formats". Left null for flat PNG/JPEG templates.
-    placement_layer: sizeEntry.placement_layer || null,
-  });
+    const upsertProductSize = db.prepare(`
+      INSERT INTO product_sizes (size_key, dimensions, dpi, orientation, mockup_template_path, placement_layer)
+      VALUES (@size_key, @dimensions, @dpi, @orientation, @mockup_template_path, @placement_layer)
+      ON CONFLICT(size_key) DO UPDATE SET
+        dimensions = excluded.dimensions,
+        dpi = excluded.dpi,
+        orientation = excluded.orientation,
+        mockup_template_path = excluded.mockup_template_path,
+        placement_layer = excluded.placement_layer
+    `);
+    upsertProductSize.run({
+      size_key: sizeKey,
+      dimensions: sizeEntry.dimensions || null,
+      dpi: sizeEntry.dpi || null,
+      orientation: sizeEntry.orientation || null,
+      mockup_template_path: sizeEntry.mockup_template,
+      // Nullable — only meaningful for .psd templates, see ARCHITECTURE.md -> Module 3 ->
+      // "Template formats". Left null for flat PNG/JPEG templates.
+      placement_layer: sizeEntry.placement_layer || null,
+    });
 
-  const productSizeRow = db.prepare('SELECT id FROM product_sizes WHERE size_key = ?').get(sizeKey);
+    const productSizeRow = db.prepare('SELECT id FROM product_sizes WHERE size_key = ?').get(sizeKey);
 
-  const upsertMockup = db.prepare(`
-    INSERT INTO mockups (job_id, product_size_id, file_path, status, ai_extended_path, smart_crop_path, needs_review, selected_variant)
-    VALUES (@job_id, @product_size_id, @file_path, 'success', @ai_extended_path, @smart_crop_path, @needs_review, 'smart_crop')
-    ON CONFLICT(job_id, product_size_id) DO UPDATE SET
-      file_path = excluded.file_path,
-      status = excluded.status,
-      ai_extended_path = excluded.ai_extended_path,
-      smart_crop_path = excluded.smart_crop_path,
-      needs_review = excluded.needs_review,
-      selected_variant = 'smart_crop'
-  `);
-  upsertMockup.run({
-    job_id: jobId,
-    product_size_id: productSizeRow.id,
-    file_path: outputPath,
-    ai_extended_path: aiExtendedPath,
-    // Same value as file_path at generation time (both point at the smart-crop output) —
-    // stored separately so it survives file_path later being synced to ai_extended_path
-    // by the PATCH variant route. See schema.sql for the full rationale.
-    smart_crop_path: outputPath,
-    needs_review: aiExtendedPath ? 1 : 0,
-  });
+    const upsertMockup = db.prepare(`
+      INSERT INTO mockups (job_id, product_size_id, file_path, status, ai_extended_path, smart_crop_path, needs_review, selected_variant)
+      VALUES (@job_id, @product_size_id, @file_path, 'success', @ai_extended_path, @smart_crop_path, @needs_review, 'smart_crop')
+      ON CONFLICT(job_id, product_size_id) DO UPDATE SET
+        file_path = excluded.file_path,
+        status = excluded.status,
+        ai_extended_path = excluded.ai_extended_path,
+        smart_crop_path = excluded.smart_crop_path,
+        needs_review = excluded.needs_review,
+        selected_variant = 'smart_crop'
+    `);
+    upsertMockup.run({
+      job_id: jobId,
+      product_size_id: productSizeRow.id,
+      file_path: outputPath,
+      ai_extended_path: aiExtendedPath,
+      // Same value as file_path at generation time (both point at the smart-crop output) —
+      // stored separately so it survives file_path later being synced to ai_extended_path
+      // by the PATCH variant route. See schema.sql for the full rationale.
+      smart_crop_path: outputPath,
+      needs_review: aiExtendedPath ? 1 : 0,
+    });
+  } catch (err) {
+    for (const p of [outputPath, aiExtendedPath]) {
+      if (p && fs.existsSync(p)) {
+        try {
+          fs.unlinkSync(p);
+        } catch {
+          // Best-effort cleanup -- if this also fails, don't mask the original DB error.
+        }
+      }
+    }
+    throw err;
+  }
 
   return { outputPath, aiExtendedPath, warnings };
 }

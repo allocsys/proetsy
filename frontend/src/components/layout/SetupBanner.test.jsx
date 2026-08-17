@@ -12,6 +12,7 @@ const READY = {
   geminiKeyConfigured: true,
   hasTagLibrary: true,
   hasProductSize: true,
+  readyToRun: true,
 };
 
 describe('SetupBanner', () => {
@@ -31,7 +32,12 @@ describe('SetupBanner', () => {
   it('shows all three items as Action Required on a fresh setup-status response', () => {
     render(
       <SetupBanner
-        setupStatus={{ geminiKeyConfigured: false, hasTagLibrary: false, hasProductSize: false }}
+        setupStatus={{
+          geminiKeyConfigured: false,
+          hasTagLibrary: false,
+          hasProductSize: false,
+          readyToRun: false,
+        }}
       />
     );
 
@@ -43,16 +49,30 @@ describe('SetupBanner', () => {
     expect(screen.getAllByText('Action Required')).toHaveLength(3);
   });
 
-  it('marks only the still-incomplete items once some checks pass', () => {
+  it('marks only the still-incomplete items when the banner is shown for a real gap', () => {
+    // geminiKeyConfigured false is what actually drives readyToRun: false here --
+    // hasTagLibrary/hasProductSize being true just means those two items show as Ready.
     render(
       <SetupBanner
-        setupStatus={{ ...READY, hasProductSize: false }}
+        setupStatus={{ ...READY, geminiKeyConfigured: false, readyToRun: false }}
       />
     );
 
     expect(screen.getByText('1 item need action')).toBeInTheDocument();
     expect(screen.getAllByText('Ready')).toHaveLength(2);
     expect(screen.getAllByText('Action Required')).toHaveLength(1);
+  });
+
+  it('does not show the banner when only Product Sizes is missing, matching backend readyToRun', () => {
+    // Backend's readyToRun is geminiKeyConfigured && hasTagLibrary -- Product Sizes was
+    // never required to run. A missing product size alone should not flag setup as
+    // incomplete, even though the item itself still shows status if the banner is visible
+    // for another reason.
+    const { container } = render(
+      <SetupBanner setupStatus={{ ...READY, hasProductSize: false, readyToRun: true }} />
+    );
+
+    expect(container).toBeEmptyDOMElement();
   });
 
   it('does not regress to the old (wrong) field names', () => {
