@@ -5,6 +5,13 @@ import { cn } from '@/lib/utils';
 // (backend/server.js) -- geminiKeyConfigured / hasTagLibrary / hasProductSize,
 // not display-friendly guesses. See server.core-routes.test.js for the
 // authoritative shape.
+//
+// "Setup Incomplete" itself is gated on the backend's own `readyToRun` flag (see
+// isSetupIncomplete below), not on every item in this list being ready -- backend has
+// never required Product Sizes to run (readyToRun = geminiKeyConfigured && hasTagLibrary).
+// It stays in this list purely as an informational item so the user still sees its
+// status, but a missing product size alone no longer flags the whole setup as
+// incomplete, matching what the backend actually requires.
 const checks = [
   {
     key: 'geminiApiKey',
@@ -25,7 +32,7 @@ const checks = [
 
 function isSetupIncomplete(setupStatus) {
   if (!setupStatus) return true;
-  return checks.some((c) => !c.ready(setupStatus));
+  return !setupStatus.readyToRun;
 }
 
 export default function SetupBanner({ setupStatus }) {
