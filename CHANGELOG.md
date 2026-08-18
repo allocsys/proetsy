@@ -1,4 +1,9 @@
 ## [Unreleased]
+### Added
+- First-run onboarding wizard (`OnboardingWizard`): a 3-step flow (Connect Gemini → starter tags → product sizes) that auto-triggers on first launch when nothing is configured yet, reusing the same endpoints and components (`TagsSection`, `MockupTemplates`) as Settings -- no new backend routes.
+
+### Changed
+- Extracted `TagsSection` out of `SettingsView.jsx` into `frontend/src/components/TagsSection.jsx` so both Settings and the onboarding wizard share one implementation.
 
 ## [0.11.5] - 2026-08-18
 ### Fixed
