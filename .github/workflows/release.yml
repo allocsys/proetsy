@@ -12,15 +12,11 @@ name: Release
 # which stays useful for anyone who'd rather run the app locally via `npm ci && npm
 # start` without installing anything.
 #
-# VERIFIED end-to-end as of run #6 (workflow_dispatch, commit after the package-lock.json
-# regeneration fix): npm ci passes against the current lockfile, @electron/rebuild
-# successfully rebuilds better-sqlite3 against Electron's ABI, electron-builder produces
-# a working NSIS installer, and the asar-inspection step below confirms better-sqlite3
-# (and by extension the rest of backend's runtime deps, via root package.json's
-# `dependencies` block -- see ARCHITECTURE.md's "Fourth CI run") actually land in the
-# packaged app, both inside app.asar and unpacked at app.asar.unpacked. See
-# ARCHITECTURE.md's "Electron packaging -- build sequence" for the full run #1-#6
-# debugging trail that got here.
+# IMPORTANT: This workflow builds a Windows installer but does NOT end-to-end test it.
+# Manual verification on first release to new OS/architecture is recommended. The
+# sanity-check step below verifies that frontend/dist, backend, and native modules are
+# present in the packaged asar, but does not actually run the installed app. See
+# ARCHITECTURE.md's "Electron packaging -- build sequence" for the full debugging trail.
 
 on:
   push:
@@ -148,17 +144,26 @@ jobs:
           node-version: ${{ env.ELECTRON_JOB_NODE_VERSION }}
           cache: npm
       - run: npm ci
+      - name: Verify electron:build script includes frontend build
+        run: |
+          if grep -q '"electron:build".*build.*frontend' package.json; then
+            echo "✓ electron:build script includes 'build -w frontend'"
+          else
+            echo "ERROR: electron:build script does not include frontend build"
+            echo "This is likely a regression. package.json should have:"
+            echo '  "electron:build": "npm run build -w frontend && electron-builder --win --publish=never"'
+            exit 1
+          fi
       - run: npm run build -w frontend
       - name: Build Windows installer
         run: npm run electron:build
 
-      # Sanity-check step (see ARCHITECTURE.md "Sanity-check finding" under Electron
-      # packaging -- build sequence): confirms whether better-sqlite3 actually landed in
-      # the packaged asar, independent of whether npmRebuild successfully rebuilt it
-      # against Electron's ABI. `asar list` runs regardless of build success/failure
-      # (`if: always()`) so a failed `electron:build` still tells us whether the files
-      # step ran far enough to produce a partial output directory.
-      - name: Inspect asar for better-sqlite3
+      # Sanity-check step: verifies that critical app components (frontend, backend,
+      # native modules) were actually packaged into the asar. Runs regardless of build
+      # success/failure so partial builds are visible for debugging. This catches
+      # regressions like missing frontend/dist builds, incomplete backend copies, or
+      # failed native module rebuilds.
+      - name: Verify asar contents
         if: always()
         shell: bash
         run: |
@@ -166,14 +171,56 @@ jobs:
           find release-builds -maxdepth 2 -type d || echo "no release-builds dir"
           ASAR=$(find release-builds -name app.asar | head -n1 || true)
           if [ -z "$ASAR" ]; then
-            echo "NO app.asar FOUND -- build did not produce packaged output"
-            exit 0
+            echo "ERROR: NO app.asar FOUND -- build did not produce packaged output"
+            exit 1
           fi
-          echo "--- app.asar contents matching better-sqlite3 ---"
-          npx asar list "$ASAR" | grep -i better-sqlite3 || echo "NOT FOUND in app.asar"
+          
+          echo "Verifying required app components in asar..."
+          MISSING=0
+          
+          # Check frontend
+          if npx asar list "$ASAR" | grep -q "frontend/dist/index.html"; then
+            echo "✓ frontend/dist/index.html found"
+          else
+            echo "✗ MISSING: frontend/dist/index.html"
+            MISSING=1
+          fi
+          
+          # Check backend
+          if npx asar list "$ASAR" | grep -q "backend/server.js"; then
+            echo "✓ backend/server.js found"
+          else
+            echo "✗ MISSING: backend/server.js"
+            MISSING=1
+          fi
+          
+          # Check native module
+          if npx asar list "$ASAR" | grep -q -i "better-sqlite3"; then
+            echo "✓ better-sqlite3 found in asar"
+          else
+            echo "✗ MISSING: better-sqlite3"
+            MISSING=1
+          fi
+          
+          # Verify better-sqlite3 native binary was unpacked correctly
           UNPACKED_DIR=$(dirname "$ASAR")/app.asar.unpacked
-          echo "--- app.asar.unpacked/node_modules/better-sqlite3 ---"
-          ls -la "$UNPACKED_DIR/node_modules/better-sqlite3/build/Release/" 2>/dev/null || echo "NOT FOUND -- native binary missing from unpacked dir"
+          if [ -f "$UNPACKED_DIR/node_modules/better-sqlite3/build/Release/better_sqlite3.node" ]; then
+            echo "✓ better-sqlite3 native binary unpacked correctly"
+          else
+            echo "✗ MISSING: better-sqlite3 native binary"
+            MISSING=1
+          fi
+          
+          if [ "$MISSING" -eq 1 ]; then
+            echo ""
+            echo "ERROR: Critical app components missing from packaged asar"
+            echo "Full asar contents:"
+            npx asar list "$ASAR" | head -50
+            exit 1
+          fi
+          
+          echo ""
+          echo "✓ All required app components verified in asar"
 
       - name: Upload packaged app for inspection
         if: always()

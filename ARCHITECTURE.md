@@ -384,6 +384,8 @@ SQLite. `pipeline_config` and backups stay as JSON/files, not tables.
 
 **CD** (`.github/workflows/release.yml`) — triggers on `v*.*.*` tags: `verify` re-runs the CI gate, then `package-local-bundle` and `package-electron-win` run in parallel and publish to the same GitHub Release (see Packaging & Deployment above).
 
+**CI/CD Limitations — Packaged App Testing:** The release workflow builds the Windows installer and verifies that critical files (frontend/dist, backend, native modules) are present in the asar, but does NOT end-to-end test the packaged app (i.e., actually run it to confirm startup and health-check). v0.11.3/v0.11.4 shipped with broken installers because the release workflow was missing the frontend-build step; this was caught manually, not by CI. Mitigated in v0.11.5+ with improved sanity-checks and a preventative check ensuring the npm script includes the build step, but automated smoke-testing of the installed app would be the strongest safeguard.
+
 ---
 
 ## Open Risks — Reviewed, Accepted As-Is
