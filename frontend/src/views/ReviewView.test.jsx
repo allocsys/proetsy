@@ -216,4 +216,28 @@ describe('ReviewView — Mockups tab (Phase 5: smart defaults for mockup generat
       });
     });
   });
+
+  it('does not leak an unsaved manual selection across job switches (regression: checked state must be re-derived from settings on every effect run, not left stale when there is no saved last-used selection)', async () => {
+    const fetchMock = makeFetchQueue([
+      ...mockupTemplateEndpoints({}),
+      ['/api/jobs/8', () => ({ ok: true, json: async () => ({ id: 8, overall_status: 'pending' }) })],
+    ]);
+    global.fetch = fetchMock;
+    const user = userEvent.setup();
+    const { rerender } = render(<ReviewView jobId={7} />);
+
+    await screen.findByText('Select Mockup Categories');
+    await user.click(checkboxFor('mugs'));
+    expect(checkboxFor('mugs').checked).toBe(true);
+
+    // Switch to a different job without generating -- e.g. navigating to another job
+    // from History. MockupCategorySelector isn't remounted (MockupsTab renders the same
+    // instance), so its own effect must re-derive `checked` fresh rather than leaving
+    // job 7's unsaved manual check in place.
+    rerender(<ReviewView jobId={8} />);
+    await screen.findByText(/Job #8/);
+
+    await waitFor(() => expect(checkboxFor('mugs').checked).toBe(false));
+    expect(checkboxFor('wall art').checked).toBe(false);
+  });
 });
