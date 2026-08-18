@@ -663,7 +663,7 @@ function BackupRestoreSection() {
   );
 }
 
-function ShopAndPipelineTab() {
+function ShopAndPipelineTab({ showAdvanced }) {
   const [settings, setSettings] = useState({});
   const [pipelineConfig, setPipelineConfig] = useState(null);
   const loadTask = useAsyncTask();
@@ -759,17 +759,33 @@ function ShopAndPipelineTab() {
 
       <Separator />
 
-      <PipelineModulesSection
-        pipelineConfig={pipelineConfig}
-        onToggleModule={handleToggleModule}
-        saveTask={saveTask}
-      />
-      <div className="flex gap-2">
-        <Button onClick={handleSavePipeline} disabled={saveTask.pending} size="sm" className="gap-1.5">
-          {saveTask.pending ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3.5" />}
-          Save Pipeline
-        </Button>
-      </div>
+      {/* Pipeline module toggles are advanced -- most shops set these once (or
+          never) and UploadView already defaults to whatever's configured here.
+          Hidden behind the page-level "Show advanced settings" toggle. */}
+      {showAdvanced ? (
+        <>
+          <PipelineModulesSection
+            pipelineConfig={pipelineConfig}
+            onToggleModule={handleToggleModule}
+            saveTask={saveTask}
+          />
+          <div className="flex gap-2">
+            <Button onClick={handleSavePipeline} disabled={saveTask.pending} size="sm" className="gap-1.5">
+              {saveTask.pending ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3.5" />}
+              Save Pipeline
+            </Button>
+          </div>
+        </>
+      ) : (
+        <Card>
+          <CardContent className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Pipeline module toggles are hidden. Turn on{' '}
+              <span className="font-medium text-foreground">Show advanced settings</span> above to configure them.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <Separator />
 
