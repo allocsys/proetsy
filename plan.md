@@ -19,11 +19,11 @@ Work through phases **in order** — later phases assume earlier ones are done (
 
 **Problem:** Rate Limits, Watch Folder, and Taste Filter Auto threshold sit at the same visual priority as API keys — most users never touch them.
 
-- [ ] Add a Basic/Advanced split within the "Automation & Diagnostics" tab (or promote to top-level toggle across Settings)
-- [ ] Basic: API Keys, Tags & Trends, Shop Defaults
-- [ ] Advanced (collapsed by default): Watch Folder, Rate Limits, Taste Filter Auto threshold, Pipeline module toggles
-- [ ] Ship a sane default for `taste_filter_auto_threshold` (0.7) so the slider only needs to be touched once a user has enough rated data to want to tune it
-- [ ] Consider collapsing Settings from 4 tabs to fewer using this split (e.g. "Shop" tab absorbs Shop & Pipeline + Automation-Basic; "Advanced" tab absorbs the rest)
+- [x] Add a Basic/Advanced split (implemented as a page-level "Show advanced settings" toggle in `SettingsView.jsx`, persisted to `localStorage` like `App.jsx`'s sidebar-collapsed flag)
+- [x] Basic (always visible): API Keys, Tags & Trends, Shop Defaults, Shop Conventions, Backup & Restore
+- [x] Advanced (hidden by default): Watch Folder, Rate Limits, Taste Filter Auto threshold (entire Automation & Diagnostics tab), Pipeline module toggles (within Shop & Pipeline tab)
+- [x] Ship a sane default for `taste_filter_auto_threshold` (0.7) so the slider only needs to be touched once a user has enough rated data to want to tune it
+- [ ] Consider collapsing Settings from 4 tabs to fewer using this split -- **deferred**: kept the existing 4 tabs since the toggle already hides the low-priority content within them without a bigger IA change; revisit if tab count itself becomes a complaint
 
 ## Phase 3 — First-run onboarding wizard
 
