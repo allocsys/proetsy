@@ -33,8 +33,10 @@ describe('OnboardingWizard — step 1 (Connect API key)', () => {
   it('shows the Connect Gemini form when no key is configured', () => {
     render(<OnboardingWizard setupStatus={NOTHING_CONFIGURED} />);
 
-    expect(screen.getByText('Connect Gemini')).toBeInTheDocument();
     expect(screen.getByLabelText('Gemini API Key')).toBeInTheDocument();
+    // "Connect Gemini" appears both as the card title and the button label,
+    // so scope this to the button specifically.
+    expect(screen.getByRole('button', { name: 'Connect Gemini' })).toBeInTheDocument();
   });
 
   it('shows the "already connected" state when geminiKeyConfigured is true', () => {
@@ -57,7 +59,7 @@ describe('OnboardingWizard — step 1 (Connect API key)', () => {
     render(<OnboardingWizard setupStatus={NOTHING_CONFIGURED} onSetupStatusChange={onSetupStatusChange} />);
 
     await user.type(screen.getByLabelText('Gemini API Key'), 'AIzaTestKey');
-    await user.click(screen.getByText('Connect Gemini'));
+    await user.click(screen.getByRole('button', { name: 'Connect Gemini' }));
 
     await waitFor(() => expect(addCalls).toHaveLength(1));
     expect(addCalls[0]).toEqual({ provider: 'gemini', key_value: 'AIzaTestKey', label: 'Gemini' });
