@@ -663,7 +663,7 @@ function BackupRestoreSection() {
   );
 }
 
-function ShopAndPipelineTab() {
+function ShopAndPipelineTab({ showAdvanced }) {
   const [settings, setSettings] = useState({});
   const [pipelineConfig, setPipelineConfig] = useState(null);
   const loadTask = useAsyncTask();
@@ -759,17 +759,33 @@ function ShopAndPipelineTab() {
 
       <Separator />
 
-      <PipelineModulesSection
-        pipelineConfig={pipelineConfig}
-        onToggleModule={handleToggleModule}
-        saveTask={saveTask}
-      />
-      <div className="flex gap-2">
-        <Button onClick={handleSavePipeline} disabled={saveTask.pending} size="sm" className="gap-1.5">
-          {saveTask.pending ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3.5" />}
-          Save Pipeline
-        </Button>
-      </div>
+      {/* Pipeline module toggles are advanced -- most shops set these once (or
+          never) and UploadView already defaults to whatever's configured here.
+          Hidden behind the page-level "Show advanced settings" toggle. */}
+      {showAdvanced ? (
+        <>
+          <PipelineModulesSection
+            pipelineConfig={pipelineConfig}
+            onToggleModule={handleToggleModule}
+            saveTask={saveTask}
+          />
+          <div className="flex gap-2">
+            <Button onClick={handleSavePipeline} disabled={saveTask.pending} size="sm" className="gap-1.5">
+              {saveTask.pending ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3.5" />}
+              Save Pipeline
+            </Button>
+          </div>
+        </>
+      ) : (
+        <Card>
+          <CardContent className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Pipeline module toggles are hidden. Turn on{' '}
+              <span className="font-medium text-foreground">Show advanced settings</span> above to configure them.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <Separator />
 
@@ -1272,9 +1288,14 @@ function RateLimitsSection() {
   );
 }
 
+// Sane default approval threshold -- most shops never need to tune this until
+// they've accumulated enough taste-filter ratings for it to matter, so ship a
+// reasonable starting point (0.7) rather than a neutral coin-flip (0.5).
+const DEFAULT_TASTE_THRESHOLD = 0.7;
+
 function TasteFilterAutoSection() {
   const [settings, setSettings] = useState({});
-  const [threshold, setThreshold] = useState(0.5);
+  const [threshold, setThreshold] = useState(DEFAULT_TASTE_THRESHOLD);
   const loadTask = useAsyncTask();
   const saveTask = useAsyncTask();
 
@@ -1284,7 +1305,7 @@ function TasteFilterAutoSection() {
       setSettings(data || {});
       if (data?.taste_filter_auto_threshold !== undefined) {
         const parsed = Number(data.taste_filter_auto_threshold);
-        setThreshold(Number.isFinite(parsed) ? parsed : 0.5);
+        setThreshold(Number.isFinite(parsed) ? parsed : DEFAULT_TASTE_THRESHOLD);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1367,7 +1388,26 @@ function TasteFilterAutoSection() {
   );
 }
 
-function AutomationDiagnosticsTab() {
+function AutomationDiagnosticsTab({ showAdvanced }) {
+  // Watch Folder, Rate Limits, and Taste Filter Auto Mode are all advanced /
+  // diagnostic settings that most users never touch. The whole tab is gated
+  // behind the page-level "Show advanced settings" toggle rather than showing
+  // three low-priority cards by default.
+  if (!showAdvanced) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
+          <Bot className="size-6 text-muted-foreground" />
+          <p className="text-sm font-medium text-foreground">Advanced automation settings are hidden</p>
+          <p className="max-w-sm text-xs text-muted-foreground">
+            Watch folders, rate limit diagnostics, and taste-filter auto-approval live here.
+            Turn on <span className="font-medium text-foreground">Show advanced settings</span> above to configure them.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <WatchFolderSection />
@@ -1382,26 +1422,60 @@ function AutomationDiagnosticsTab() {
 // ─── Main SettingsView ───────────────────────────────────────────────────
 
 export default function SettingsView({ onBack, onSetupStatusChange }) {
+  // Persisted like App.jsx's sidebar-collapsed flag -- a one-time choice that
+  // shouldn't reset every time Settings is opened. Most shops never need
+  // Pipeline Modules or the Automation tab's contents (watch folder, rate
+  // limits, taste-filter threshold), so those stay hidden until explicitly
+  // opted into here.
+  const [showAdvanced, setShowAdvanced] = useState(() => {
+    try {
+      return localStorage.getItem('proetsy-settings-advanced') === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleToggleAdvanced = useCallback((checked) => {
+    setShowAdvanced(checked);
+    try {
+      localStorage.setItem('proetsy-settings-advanced', checked ? '1' : '0');
+    } catch {
+      // localStorage unavailable (e.g. private browsing) -- toggle still works
+      // for this session, it just won't persist across reloads.
+    }
+  }, []);
+
   return (
     <div className="space-y-6">
       {/* Page header with back button */}
-      <div className="flex items-center gap-3">
-        {onBack && (
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onBack}
-            aria-label="Go back"
-          >
-            <ArrowLeft className="size-4" />
-          </Button>
-        )}
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Configure your shop, pipeline, API keys, and automation.
-          </p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onBack}
+              aria-label="Go back"
+            >
+              <ArrowLeft className="size-4" />
+            </Button>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Configure your shop, pipeline, API keys, and automation.
+            </p>
+          </div>
         </div>
+        <label className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
+          <span className="hidden sm:inline">Show advanced settings</span>
+          <span className="sm:hidden">Advanced</span>
+          <Switch
+            checked={showAdvanced}
+            onCheckedChange={handleToggleAdvanced}
+            aria-label="Show advanced settings"
+          />
+        </label>
       </div>
 
       {/* Sub-tabs */}
@@ -1434,7 +1508,7 @@ export default function SettingsView({ onBack, onSetupStatusChange }) {
         </TabsContent>
 
         <TabsContent value="shop-pipeline" className="mt-6">
-          <ShopAndPipelineTab />
+          <ShopAndPipelineTab showAdvanced={showAdvanced} />
         </TabsContent>
 
         <TabsContent value="api-keys" className="mt-6">
@@ -1442,7 +1516,7 @@ export default function SettingsView({ onBack, onSetupStatusChange }) {
         </TabsContent>
 
         <TabsContent value="automation" className="mt-6">
-          <AutomationDiagnosticsTab />
+          <AutomationDiagnosticsTab showAdvanced={showAdvanced} />
         </TabsContent>
       </Tabs>
     </div>
