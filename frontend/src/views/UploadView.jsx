@@ -161,8 +161,11 @@ export default function UploadView({ onNavigate, onJobsChanged }) {
       setUploadStep('done');
       toast.success(`${files.length} artwork${files.length > 1 ? 's' : ''} submitted to pipeline`);
 
-      // Clear files
+      // Clear files, and reset any per-upload override back to defaults so it
+      // doesn't silently carry over and apply to the next batch's uploads too.
       setFiles([]);
+      handleResetOverride();
+      setShowOverride(false);
     } catch (err) {
       setUploadStep(null);
       toast.error(err.message || 'Upload failed');
