@@ -99,12 +99,17 @@ function AppShell() {
   // Phase 3). Runs at most once per browser (onboardingCheckedRef guards
   // against re-triggering on subsequent setupStatus refreshes within the
   // same session, e.g. after the user completes/skips a step).
+  //
+  // Deliberately does NOT call markOnboardingSeen() here -- that only
+  // happens once the user actually finishes or explicitly skips the wizard
+  // (see handleOnboardingComplete below). Marking it "seen" at trigger time
+  // would mean a reload mid-wizard (e.g. right after step 1) permanently
+  // loses the auto-trigger even though nothing was ever configured.
   useEffect(() => {
     if (onboardingCheckedRef.current) return;
     if (setupStatus === null) return;
     onboardingCheckedRef.current = true;
     if (!hasSeenOnboarding() && isNothingConfigured(setupStatus)) {
-      markOnboardingSeen();
       setPreviousView('upload');
       setActiveView('onboarding');
     }
@@ -163,9 +168,13 @@ function AppShell() {
     setActiveView('review');
   }, [activeView]);
 
-  // Called when the onboarding wizard is finished or skipped -- return to
-  // the normal Upload view.
+  // Called when the onboarding wizard is finished or skipped -- mark it as
+  // seen (so it won't auto-trigger again) and return to the normal Upload
+  // view. Marking "seen" here rather than at trigger time means an
+  // interrupted session (reload mid-wizard) will still bring the wizard
+  // back on next launch.
   const handleOnboardingComplete = useCallback(() => {
+    markOnboardingSeen();
     setActiveView('upload');
   }, []);
 
