@@ -10,10 +10,10 @@ Work through phases **in order** — later phases assume earlier ones are done (
 
 **Problem:** Pipeline module toggles (Image Analyzer / Listing Generator / Mockup Composer) exist in both `UploadView.jsx` and `SettingsView.jsx` (Shop & Pipeline tab), each with their own copy of `MODULE_LABELS` and independent state.
 
-- [ ] Make Settings → Shop & Pipeline the single source of truth for pipeline defaults (already patches `pipeline_defaults` via `api.settings.patch`)
-- [ ] In `UploadView.jsx`, replace the full toggle list with a collapsed summary: "Using default pipeline (Image Analyzer, Listing Generator, Mockup Composer) — Edit" that deep-links to Settings
-- [ ] Extract `MODULE_LABELS` into a shared constant (e.g. `frontend/src/lib/pipelineModules.js`) instead of duplicating it in both files
-- [ ] Confirm `pipeline_overrides` per-job override still works for the rare case a user wants a one-off change (keep as an "Override for this upload" expandable, not default-visible)
+- [x] Make Settings → Shop & Pipeline the single source of truth for pipeline defaults (already patches `pipeline_defaults` via `api.settings.patch`)
+- [x] In `UploadView.jsx`, replace the full toggle list with a collapsed summary: "Using default pipeline (Image Analyzer, Listing Generator, Mockup Composer) — Edit" that deep-links to Settings
+- [x] Extract `MODULE_LABELS` into a shared constant (`frontend/src/lib/pipelineModules.js`) instead of duplicating it in both files
+- [x] Confirm `pipeline_overrides` per-job override still works for the rare case a user wants a one-off change (kept as an "Override for this upload" expandable, not default-visible)
 
 ## Phase 2 — Progressive disclosure in Settings (Basic vs Advanced)
 
