@@ -2,6 +2,8 @@
 ### Added
 - First-run onboarding wizard (`OnboardingWizard`): a 3-step flow (Connect Gemini → starter tags → product sizes) that auto-triggers on first launch when nothing is configured yet, reusing the same endpoints and components (`TagsSection`, `MockupTemplates`) as Settings -- no new backend routes.
 
+- `ReviewView`'s mockup category selector now pre-checks the last-used category selection (persisted per shop via the `mockup_last_categories` setting) instead of starting from nothing on every job, and offers an "All enabled templates" quick-select alongside the per-category checkboxes.
+
 ### Changed
 - Extracted `TagsSection` out of `SettingsView.jsx` into `frontend/src/components/TagsSection.jsx` so both Settings and the onboarding wizard share one implementation.
 
