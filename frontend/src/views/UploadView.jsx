@@ -52,10 +52,37 @@ export default function UploadView({ onNavigate, onJobsChanged }) {
     );
   }, [pipelineModules, overrides]);
 
+  // Effective module list with overrides applied -- this, not raw
+  // pipelineModules, is what the collapsed summary and "is this overridden?"
+  // check must read from, since it's what pipelineOverrides above (and
+  // therefore the actual upload) is built from.
+  const effectiveModules = useMemo(() => {
+    return pipelineModules.map((mod) => ({
+      ...mod,
+      enabled: overrides[mod.module] ?? mod.enabled,
+    }));
+  }, [pipelineModules, overrides]);
+
+  const hasOverride = useMemo(() => {
+    return pipelineModules.some((mod) => {
+      const overrideValue = overrides[mod.module];
+      return overrideValue !== undefined && overrideValue !== mod.enabled;
+    });
+  }, [pipelineModules, overrides]);
+
   // Handle toggle change
   const handleToggleChange = useCallback((moduleName, checked) => {
     setOverrides((prev) => ({ ...prev, [moduleName]: checked }));
   }, []);
+
+  // Reset the per-upload override back to whatever's configured in Settings
+  const handleResetOverride = useCallback(() => {
+    const defaults = {};
+    for (const mod of pipelineModules) {
+      defaults[mod.module] = mod.enabled;
+    }
+    setOverrides(defaults);
+  }, [pipelineModules]);
 
   // Validate file types
   const isValidFile = useCallback((file) => {
@@ -341,14 +368,30 @@ export default function UploadView({ onNavigate, onJobsChanged }) {
             <Skeleton className="h-3 w-72" />
           ) : configTask.error ? null : !showOverride ? (
             <CardDescription>
-              Using default pipeline: {summarizeEnabledModules(pipelineModules) || 'none'}.{' '}
-              <button
-                type="button"
-                onClick={() => onNavigate?.('settings')}
-                className="text-primary underline-offset-2 hover:underline"
-              >
-                Edit defaults in Settings
-              </button>
+              {hasOverride ? (
+                <>
+                  Using: {summarizeEnabledModules(effectiveModules) || 'none'}.{' '}
+                  <span className="font-medium text-amber-500">(modified for this upload)</span>{' '}
+                  <button
+                    type="button"
+                    onClick={handleResetOverride}
+                    className="text-primary underline-offset-2 hover:underline"
+                  >
+                    Reset to default
+                  </button>
+                </>
+              ) : (
+                <>
+                  Using default pipeline: {summarizeEnabledModules(pipelineModules) || 'none'}.{' '}
+                  <button
+                    type="button"
+                    onClick={() => onNavigate?.('settings')}
+                    className="text-primary underline-offset-2 hover:underline"
+                  >
+                    Edit defaults in Settings
+                  </button>
+                </>
+              )}
             </CardDescription>
           ) : (
             <CardDescription>
