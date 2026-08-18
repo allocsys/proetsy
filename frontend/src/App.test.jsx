@@ -45,6 +45,14 @@ vi.mock('@/views/PromptHelper.jsx', () => ({
 vi.mock('@/views/TasteFilter.jsx', () => ({
   default: () => <div data-testid="view-taste-filter">Taste Filter</div>,
 }));
+vi.mock('@/views/OnboardingWizard.jsx', () => ({
+  default: ({ onComplete }) => (
+    <div data-testid="view-onboarding">
+      Onboarding Wizard
+      <button onClick={onComplete}>Finish onboarding</button>
+    </div>
+  ),
+}));
 
 // UpdaterStatus is Electron-only and returns null when window.updaterAPI is absent.
 vi.mock('@/UpdaterStatus.jsx', () => ({ default: () => null }));
@@ -68,6 +76,12 @@ const SETUP_STATUS_INCOMPLETE = {
   geminiKeyConfigured: false,
   hasTagLibrary: false,
   hasProductSize: true,
+};
+
+const SETUP_STATUS_NOTHING_CONFIGURED = {
+  geminiKeyConfigured: false,
+  hasTagLibrary: false,
+  hasProductSize: false,
 };
 
 const PIPELINE_CONFIG = {
@@ -128,6 +142,10 @@ describe('AppShell', () => {
   it('shows Backend Down when health fetch fails', async () => {
     global.fetch = vi.fn((url) => {
       if (url === '/api/health') return Promise.reject(new Error('network error'));
+      // Setup status explicitly resolved (rather than falling through to the
+      // default '{}' below) so this test doesn't incidentally auto-trigger
+      // the onboarding wizard -- that behavior has its own describe block.
+      if (url === '/api/setup-status') return Promise.resolve({ ok: true, json: async () => SETUP_STATUS_READY });
       if (url === '/api/jobs') return Promise.resolve({ ok: true, json: async () => [] });
       return Promise.resolve({ ok: true, json: async () => ({}) });
     });
@@ -258,5 +276,47 @@ describe('AppShell', () => {
     // The sidebar renders a pipeline status progress bar
     const sidebar = document.querySelector('aside');
     expect(sidebar).toBeInTheDocument();
+  });
+});
+
+describe('AppShell — onboarding auto-trigger (plan.md Phase 3)', () => {
+  it('auto-triggers the onboarding wizard on first launch when nothing is configured', async () => {
+    mockFetchByUrl({ '/api/setup-status': SETUP_STATUS_NOTHING_CONFIGURED });
+    render(<App />);
+
+    expect(await screen.findByTestId('view-onboarding')).toBeInTheDocument();
+  });
+
+  it('does not auto-trigger the wizard when setup is only partially incomplete', async () => {
+    mockFetchByUrl({ '/api/setup-status': SETUP_STATUS_INCOMPLETE });
+    render(<App />);
+
+    expect(await screen.findByTestId('view-upload')).toBeInTheDocument();
+    expect(screen.queryByTestId('view-onboarding')).not.toBeInTheDocument();
+  });
+
+  it('does not auto-trigger the wizard once it has already been seen', async () => {
+    localStorage.setItem('proetsy-onboarding-seen', '1');
+    mockFetchByUrl({ '/api/setup-status': SETUP_STATUS_NOTHING_CONFIGURED });
+    render(<App />);
+
+    expect(await screen.findByTestId('view-upload')).toBeInTheDocument();
+    expect(screen.queryByTestId('view-onboarding')).not.toBeInTheDocument();
+  });
+
+  it('does not mark onboarding as seen merely from being triggered -- only after Finish/Skip', async () => {
+    mockFetchByUrl({ '/api/setup-status': SETUP_STATUS_NOTHING_CONFIGURED });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByTestId('view-onboarding');
+
+    // Regression check: a reload before finishing must still bring the
+    // wizard back, so triggering alone must not persist "seen".
+    expect(localStorage.getItem('proetsy-onboarding-seen')).not.toBe('1');
+
+    await user.click(screen.getByText('Finish onboarding'));
+
+    expect(await screen.findByTestId('view-upload')).toBeInTheDocument();
+    expect(localStorage.getItem('proetsy-onboarding-seen')).toBe('1');
   });
 });
