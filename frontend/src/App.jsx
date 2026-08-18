@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '@/hooks/useApi';
 import { ConfirmProvider } from '@/contexts/ConfirmContext.jsx';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -13,6 +13,38 @@ import ReviewView from '@/views/ReviewView.jsx';
 import PromptHelper from '@/views/PromptHelper.jsx';
 import TasteFilter from '@/views/TasteFilter.jsx';
 import SettingsView from '@/views/SettingsView.jsx';
+import OnboardingWizard from '@/views/OnboardingWizard.jsx';
+
+// Once a user has seen the first-run onboarding wizard (whether they finish
+// it or skip it), never auto-trigger it again -- they can still get to the
+// underlying Settings/Mockup Templates screens directly. Persisted the same
+// way App.jsx already persists sidebar-collapsed / settings-advanced flags.
+const ONBOARDING_SEEN_KEY = 'proetsy-onboarding-seen';
+
+function hasSeenOnboarding() {
+  try {
+    return localStorage.getItem(ONBOARDING_SEEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markOnboardingSeen() {
+  try {
+    localStorage.setItem(ONBOARDING_SEEN_KEY, '1');
+  } catch {
+    // localStorage unavailable (e.g. private browsing) -- wizard may
+    // reappear next launch, which is an acceptable fallback.
+  }
+}
+
+// "First launch when setup-status shows nothing configured" (plan.md Phase 3)
+// -- all three setup-status checks are unmet, not just the backend's
+// readyToRun flag (which ignores product sizes entirely).
+function isNothingConfigured(setupStatus) {
+  if (!setupStatus) return false;
+  return !setupStatus.geminiKeyConfigured && !setupStatus.hasTagLibrary && !setupStatus.hasProductSize;
+}
 
 function AppShell() {
   const [activeView, setActiveView] = useState('upload');
@@ -29,6 +61,7 @@ function AppShell() {
   const [jobs, setJobs] = useState([]);
   const [pipelineConfig, setPipelineConfig] = useState(null);
   const [selectedJobId, setSelectedJobId] = useState(null);
+  const onboardingCheckedRef = useRef(false);
 
   // Re-fetches the jobs list so the sidebar's status counts (derived from
   // `jobs` below) stay current. Exposed to views that create/mutate jobs
@@ -60,6 +93,22 @@ function AppShell() {
     refreshJobs();
     api.pipelineConfig().then(setPipelineConfig).catch(() => {});
   }, [refreshJobs]);
+
+  // Trigger the onboarding wizard automatically on first launch, once
+  // setup-status has loaded and shows nothing configured yet (see plan.md
+  // Phase 3). Runs at most once per browser (onboardingCheckedRef guards
+  // against re-triggering on subsequent setupStatus refreshes within the
+  // same session, e.g. after the user completes/skips a step).
+  useEffect(() => {
+    if (onboardingCheckedRef.current) return;
+    if (setupStatus === null) return;
+    onboardingCheckedRef.current = true;
+    if (!hasSeenOnboarding() && isNothingConfigured(setupStatus)) {
+      markOnboardingSeen();
+      setPreviousView('upload');
+      setActiveView('onboarding');
+    }
+  }, [setupStatus]);
 
   // Compute status counts from jobs
   const statusCounts = useMemo(() => {
@@ -114,6 +163,12 @@ function AppShell() {
     setActiveView('review');
   }, [activeView]);
 
+  // Called when the onboarding wizard is finished or skipped -- return to
+  // the normal Upload view.
+  const handleOnboardingComplete = useCallback(() => {
+    setActiveView('upload');
+  }, []);
+
   // View routing
   const viewComponent = (() => {
     switch (activeView) {
@@ -124,6 +179,13 @@ function AppShell() {
       case 'prompt-helper': return PromptHelper && <PromptHelper />;
       case 'taste-filter': return TasteFilter && <TasteFilter overrides={tasteFilterOverrides} refreshJobs={refreshJobs} />;
       case 'settings': return SettingsView && <SettingsView onBack={() => setActiveView(previousView)} onSetupStatusChange={refreshSetupStatus} />;
+      case 'onboarding': return OnboardingWizard && (
+        <OnboardingWizard
+          setupStatus={setupStatus}
+          onComplete={handleOnboardingComplete}
+          onSetupStatusChange={refreshSetupStatus}
+        />
+      );
       default: return null;
     }
   })();
@@ -149,7 +211,10 @@ function AppShell() {
         />
         <main className="flex-1 overflow-auto">
           <div className="mx-auto max-w-5xl p-6">
-            <SetupBanner setupStatus={setupStatus} />
+            {/* SetupBanner is redundant with (and visually competes with) the
+                onboarding wizard's own step indicator, so it's hidden while
+                the wizard is active. */}
+            {activeView !== 'onboarding' && <SetupBanner setupStatus={setupStatus} />}
             {viewComponent}
           </div>
         </main>
