@@ -1272,9 +1272,14 @@ function RateLimitsSection() {
   );
 }
 
+// Sane default approval threshold -- most shops never need to tune this until
+// they've accumulated enough taste-filter ratings for it to matter, so ship a
+// reasonable starting point (0.7) rather than a neutral coin-flip (0.5).
+const DEFAULT_TASTE_THRESHOLD = 0.7;
+
 function TasteFilterAutoSection() {
   const [settings, setSettings] = useState({});
-  const [threshold, setThreshold] = useState(0.5);
+  const [threshold, setThreshold] = useState(DEFAULT_TASTE_THRESHOLD);
   const loadTask = useAsyncTask();
   const saveTask = useAsyncTask();
 
@@ -1284,7 +1289,7 @@ function TasteFilterAutoSection() {
       setSettings(data || {});
       if (data?.taste_filter_auto_threshold !== undefined) {
         const parsed = Number(data.taste_filter_auto_threshold);
-        setThreshold(Number.isFinite(parsed) ? parsed : 0.5);
+        setThreshold(Number.isFinite(parsed) ? parsed : DEFAULT_TASTE_THRESHOLD);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
