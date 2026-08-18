@@ -683,12 +683,13 @@ function MockupCategorySelector({ jobId, onGenerated }) {
         // Pre-check whatever category selection was last used for a generate run,
         // instead of starting from nothing every time (plan.md Phase 5). Only
         // pre-checks categories that still exist, in case templates were removed
-        // since the last run.
+        // since the last run. Always derived fresh (even to an empty selection) --
+        // this component instance persists across job switches (MockupsTab doesn't
+        // remount it), so leaving a stale `checked` state in place here would let an
+        // unsaved manual selection from a previous job bleed into the next one.
         const lastUsed = parseLastCategories(settings?.[MOCKUP_LAST_CATEGORIES_SETTING]);
         const stillValid = lastUsed.filter((c) => resolvedCategories.includes(c));
-        if (stillValid.length) {
-          setChecked(Object.fromEntries(stillValid.map((c) => [c, true])));
-        }
+        setChecked(Object.fromEntries(stillValid.map((c) => [c, true])));
         setLoaded(true);
       })
       .catch(() => {});
