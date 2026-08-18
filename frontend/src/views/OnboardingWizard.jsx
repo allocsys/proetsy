@@ -176,7 +176,7 @@ export default function OnboardingWizard({ setupStatus, onComplete, onSetupStatu
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Welcome to Proetsy</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Let's get your shop set up. This only takes a minute.
+            Let&rsquo;s get your shop set up. This only takes a minute.
           </p>
         </div>
         <Button variant="ghost" size="sm" onClick={handleFinish} className="shrink-0 text-muted-foreground">
