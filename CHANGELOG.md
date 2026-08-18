@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [0.11.5] - 2026-08-18
+### Fixed
+- Windows Electron installer now includes `frontend/dist` and `backend/` in the packaged app -- previously the release workflow was missing the `npm run build -w frontend` step, causing installed apps to have no UI and fail immediately on startup (#86).
+
 ## [0.11.4] - 2026-08-17
 ### Fixed
 - `generateMockupForJob()` no longer leaves an orphaned mockup file on disk if the `product_sizes`/`mockups` DB upsert fails after the file was already written -- the file(s) are now deleted before the error is re-thrown (#85).
