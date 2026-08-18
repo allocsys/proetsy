@@ -53,12 +53,6 @@ const FALLBACK_CONVENTIONS = {
   deliveryDetailPhrases: [],
 };
 
-function findPhraseHits(text, phrases) {
-  if (!text || !phrases) return [];
-  const lower = text.toLowerCase();
-  return phrases.filter((p) => lower.includes(p.toLowerCase()));
-}
-
 // ─── Job Picker ───────────────────────────────────────────────────────────
 
 function JobPicker({ initialJobId, onLoadJob }) {
@@ -370,10 +364,6 @@ function ListingCard({ listing, conventions, onSaved }) {
   const tagsOverLimit = parsedTags.length > conventions.tagsPerListing;
   const oversizedTagCount = parsedTags.filter((t) => t.length > conventions.maxTagLength).length;
 
-  const forbiddenTitleHits = findPhraseHits(title, conventions.forbiddenTitleWords);
-  const aiDisclosureHits = findPhraseHits(description, conventions.aiDisclosurePhrases);
-  const deliveryDetailHits = findPhraseHits(description, conventions.deliveryDetailPhrases);
-
   const handleSave = useCallback(() => {
     saveTask.run(async () => {
       const data = await api.listings.patch(listing.job_id, listing.id, {
@@ -386,9 +376,19 @@ function ListingCard({ listing, conventions, onSaved }) {
       setDescription(data.description || '');
       setTagsText(tagsToText(data.tags));
       setTagAltText(tagsToText(data.tag_alternates));
-      setWarnings(data.warnings || []);
+      const newWarnings = data.warnings || [];
+      setWarnings(newWarnings);
       onSaved(data);
-      toast.success('Listing saved');
+      // Post-save diff notice (plan.md Phase 4): the server silently strips forbidden
+      // words / AI-disclosure / delivery-detail phrases via enforceConventions. Rather
+      // than asking the reviewer to notice and pre-emptively fix these before saving,
+      // surface exactly what changed after the fact. Full detail also stays visible in
+      // the inline warnings note below.
+      if (newWarnings.length > 0) {
+        toast.success('Listing saved', { description: newWarnings.join(' · ') });
+      } else {
+        toast.success('Listing saved');
+      }
     });
   }, [listing, title, description, tagsText, tagAltText, onSaved, saveTask]);
 
@@ -431,11 +431,6 @@ function ListingCard({ listing, conventions, onSaved }) {
             onChange={(e) => setTitle(e.target.value)}
             aria-invalid={titleOverLimit}
           />
-          {forbiddenTitleHits.length > 0 && (
-            <p className="text-xs text-destructive">
-              Contains forbidden word(s), will be removed on save: {forbiddenTitleHits.join(', ')}
-            </p>
-          )}
         </div>
 
         {/* Description */}
@@ -450,16 +445,6 @@ function ListingCard({ listing, conventions, onSaved }) {
             rows={6}
             className="resize-y"
           />
-          {aiDisclosureHits.length > 0 && (
-            <p className="text-xs text-destructive">
-              Contains AI-disclosure phrase(s), will be removed on save: {aiDisclosureHits.join(', ')}
-            </p>
-          )}
-          {deliveryDetailHits.length > 0 && (
-            <p className="text-xs text-destructive">
-              Contains delivery-detail phrase(s), will be removed on save: {deliveryDetailHits.join(', ')}
-            </p>
-          )}
         </div>
 
         {/* Tags */}
