@@ -17,6 +17,11 @@ export default function UploadView({ onNavigate, onJobsChanged }) {
   const [uploadStep, setUploadStep] = useState(null); // null | 'uploading' | 'creating' | 'running' | 'done'
   const [createdJobIds, setCreatedJobIds] = useState([]);
   const [dragActive, setDragActive] = useState(false);
+  // Pipeline modules default to whatever's configured in Settings (single
+  // source of truth -- see frontend/src/lib/pipelineModules.js). Most uploads
+  // never need to touch this, so the toggle list starts collapsed behind an
+  // "Override for this upload" disclosure instead of always being shown.
+  const [showOverride, setShowOverride] = useState(false);
   const inputRef = useRef(null);
 
   const configTask = useAsyncTask();
