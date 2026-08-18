@@ -144,6 +144,16 @@ jobs:
           node-version: ${{ env.ELECTRON_JOB_NODE_VERSION }}
           cache: npm
       - run: npm ci
+      - name: Verify electron:build script includes frontend build
+        run: |
+          if grep -q '"electron:build".*build.*frontend' package.json; then
+            echo "✓ electron:build script includes 'build -w frontend'"
+          else
+            echo "ERROR: electron:build script does not include frontend build"
+            echo "This is likely a regression. package.json should have:"
+            echo '  "electron:build": "npm run build -w frontend && electron-builder --win --publish=never"'
+            exit 1
+          fi
       - run: npm run build -w frontend
       - name: Build Windows installer
         run: npm run electron:build
