@@ -1388,7 +1388,26 @@ function TasteFilterAutoSection() {
   );
 }
 
-function AutomationDiagnosticsTab() {
+function AutomationDiagnosticsTab({ showAdvanced }) {
+  // Watch Folder, Rate Limits, and Taste Filter Auto Mode are all advanced /
+  // diagnostic settings that most users never touch. The whole tab is gated
+  // behind the page-level "Show advanced settings" toggle rather than showing
+  // three low-priority cards by default.
+  if (!showAdvanced) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
+          <Bot className="size-6 text-muted-foreground" />
+          <p className="text-sm font-medium text-foreground">Advanced automation settings are hidden</p>
+          <p className="max-w-sm text-xs text-muted-foreground">
+            Watch folders, rate limit diagnostics, and taste-filter auto-approval live here.
+            Turn on <span className="font-medium text-foreground">Show advanced settings</span> above to configure them.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <WatchFolderSection />
