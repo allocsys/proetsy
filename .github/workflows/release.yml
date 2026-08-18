@@ -148,6 +148,7 @@ jobs:
           node-version: ${{ env.ELECTRON_JOB_NODE_VERSION }}
           cache: npm
       - run: npm ci
+      - run: npm run build -w frontend
       - name: Build Windows installer
         run: npm run electron:build
 
