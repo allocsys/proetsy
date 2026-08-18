@@ -29,12 +29,12 @@ Work through phases **in order** — later phases assume earlier ones are done (
 
 **Problem:** Setup (API key, tags, product size) is scattered across Settings tabs, surfaced only via `SetupBanner`.
 
-- [ ] New component `frontend/src/views/OnboardingWizard.jsx`, 3 steps:
+- [x] New component `frontend/src/views/OnboardingWizard.jsx`, 3 steps:
   1. Connect API key (simplify to a single "Connect Gemini" button — see Phase 6)
-  2. Import or generate starter tags (reuse `TagsSection` CSV import, or offer a "Generate starter tags" AI action)
-  3. Confirm/set product sizes (reuse relevant part of Mockup Templates)
-- [ ] Trigger wizard automatically on first launch when `setup-status` shows nothing configured; otherwise normal `SetupBanner` behavior stands
-- [ ] Wizard writes to the same endpoints Settings already uses — no new backend routes needed
+  2. Import or generate starter tags (reuse `TagsSection` CSV import, or offer a "Generate starter tags" AI action) -- implemented via reused `TagsSection`; the AI-generate variant was left as a future option
+  3. Confirm/set product sizes (reuse relevant part of Mockup Templates) -- implemented by reusing the full `MockupTemplates` component rather than a trimmed subset
+- [x] Trigger wizard automatically on first launch when `setup-status` shows nothing configured; otherwise normal `SetupBanner` behavior stands
+- [x] Wizard writes to the same endpoints Settings already uses — no new backend routes needed
 
 ## Phase 4 — Reduce manual per-listing editing (Review → Listings tab)
 
