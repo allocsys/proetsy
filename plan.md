@@ -40,9 +40,9 @@ Work through phases **in order** — later phases assume earlier ones are done (
 
 **Problem:** Users manually notice and fix forbidden words / AI-disclosure phrases / delivery-detail phrases that the server already knows about.
 
-- [ ] Backend: when generating/saving a listing, auto-strip known-forbidden words and disclosure/delivery phrases server-side before returning the draft (`backend/lib/listing-generator`)
-- [ ] Frontend: replace the current "contains X, will be removed on save" warning-before-the-fact pattern with a post-save diff notice: "Removed 2 words: X, Y" (toast or inline note)
-- [ ] Keep the char-counters (title/tags length) as-is — those are legitimately useful live feedback, not the problem
+- [x] Backend: when generating/saving a listing, auto-strip known-forbidden words and disclosure/delivery phrases server-side before returning the draft (`backend/lib/listing-generator`) -- already in place: `enforceConventions` (validate.js) runs on both initial generation (index.js) and on every manual edit (PATCH /api/jobs/:id/listings/:listingId in server.js), and the route returns a `warnings` array describing what was stripped
+- [x] Frontend: replace the current "contains X, will be removed on save" warning-before-the-fact pattern with a post-save diff notice: "Removed 2 words: X, Y" (toast or inline note) -- removed the pre-save forbidden-word/AI-disclosure/delivery-phrase hint text in `ListingCard` (ReviewView.jsx); on save, the server's `warnings` now surface via a toast description as well as the existing inline amber note
+- [x] Keep the char-counters (title/tags length) as-is — those are legitimately useful live feedback, not the problem -- untouched
 
 ## Phase 5 — Smart defaults for mockup generation
 
