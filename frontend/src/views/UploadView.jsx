@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Upload, Loader2, CheckCircle2, Eye, Settings2 } from 'lucide-react';
+import { Upload, Loader2, CheckCircle2, Eye, Settings2, ChevronDown, ChevronUp } from 'lucide-react';
 import { api } from '@/hooks/useApi';
 import { useAsyncTask } from '@/hooks/useAsyncTask';
 import { toast } from 'sonner';
@@ -8,16 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
-
-// Keys must match the module names in backend/config/pipeline.config.json
-// (image_analyzer, listing_generator, mockup_composer), not display-friendly
-// slugs -- mod.module from GET /api/config/pipeline is looked up directly
-// against this object below. See docs/known-issues/frontend-rebuild-logic-review-2026-08-12.md #7.
-const MODULE_LABELS = {
-  image_analyzer: { name: 'Image Analyzer', description: 'Analyzes artwork for colors, style, and composition' },
-  listing_generator: { name: 'Listing Generator', description: 'Creates Etsy-optimized titles, descriptions, and tags' },
-  mockup_composer: { name: 'Mockup Composer', description: 'Generates product mockups using PSD templates' },
-};
+import { getModuleLabel, summarizeEnabledModules } from '@/lib/pipelineModules';
 
 export default function UploadView({ onNavigate, onJobsChanged }) {
   const [files, setFiles] = useState([]);
@@ -26,6 +17,11 @@ export default function UploadView({ onNavigate, onJobsChanged }) {
   const [uploadStep, setUploadStep] = useState(null); // null | 'uploading' | 'creating' | 'running' | 'done'
   const [createdJobIds, setCreatedJobIds] = useState([]);
   const [dragActive, setDragActive] = useState(false);
+  // Pipeline modules default to whatever's configured in Settings (single
+  // source of truth -- see frontend/src/lib/pipelineModules.js). Most uploads
+  // never need to touch this, so the toggle list starts collapsed behind an
+  // "Override for this upload" disclosure instead of always being shown.
+  const [showOverride, setShowOverride] = useState(false);
   const inputRef = useRef(null);
 
   const configTask = useAsyncTask();
@@ -319,39 +315,56 @@ export default function UploadView({ onNavigate, onJobsChanged }) {
         </Card>
       )}
 
-      {/* Pipeline Configuration */}
+      {/* Pipeline Configuration -- collapsed by default. Defaults live in
+          Settings → Shop & Pipeline (single source of truth); this card only
+          needs to show what's active and offer a rare per-upload override. */}
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <Settings2 className="size-4 text-muted-foreground" />
-            <CardTitle>Pipeline Configuration</CardTitle>
-          </div>
-          <CardDescription>
-            Toggle modules on or off. Disabled modules will be skipped when running the pipeline.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {configTask.pending ? (
-            <div className="space-y-4">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="flex items-center justify-between">
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-36" />
-                    <Skeleton className="h-3 w-56" />
-                  </div>
-                  <Skeleton className="h-5 w-9 rounded-full" />
-                </div>
-              ))}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <Settings2 className="size-4 text-muted-foreground" />
+              <CardTitle>Pipeline Configuration</CardTitle>
             </div>
-          ) : configTask.error ? (
-            <p className="text-sm text-destructive">Failed to load pipeline config: {configTask.error}</p>
+            {!configTask.pending && !configTask.error && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowOverride((v) => !v)}
+                className="gap-1 text-xs text-muted-foreground"
+              >
+                {showOverride ? 'Hide override' : 'Override for this upload'}
+                {showOverride ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+              </Button>
+            )}
+          </div>
+          {configTask.pending ? (
+            <Skeleton className="h-3 w-72" />
+          ) : configTask.error ? null : !showOverride ? (
+            <CardDescription>
+              Using default pipeline: {summarizeEnabledModules(pipelineModules) || 'none'}.{' '}
+              <button
+                type="button"
+                onClick={() => onNavigate?.('settings')}
+                className="text-primary underline-offset-2 hover:underline"
+              >
+                Edit defaults in Settings
+              </button>
+            </CardDescription>
           ) : (
+            <CardDescription>
+              Toggle modules on or off for this upload only. Disabled modules will be skipped.
+            </CardDescription>
+          )}
+        </CardHeader>
+        {configTask.error ? (
+          <CardContent>
+            <p className="text-sm text-destructive">Failed to load pipeline config: {configTask.error}</p>
+          </CardContent>
+        ) : showOverride && (
+          <CardContent>
             <div className="space-y-4">
               {pipelineModules.map((mod) => {
-                const label = MODULE_LABELS[mod.module] || {
-                  name: mod.module,
-                  description: 'Pipeline module',
-                };
+                const label = getModuleLabel(mod.module);
                 const isDisabled = mod.required;
                 const isChecked = overrides[mod.module] ?? mod.enabled;
 
@@ -385,8 +398,8 @@ export default function UploadView({ onNavigate, onJobsChanged }) {
                 );
               })}
             </div>
-          )}
-        </CardContent>
+          </CardContent>
+        )}
       </Card>
     </div>
   );

@@ -53,6 +53,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import ShopConventions from '@/ShopConventions';
+import { getModuleLabel } from '@/lib/pipelineModules';
 
 // ─── Sub-tab 1: Tags & Trends ────────────────────────────────────────────
 
@@ -522,16 +523,6 @@ function ShopDefaultsSection({ settings, onSettingsChange }) {
 }
 
 function PipelineModulesSection({ pipelineConfig, onToggleModule }) {
-  // Keys must match the module names in backend/config/pipeline.config.json
-  // (image_analyzer, listing_generator, mockup_composer), not display-friendly
-  // slugs -- mod.module from GET /api/config/pipeline is looked up directly
-  // against this object below. See docs/known-issues/frontend-rebuild-logic-review-2026-08-12.md #7.
-  const MODULE_LABELS = {
-    image_analyzer: { name: 'Image Analyzer', desc: 'Analyzes artwork for colors, style, and composition' },
-    listing_generator: { name: 'Listing Generator', desc: 'Creates Etsy-optimized titles, descriptions, and tags' },
-    mockup_composer: { name: 'Mockup Composer', desc: 'Generates product mockups using PSD templates' },
-  };
-
   if (!pipelineConfig || !pipelineConfig.pipeline) {
     return (
       <Card>
@@ -556,7 +547,7 @@ function PipelineModulesSection({ pipelineConfig, onToggleModule }) {
       <CardContent>
         <div className="space-y-3">
           {pipelineConfig.pipeline.map((mod) => {
-            const label = MODULE_LABELS[mod.module] || { name: mod.module, desc: 'Pipeline module' };
+            const label = getModuleLabel(mod.module);
             const isRequired = mod.required;
             return (
               <div
@@ -570,7 +561,7 @@ function PipelineModulesSection({ pipelineConfig, onToggleModule }) {
                       <Badge variant="outline" className="text-[10px]">Required</Badge>
                     )}
                   </div>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{label.desc}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{label.description}</p>
                 </div>
                 <Switch
                   checked={mod.enabled}
