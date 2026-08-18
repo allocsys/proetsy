@@ -1422,26 +1422,60 @@ function AutomationDiagnosticsTab({ showAdvanced }) {
 // ─── Main SettingsView ───────────────────────────────────────────────────
 
 export default function SettingsView({ onBack, onSetupStatusChange }) {
+  // Persisted like App.jsx's sidebar-collapsed flag -- a one-time choice that
+  // shouldn't reset every time Settings is opened. Most shops never need
+  // Pipeline Modules or the Automation tab's contents (watch folder, rate
+  // limits, taste-filter threshold), so those stay hidden until explicitly
+  // opted into here.
+  const [showAdvanced, setShowAdvanced] = useState(() => {
+    try {
+      return localStorage.getItem('proetsy-settings-advanced') === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleToggleAdvanced = useCallback((checked) => {
+    setShowAdvanced(checked);
+    try {
+      localStorage.setItem('proetsy-settings-advanced', checked ? '1' : '0');
+    } catch {
+      // localStorage unavailable (e.g. private browsing) -- toggle still works
+      // for this session, it just won't persist across reloads.
+    }
+  }, []);
+
   return (
     <div className="space-y-6">
       {/* Page header with back button */}
-      <div className="flex items-center gap-3">
-        {onBack && (
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onBack}
-            aria-label="Go back"
-          >
-            <ArrowLeft className="size-4" />
-          </Button>
-        )}
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Configure your shop, pipeline, API keys, and automation.
-          </p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onBack}
+              aria-label="Go back"
+            >
+              <ArrowLeft className="size-4" />
+            </Button>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Configure your shop, pipeline, API keys, and automation.
+            </p>
+          </div>
         </div>
+        <label className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
+          <span className="hidden sm:inline">Show advanced settings</span>
+          <span className="sm:hidden">Advanced</span>
+          <Switch
+            checked={showAdvanced}
+            onCheckedChange={handleToggleAdvanced}
+            aria-label="Show advanced settings"
+          />
+        </label>
       </div>
 
       {/* Sub-tabs */}
@@ -1474,7 +1508,7 @@ export default function SettingsView({ onBack, onSetupStatusChange }) {
         </TabsContent>
 
         <TabsContent value="shop-pipeline" className="mt-6">
-          <ShopAndPipelineTab />
+          <ShopAndPipelineTab showAdvanced={showAdvanced} />
         </TabsContent>
 
         <TabsContent value="api-keys" className="mt-6">
@@ -1482,7 +1516,7 @@ export default function SettingsView({ onBack, onSetupStatusChange }) {
         </TabsContent>
 
         <TabsContent value="automation" className="mt-6">
-          <AutomationDiagnosticsTab />
+          <AutomationDiagnosticsTab showAdvanced={showAdvanced} />
         </TabsContent>
       </Tabs>
     </div>
