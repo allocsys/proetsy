@@ -145,6 +145,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Verify electron:build script includes frontend build
+        shell: bash
         run: |
           if grep -q '"electron:build".*build.*frontend' package.json; then
             echo "✓ electron:build script includes 'build -w frontend'"
