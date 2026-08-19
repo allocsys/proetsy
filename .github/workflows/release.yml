@@ -156,7 +156,27 @@ jobs:
             exit 1
           fi
       - run: npm run build -w frontend
+
+      # Debug aid: confirms the build outputs actually exist on disk right before
+      # electron-builder runs, so a failure can be split into "build didn't produce
+      # these files" vs "electron-builder ignored files that were there" without
+      # needing to download the packaged artifact.
+      - name: List build outputs before packaging
+        shell: bash
+        run: |
+          echo "=== frontend/dist (pre-packaging) ==="
+          find frontend/dist -type f 2>/dev/null | head -50 || echo "frontend/dist NOT FOUND"
+          echo ""
+          echo "=== backend (pre-packaging, top-level) ==="
+          find backend -maxdepth 1 2>/dev/null || echo "backend NOT FOUND"
+
       - name: Build Windows installer
+        env:
+          # electron-builder logs every files-glob include/exclude decision at this
+          # level -- this is the direct way to see why a configured `files` pattern
+          # (e.g. frontend/dist/**/*, backend/**/*) isn't matching anything, without
+          # downloading the packaged output to inspect it by hand.
+          DEBUG: electron-builder
         run: npm run electron:build
 
       # Sanity-check step: verifies that critical app components (frontend, backend,
