@@ -199,12 +199,23 @@ jobs:
         shell: bash
         run: |
           set -x
+          # Everything below is also tee'd into release-builds-summary.txt (small,
+          # text-only) so it can be uploaded as its own lightweight artifact --
+          # see "Upload build summary" below. Lets someone check whether packaging
+          # and asar verification looked right without pulling the full ~600MB
+          # electron-package-debug artifact just to read what's plain text.
+          exec > >(tee release-builds-summary.txt) 2>&1
+
           find release-builds -maxdepth 2 -type d || echo "no release-builds dir"
           ASAR=$(find release-builds -name app.asar | head -n1 || true)
           if [ -z "$ASAR" ]; then
             echo "ERROR: NO app.asar FOUND -- build did not produce packaged output"
             exit 1
           fi
+
+          echo ""
+          echo "=== File sizes ==="
+          find release-builds -maxdepth 2 -type f -exec ls -lh {} \; 2>/dev/null || true
           
           echo "Verifying required app components in asar..."
           MISSING=0
@@ -264,6 +275,15 @@ jobs:
           
           echo ""
           echo "✓ All required app components verified in asar"
+
+      - name: Upload build summary
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-build-summary
+          path: release-builds-summary.txt
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload packaged app for inspection
         if: always()
