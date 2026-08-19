@@ -62,9 +62,9 @@ Work through phases **in order** — later phases assume earlier ones are done (
 
 ## Phase 7 — Visual/professional polish pass
 
-- [ ] Settings: replace the 3-field "Provider dropdown + password input + label" API key form with a connect-button pattern (e.g. "Connect Gemini" → modal with just the key field, provider pre-selected)
-- [ ] Audit empty states across views (Upload, History, Review tabs, Tags/Trends) for consistent illustration + guidance copy, matching the pattern already used in a few places
-- [ ] Consistency pass on button/icon usage and spacing once the structural changes above land (do this last so it's not redone mid-restructure)
+- [x] Settings: replace the 3-field "Provider dropdown + password input + label" API key form with a connect-button pattern (e.g. "Connect Gemini" → modal with just the key field, provider pre-selected) -- `ApiKeysTab` in `SettingsView.jsx` now shows a "Connect Gemini" button or a compact Connected state (provider + masked key + Change/Disconnect), with the key input moved into a `Dialog` modal; existing `api.apiKeys.*` calls and setup-status callback left untouched
+- [x] Audit empty states across views (Upload, History, Review tabs, Tags/Trends) for consistent illustration + guidance copy, matching the pattern already used in a few places -- brought `HistoryView.jsx` and the Analysis/Listings/Mockups tabs in `ReviewView.jsx` in line with the existing icon + heading + guidance-text pattern; `UploadView.jsx` and `TagsSection.jsx` already matched or don't need one
+- [x] Consistency pass on button/icon usage and spacing once the structural changes above land (do this last so it's not redone mid-restructure) -- normalized button variant usage, icon sizing (`size-4`), and gap spacing across views/components to the established majority pattern; no structural or behavioral changes
 
 ---
 

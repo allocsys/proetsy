@@ -175,15 +175,15 @@ function JobRow({ job, onOpenJob, selected, onToggleSelect }) {
 
 function EmptyState() {
   return (
-    <Card className="py-12">
-      <CardContent className="flex flex-col items-center justify-center gap-3 py-4">
+    <Card>
+      <CardContent className="flex flex-col items-center justify-center gap-3 py-12">
         <div className="flex size-14 items-center justify-center rounded-full bg-muted">
           <Clock className="size-7 text-muted-foreground" />
         </div>
         <div className="text-center">
           <p className="text-sm font-medium text-foreground">No jobs yet</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Upload artwork to get started.
+            Upload artwork to start the pipeline and view your listing history here.
           </p>
         </div>
       </CardContent>
