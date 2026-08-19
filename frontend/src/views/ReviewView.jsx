@@ -286,12 +286,12 @@ function AnalysisTab({ jobId }) {
       {/* No analysis yet */}
       {!loadTask.pending && hasData && !analysis && (
         <Card>
-          <CardContent className="flex flex-col items-center gap-3 py-10">
-            <div className="flex size-12 items-center justify-center rounded-full bg-muted">
-              <Eye className="size-6 text-muted-foreground" />
+          <CardContent className="flex flex-col items-center justify-center gap-3 py-12">
+            <div className="flex size-14 items-center justify-center rounded-full bg-muted">
+              <Eye className="size-7 text-muted-foreground" />
             </div>
             <div className="text-center">
-              <p className="text-sm font-medium text-foreground">No analysis yet for this artwork</p>
+              <p className="text-sm font-medium text-foreground">No analysis yet</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 Click &ldquo;Run Image Analyzer&rdquo; to generate one.
               </p>
@@ -303,14 +303,14 @@ function AnalysisTab({ jobId }) {
       {/* Empty - no job loaded */}
       {!loadTask.pending && !hasData && !error && (
         <Card>
-          <CardContent className="flex flex-col items-center gap-3 py-10">
-            <div className="flex size-12 items-center justify-center rounded-full bg-muted">
-              <FileText className="size-6 text-muted-foreground" />
+          <CardContent className="flex flex-col items-center justify-center gap-3 py-12">
+            <div className="flex size-14 items-center justify-center rounded-full bg-muted">
+              <FileText className="size-7 text-muted-foreground" />
             </div>
             <div className="text-center">
-              <p className="text-sm font-medium text-foreground">Load a job to see analysis</p>
+              <p className="text-sm font-medium text-foreground">No job loaded</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Enter a job ID above and click Load.
+                Enter a job ID above and click Load to see analysis.
               </p>
             </div>
           </CardContent>
@@ -626,16 +626,16 @@ function ListingsTab({ jobId }) {
       {/* Empty */}
       {!loadTask.pending && listings.length === 0 && !loadTask.error && (
         <Card>
-          <CardContent className="flex flex-col items-center gap-3 py-10">
-            <div className="flex size-12 items-center justify-center rounded-full bg-muted">
-              <FileText className="size-6 text-muted-foreground" />
+          <CardContent className="flex flex-col items-center justify-center gap-3 py-12">
+            <div className="flex size-14 items-center justify-center rounded-full bg-muted">
+              <FileText className="size-7 text-muted-foreground" />
             </div>
             <div className="text-center">
-              <p className="text-sm font-medium text-foreground">No listings loaded yet</p>
+              <p className="text-sm font-medium text-foreground">No listings loaded</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {jobId
-                  ? 'Click "Load Listings" to fetch generated listings for this job.'
-                  : 'Load a job first, then fetch its listings.'}
+                  ? 'Click "Load Listings" to fetch generated listings.'
+                  : 'Load a job first to see its listings.'}
               </p>
             </div>
           </CardContent>
@@ -1059,12 +1059,12 @@ function MockupsTab({ jobId }) {
       {/* Empty */}
       {!loadTask.pending && mockups.length === 0 && !loadTask.error && (
         <Card>
-          <CardContent className="flex flex-col items-center gap-3 py-10">
-            <div className="flex size-12 items-center justify-center rounded-full bg-muted">
-              <ImageIcon className="size-6 text-muted-foreground" />
+          <CardContent className="flex flex-col items-center justify-center gap-3 py-12">
+            <div className="flex size-14 items-center justify-center rounded-full bg-muted">
+              <ImageIcon className="size-7 text-muted-foreground" />
             </div>
             <div className="text-center">
-              <p className="text-sm font-medium text-foreground">No mockups loaded yet</p>
+              <p className="text-sm font-medium text-foreground">No mockups loaded</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {jobId
                   ? 'Select categories above and generate, or load existing mockups.'
