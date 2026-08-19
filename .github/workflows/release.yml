@@ -178,9 +178,14 @@ jobs:
       - name: Build Windows installer
         env:
           # electron-builder logs every files-glob include/exclude decision at this
-          # level -- this is the direct way to see why a configured `files` pattern
-          # (e.g. frontend/dist/**/*, backend/**/*) isn't matching anything, without
-          # downloading the packaged output to inspect it by hand.
+          # level -- this is the direct way to see why a configured `files` entry
+          # isn't matching anything, without downloading the packaged output to
+          # inspect it by hand. Note: frontend/dist and backend are packaged via
+          # explicit {from,to,filter} object entries in package.json's `build.files`
+          # (not plain glob strings) -- see that file for why: electron-builder's
+          # matcher special-cases top-level dirs that match an npm `workspaces`
+          # entry when given plain string globs, so "frontend/dist/**" style
+          # patterns silently match nothing for this repo regardless of glob depth.
           DEBUG: electron-builder
         run: npm run electron:build
 
@@ -204,8 +209,20 @@ jobs:
           echo "Verifying required app components in asar..."
           MISSING=0
           
+          # asar list prints backslash-separated paths on a Windows build
+          # (\frontend\dist\index.html) but forward-slash paths on Linux/macOS --
+          # normalize once so the grep patterns below match either way.
+          #
+          # Captured into a variable (once) rather than piped live into each grep/head
+          # below: `ASAR_LIST | grep -q ...` closes its pipe the instant grep finds a
+          # match, which sends SIGPIPE back to `npx asar list`/`tr`. Under
+          # `set -e -o pipefail` that 141 exit status wins over grep's real (successful)
+          # match, so every check below reported MISSING even when the file was present.
+          # Using a captured variable + here-strings (<<<) avoids the live pipe entirely.
+          LISTING=$(npx asar list "$ASAR" | tr '\\' '/')
+          
           # Check frontend
-          if npx asar list "$ASAR" | grep -q "frontend/dist/index.html"; then
+          if grep -q "frontend/dist/index.html" <<< "$LISTING"; then
             echo "✓ frontend/dist/index.html found"
           else
             echo "✗ MISSING: frontend/dist/index.html"
@@ -213,7 +230,7 @@ jobs:
           fi
           
           # Check backend
-          if npx asar list "$ASAR" | grep -q "backend/server.js"; then
+          if grep -q "backend/server.js" <<< "$LISTING"; then
             echo "✓ backend/server.js found"
           else
             echo "✗ MISSING: backend/server.js"
@@ -221,7 +238,7 @@ jobs:
           fi
           
           # Check native module
-          if npx asar list "$ASAR" | grep -q -i "better-sqlite3"; then
+          if grep -q -i "better-sqlite3" <<< "$LISTING"; then
             echo "✓ better-sqlite3 found in asar"
           else
             echo "✗ MISSING: better-sqlite3"
@@ -241,7 +258,7 @@ jobs:
             echo ""
             echo "ERROR: Critical app components missing from packaged asar"
             echo "Full asar contents:"
-            npx asar list "$ASAR" | head -50
+            head -50 <<< "$LISTING"
             exit 1
           fi
           

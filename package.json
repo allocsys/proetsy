@@ -55,12 +55,22 @@
     },
     "files": [
       "electron/**/*",
-      "frontend/dist/**",
-      "backend/**",
-      "!backend/data/**",
-      "!backend/**/*.test.js",
-      "!backend/lib/__fixtures__/**",
-      "!backend/.env",
+      {
+        "from": "frontend/dist",
+        "to": "frontend/dist",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "backend",
+        "to": "backend",
+        "filter": [
+          "**/*",
+          "!data/**",
+          "!**/*.test.js",
+          "!lib/__fixtures__/**",
+          "!.env"
+        ]
+      },
       "package.json"
     ],
     "asarUnpack": [
