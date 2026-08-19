@@ -178,9 +178,14 @@ jobs:
       - name: Build Windows installer
         env:
           # electron-builder logs every files-glob include/exclude decision at this
-          # level -- this is the direct way to see why a configured `files` pattern
-          # (e.g. frontend/dist/**/*, backend/**/*) isn't matching anything, without
-          # downloading the packaged output to inspect it by hand.
+          # level -- this is the direct way to see why a configured `files` entry
+          # isn't matching anything, without downloading the packaged output to
+          # inspect it by hand. Note: frontend/dist and backend are packaged via
+          # explicit {from,to,filter} object entries in package.json's `build.files`
+          # (not plain glob strings) -- see that file for why: electron-builder's
+          # matcher special-cases top-level dirs that match an npm `workspaces`
+          # entry when given plain string globs, so "frontend/dist/**" style
+          # patterns silently match nothing for this repo regardless of glob depth.
           DEBUG: electron-builder
         run: npm run electron:build
 
