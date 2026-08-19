@@ -646,6 +646,21 @@ function ListingsTab({ jobId }) {
 
 // ─── Tab 3: Mockups ───────────────────────────────────────────────────────
 
+// plan.md Phase 5: a single flat `settings` key (same generic key/value table every
+// other settings field already uses -- see api.settings.get/patch) holding a JSON array
+// of category names, e.g. '["wall art","mugs"]'. Shop-wide, not per-job -- "last used"
+// intentionally carries across jobs so the next upload starts pre-checked too.
+const MOCKUP_LAST_CATEGORIES_SETTING = 'mockup_last_categories';
+
+function parseLastCategories(rawValue) {
+  try {
+    const parsed = JSON.parse(rawValue || '[]');
+    return Array.isArray(parsed) ? parsed.filter((c) => typeof c === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
 function MockupCategorySelector({ jobId, onGenerated }) {
   const [categories, setCategories] = useState([]);
   const [templates, setTemplates] = useState([]);
@@ -659,10 +674,22 @@ function MockupCategorySelector({ jobId, onGenerated }) {
     Promise.all([
       api.mockups.templates.categories(),
       api.mockups.templates.list(),
+      api.settings.get(),
     ])
-      .then(([cats, tpls]) => {
-        setCategories(Array.isArray(cats) ? cats : []);
+      .then(([cats, tpls, settings]) => {
+        const resolvedCategories = Array.isArray(cats) ? cats : [];
+        setCategories(resolvedCategories);
         setTemplates(Array.isArray(tpls) ? tpls : []);
+        // Pre-check whatever category selection was last used for a generate run,
+        // instead of starting from nothing every time (plan.md Phase 5). Only
+        // pre-checks categories that still exist, in case templates were removed
+        // since the last run. Always derived fresh (even to an empty selection) --
+        // this component instance persists across job switches (MockupsTab doesn't
+        // remount it), so leaving a stale `checked` state in place here would let an
+        // unsaved manual selection from a previous job bleed into the next one.
+        const lastUsed = parseLastCategories(settings?.[MOCKUP_LAST_CATEGORIES_SETTING]);
+        const stillValid = lastUsed.filter((c) => resolvedCategories.includes(c));
+        setChecked(Object.fromEntries(stillValid.map((c) => [c, true])));
         setLoaded(true);
       })
       .catch(() => {});
@@ -672,28 +699,43 @@ function MockupCategorySelector({ jobId, onGenerated }) {
     setChecked((prev) => ({ ...prev, [category]: !prev[category] }));
   }, []);
 
+  // "All enabled templates" quick-select (plan.md Phase 5) -- checks every category
+  // that currently has at least one configured template, in one click.
+  const selectAllEnabled = useCallback(() => {
+    setChecked(Object.fromEntries(categories.map((c) => [c, true])));
+  }, [categories]);
+
+  const checkedCategoryNames = useMemo(
+    () => Object.keys(checked).filter((c) => checked[c]),
+    [checked]
+  );
+
   const resolvedSizeKeys = useMemo(() => {
-    const checkedCategories = new Set(
-      Object.keys(checked).filter((c) => checked[c])
-    );
+    const checkedCategories = new Set(checkedCategoryNames);
     if (!checkedCategories.size) return [];
     return templates
       .filter((t) => t.category && checkedCategories.has(t.category))
       .map((t) => t.size_key);
-  }, [checked, templates]);
+  }, [checkedCategoryNames, templates]);
 
   const handleGenerate = useCallback(async () => {
     if (!jobId || !resolvedSizeKeys.length) return;
     setStatus('Generating mockups…');
     const succeeded = await runTask.run(async () => {
       const data = await api.jobs.runModule(jobId, { size_keys: resolvedSizeKeys });
+      // Persist this run's category selection as "last used" for next time (plan.md
+      // Phase 5). Best-effort -- a failure here shouldn't surface as a generate
+      // failure, since the mockups themselves already generated successfully.
+      api.settings
+        .patch({ [MOCKUP_LAST_CATEGORIES_SETTING]: JSON.stringify(checkedCategoryNames) })
+        .catch(() => {});
       setStatus(`Generated mockups for ${resolvedSizeKeys.length} template${resolvedSizeKeys.length === 1 ? '' : 's'}.`);
       onGenerated?.();
       toast.success(`Mockups generated for ${resolvedSizeKeys.length} size(s)`);
       return data;
     });
     if (!succeeded) setStatus('');
-  }, [jobId, resolvedSizeKeys, runTask, onGenerated]);
+  }, [jobId, resolvedSizeKeys, checkedCategoryNames, runTask, onGenerated]);
 
   if (!loaded) return null;
 
@@ -707,30 +749,42 @@ function MockupCategorySelector({ jobId, onGenerated }) {
       </CardHeader>
       <CardContent className="space-y-4">
         {categories.length > 0 ? (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-            {categories.map((c) => (
-              <label
-                key={c}
-                className={cn(
-                  'flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors',
-                  checked[c]
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-border hover:bg-muted/30 text-foreground'
-                )}
+          <>
+            <div className="flex items-center justify-between">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={selectAllEnabled}
+                className="gap-1.5"
               >
-                <input
-                  type="checkbox"
-                  className="sr-only"
-                  checked={!!checked[c]}
-                  onChange={() => toggleCategory(c)}
-                />
-                <span className="font-medium">{c}</span>
-                <span className="ml-auto text-xs text-muted-foreground">
-                  {templates.filter((t) => t.category === c).length}
-                </span>
-              </label>
-            ))}
-          </div>
+                All enabled templates
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+              {categories.map((c) => (
+                <label
+                  key={c}
+                  className={cn(
+                    'flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors',
+                    checked[c]
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border hover:bg-muted/30 text-foreground'
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={!!checked[c]}
+                    onChange={() => toggleCategory(c)}
+                  />
+                  <span className="font-medium">{c}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {templates.filter((t) => t.category === c).length}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </>
         ) : (
           <p className="text-sm text-muted-foreground">No mockup categories configured yet.</p>
         )}

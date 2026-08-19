@@ -48,9 +48,9 @@ Work through phases **in order** — later phases assume earlier ones are done (
 
 **Problem:** Mockup category checkboxes must be manually re-selected on every job.
 
-- [ ] Persist "last used category selection" per shop (new `settings` key, e.g. `mockup_last_categories`) via existing `api.settings.patch`
-- [ ] On `MockupCategorySelector` mount, pre-check the last-used set instead of nothing
-- [ ] Add an "All enabled templates" quick-select option alongside per-category checkboxes
+- [x] Persist "last used category selection" per shop (new `settings` key, e.g. `mockup_last_categories`) via existing `api.settings.patch` -- persisted as a JSON array string on the generic `settings` key/value table, written each time `Generate Mockups` runs (`MockupCategorySelector` in `ReviewView.jsx`)
+- [x] On `MockupCategorySelector` mount, pre-check the last-used set instead of nothing -- categories no longer present among the currently configured templates are filtered out rather than left checked
+- [x] Add an "All enabled templates" quick-select option alongside per-category checkboxes
 
 ## Phase 6 — Bulk actions (highest leverage for batch workflows)
 

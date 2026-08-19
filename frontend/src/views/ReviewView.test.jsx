@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 import ReviewView from './ReviewView.jsx';
@@ -132,5 +132,112 @@ describe('ReviewView — Listings tab (Phase 4: post-save diff notice)', () => {
       expect(toast.success).toHaveBeenCalledWith('Listing saved');
     });
     expect(screen.queryByText(/Removed/i)).not.toBeInTheDocument();
+  });
+});
+
+// plan.md Phase 5 — "Smart defaults for mockup generation": the last-used mockup
+// category selection is persisted to the generic `settings` key/value store (see
+// MOCKUP_LAST_CATEGORIES_SETTING in ReviewView.jsx) and pre-checked on mount instead of
+// starting from nothing every time; an "All enabled templates" quick-select is available
+// alongside the per-category checkboxes.
+
+const MOCKUP_CATEGORIES = ['wall art', 'mugs'];
+const MOCKUP_TEMPLATES = [
+  { size_key: 'wa-12x16', category: 'wall art' },
+  { size_key: 'mug-11oz', category: 'mugs' },
+];
+
+function mockupTemplateEndpoints(settingsOverrides = {}) {
+  return [
+    ['/api/mockup-templates/categories', () => ({ ok: true, json: async () => MOCKUP_CATEGORIES })],
+    ['/api/mockup-templates', () => ({ ok: true, json: async () => MOCKUP_TEMPLATES })],
+    ['/api/settings', () => ({ ok: true, json: async () => settingsOverrides })],
+  ];
+}
+
+function checkboxFor(labelText) {
+  return within(screen.getByText(labelText).closest('label')).getByRole('checkbox');
+}
+
+describe('ReviewView — Mockups tab (Phase 5: smart defaults for mockup generation)', () => {
+  it('pre-checks the last-used category selection on mount instead of starting from nothing', async () => {
+    global.fetch = makeFetchQueue(
+      mockupTemplateEndpoints({ mockup_last_categories: JSON.stringify(['mugs']) })
+    );
+    render(<ReviewView jobId={7} />);
+
+    await screen.findByText('Select Mockup Categories');
+    await waitFor(() => expect(checkboxFor('mugs').checked).toBe(true));
+    expect(checkboxFor('wall art').checked).toBe(false);
+  });
+
+  it('starts with nothing checked when no last-used selection is saved yet', async () => {
+    global.fetch = makeFetchQueue(mockupTemplateEndpoints({}));
+    render(<ReviewView jobId={7} />);
+
+    await screen.findByText('Select Mockup Categories');
+    expect(checkboxFor('wall art').checked).toBe(false);
+    expect(checkboxFor('mugs').checked).toBe(false);
+  });
+
+  it('"All enabled templates" checks every category in one click', async () => {
+    global.fetch = makeFetchQueue(mockupTemplateEndpoints({}));
+    const user = userEvent.setup();
+    render(<ReviewView jobId={7} />);
+
+    await screen.findByText('Select Mockup Categories');
+    await user.click(screen.getByRole('button', { name: 'All enabled templates' }));
+
+    expect(checkboxFor('wall art').checked).toBe(true);
+    expect(checkboxFor('mugs').checked).toBe(true);
+  });
+
+  it('persists the checked selection as the new "last used" set after generating', async () => {
+    const fetchMock = makeFetchQueue([
+      ...mockupTemplateEndpoints({}),
+      ['/api/jobs/7/run', () => ({ ok: true, json: async () => ({ job: { id: 7 } }) })],
+      ['/api/jobs/7/mockups', () => ({ ok: true, json: async () => [] })],
+    ]);
+    global.fetch = fetchMock;
+    const user = userEvent.setup();
+    render(<ReviewView jobId={7} />);
+
+    await screen.findByText('Select Mockup Categories');
+    await user.click(checkboxFor('mugs'));
+    await user.click(screen.getByRole('button', { name: /Generate Mockups/i }));
+
+    await waitFor(() => {
+      const patchCall = fetchMock.mock.calls.find(
+        ([url, options]) => url === '/api/settings' && options?.method === 'PATCH'
+      );
+      expect(patchCall).toBeTruthy();
+      expect(JSON.parse(patchCall[1].body)).toEqual({
+        mockup_last_categories: JSON.stringify(['mugs']),
+      });
+    });
+  });
+
+  it('does not leak an unsaved manual selection across job switches (regression: checked state must be re-derived from settings on every effect run, not left stale when there is no saved last-used selection)', async () => {
+    const fetchMock = makeFetchQueue([
+      ...mockupTemplateEndpoints({}),
+      ['/api/jobs/8', () => ({ ok: true, json: async () => ({ id: 8, overall_status: 'pending' }) })],
+    ]);
+    global.fetch = fetchMock;
+    const user = userEvent.setup();
+    const { rerender } = render(<ReviewView jobId={7} />);
+
+    await screen.findByText('Select Mockup Categories');
+    await user.click(checkboxFor('mugs'));
+    expect(checkboxFor('mugs').checked).toBe(true);
+
+    // Switch to a different job without generating -- e.g. navigating to another job
+    // from History. MockupCategorySelector isn't remounted (MockupsTab renders the same
+    // instance), so its own effect must re-derive `checked` fresh rather than leaving
+    // job 7's unsaved manual check in place.
+    rerender(<ReviewView jobId={8} />);
+    await screen.findByText(/Job #8/);
+
+    await waitFor(() => expect(checkboxFor('mugs').checked).toBe(false));
+    expect(checkboxFor('wall art').checked).toBe(false);
   });
 });
