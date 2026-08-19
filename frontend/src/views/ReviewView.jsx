@@ -12,6 +12,7 @@ import {
   Check,
   RefreshCw,
   Camera,
+  CheckCheck,
 } from 'lucide-react';
 import { api } from '@/hooks/useApi';
 import { useAsyncTask } from '@/hooks/useAsyncTask';
@@ -945,6 +946,7 @@ function MockupsSkeleton() {
 function MockupsTab({ jobId }) {
   const [mockups, setMockups] = useState([]);
   const loadTask = useAsyncTask();
+  const approveTask = useAsyncTask();
 
   const handleLoadMockups = useCallback(() => {
     if (!jobId) return;
@@ -957,6 +959,32 @@ function MockupsTab({ jobId }) {
   const handleVariantChange = useCallback(() => {
     handleLoadMockups();
   }, [handleLoadMockups]);
+
+  // plan.md Phase 6: "Approve all non-flagged" alongside the existing per-mockup variant
+  // selection. Non-flagged mockups (needs_review === 0) already have a valid
+  // selected_variant (smart_crop by default) -- there's no separate "approved" concept
+  // in the schema to flip, so this re-PATCHes each one's current variant via the same
+  // endpoint the per-mockup picker uses. That's a real (if idempotent) confirm action,
+  // not just a client-side label, and needs no new backend endpoint.
+  const nonFlaggedMockups = useMemo(
+    () => mockups.filter((m) => !m.needs_review),
+    [mockups]
+  );
+
+  const handleApproveAllNonFlagged = useCallback(() => {
+    if (!jobId || !nonFlaggedMockups.length) return;
+    approveTask.run(async () => {
+      await Promise.all(
+        nonFlaggedMockups.map((m) =>
+          api.mockups.setVariant(jobId, m.id, m.selected_variant || 'smart_crop')
+        )
+      );
+      toast.success(
+        `Approved ${nonFlaggedMockups.length} mockup${nonFlaggedMockups.length !== 1 ? 's' : ''}`
+      );
+      await handleLoadMockups();
+    });
+  }, [jobId, nonFlaggedMockups, approveTask, handleLoadMockups]);
 
   return (
     <div className="space-y-4">
@@ -978,7 +1006,33 @@ function MockupsTab({ jobId }) {
             {mockups.length} mockup{mockups.length !== 1 ? 's' : ''}
           </Badge>
         )}
+        {nonFlaggedMockups.length > 0 && (
+          <Button
+            variant="outline"
+            onClick={handleApproveAllNonFlagged}
+            disabled={approveTask.pending}
+            className="ml-auto gap-1.5"
+            title="Re-confirms the current variant for every mockup that doesn't need review"
+          >
+            {approveTask.pending ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <CheckCheck className="size-3.5" />
+            )}
+            Approve all non-flagged ({nonFlaggedMockups.length})
+          </Button>
+        )}
       </div>
+
+      {/* Bulk approve error */}
+      {approveTask.error && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="flex items-center gap-3 py-3">
+            <AlertCircle className="size-4 shrink-0 text-destructive" />
+            <p className="text-sm text-destructive">{approveTask.error}</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Error */}
       {loadTask.error && (

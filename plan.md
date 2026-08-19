@@ -56,9 +56,9 @@ Work through phases **in order** — later phases assume earlier ones are done (
 
 **Problem:** Tags, listings, and mockups are all edited one at a time; History has no multi-select.
 
-- [ ] `HistoryView.jsx`: add row multi-select + bulk action bar ("Approve all", "Regenerate all flagged", "Re-run pipeline")
-- [ ] `ReviewView.jsx` Mockups tab: "Approve all non-flagged" action alongside existing per-mockup variant selection
-- [ ] Backend: confirm/add bulk endpoints as needed (check `backend/lib/jobs.js` `runBatch` — likely reusable; mockup bulk-approve may need a new endpoint)
+- [x] `HistoryView.jsx`: add row multi-select + bulk action bar ("Approve all", "Regenerate all flagged", "Re-run pipeline") -- "Re-run pipeline" and "Regenerate flagged" both call the existing `POST /api/jobs/run-batch`; "Approve all" is shown disabled with an explanatory tooltip since jobs have no "approved" concept in the schema today
+- [x] `ReviewView.jsx` Mockups tab: "Approve all non-flagged" action alongside existing per-mockup variant selection -- re-confirms each non-flagged mockup's current `selected_variant` via the existing per-mockup PATCH endpoint
+- [x] Backend: confirm/add bulk endpoints as needed -- confirmed `runBatch` is reusable as-is for History; mockup bulk-approve did not need a new endpoint, since looping the existing single-mockup PATCH client-side is sufficient (non-flagged mockups already carry a valid variant, so there's nothing new to add server-side)
 
 ## Phase 7 — Visual/professional polish pass
 

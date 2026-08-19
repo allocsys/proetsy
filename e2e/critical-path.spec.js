@@ -46,6 +46,16 @@ test.describe('critical path: upload → generate listing → review → copy-to
       navigator.clipboard.readText = async () => clipboardText;
     });
 
+    // App.jsx auto-routes to the first-launch onboarding wizard instead of UploadView
+    // whenever setup-status shows nothing configured (see isNothingConfigured) and this
+    // flag isn't set -- which is always true against this suite's fresh throwaway
+    // backend/browser context. Set the same localStorage flag a returning user's browser
+    // would already have, so the app routes to 'upload' like it would for any non-first-
+    // launch user, which is what this critical-path test is actually meant to cover.
+    await page.addInitScript(() => {
+      localStorage.setItem('proetsy-onboarding-seen', '1');
+    });
+
     await page.goto('/');
 
     // Confirm the backend is actually reachable before doing anything real — a much

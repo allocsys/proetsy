@@ -241,3 +241,72 @@ describe('ReviewView — Mockups tab (Phase 5: smart defaults for mockup generat
     expect(checkboxFor('wall art').checked).toBe(false);
   });
 });
+
+// plan.md Phase 6 — "Approve all non-flagged": bulk-confirms every loaded mockup that
+// doesn't need review (needs_review === 0) by re-PATCHing its current selected_variant
+// via the same endpoint the per-mockup picker already uses. Flagged mockups (still
+// awaiting a smart-crop-vs-AI-extended choice) are left untouched by the bulk action.
+
+const MOCKUPS = [
+  { id: 1, job_id: 7, size_key: 'wa-12x16', needs_review: 0, selected_variant: 'smart_crop', file_url: '/m1.png' },
+  {
+    id: 2,
+    job_id: 7,
+    size_key: 'mug-11oz',
+    needs_review: 1,
+    selected_variant: 'smart_crop',
+    smart_crop_url: '/m2-crop.png',
+    ai_extended_url: '/m2-ext.png',
+  },
+  { id: 3, job_id: 7, size_key: 'tote', needs_review: 0, selected_variant: 'ai_extended', file_url: '/m3.png' },
+];
+
+describe('ReviewView — Mockups tab (Phase 6: Approve all non-flagged)', () => {
+  it('PATCHes the current variant for every non-flagged mockup only, then shows a success toast and reloads', async () => {
+    const fetchMock = makeFetchQueue([
+      ...mockupTemplateEndpoints({}),
+      ['/api/jobs/7/mockups', () => ({ ok: true, json: async () => MOCKUPS })],
+      [/\/api\/jobs\/7\/mockups\/1\/variant$/, () => ({ ok: true, json: async () => ({ ...MOCKUPS[0] }) })],
+      [/\/api\/jobs\/7\/mockups\/3\/variant$/, () => ({ ok: true, json: async () => ({ ...MOCKUPS[2] }) })],
+    ]);
+    global.fetch = fetchMock;
+    const user = userEvent.setup();
+    render(<ReviewView jobId={7} />);
+
+    await user.click(screen.getByRole('button', { name: /Load Mockups/i }));
+    const approveButton = await screen.findByRole('button', { name: /Approve all non-flagged \(2\)/i });
+    await user.click(approveButton);
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Approved 2 mockups');
+    });
+
+    const variantPatchCalls = fetchMock.mock.calls.filter(([url]) => /\/variant$/.test(url));
+    expect(variantPatchCalls).toHaveLength(2);
+    const patchedIds = variantPatchCalls.map(([url]) => url.match(/mockups\/(\d+)\/variant/)[1]).sort();
+    expect(patchedIds).toEqual(['1', '3']);
+
+    const call1 = variantPatchCalls.find(([url]) => url.includes('/1/variant'));
+    expect(JSON.parse(call1[1].body)).toEqual({ variant: 'smart_crop' });
+    const call3 = variantPatchCalls.find(([url]) => url.includes('/3/variant'));
+    expect(JSON.parse(call3[1].body)).toEqual({ variant: 'ai_extended' });
+
+    // Reloads after approving -- GET .../mockups is called again beyond the initial load.
+    const mockupGetCalls = fetchMock.mock.calls.filter(([url]) => url === '/api/jobs/7/mockups');
+    expect(mockupGetCalls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('does not show the bulk approve button when every loaded mockup needs review', async () => {
+    global.fetch = makeFetchQueue([
+      ...mockupTemplateEndpoints({}),
+      ['/api/jobs/7/mockups', () => ({ ok: true, json: async () => [MOCKUPS[1]] })],
+    ]);
+    const user = userEvent.setup();
+    render(<ReviewView jobId={7} />);
+
+    await user.click(screen.getByRole('button', { name: /Load Mockups/i }));
+    await screen.findByText(/1 mockup/);
+
+    expect(screen.queryByRole('button', { name: /Approve all non-flagged/i })).not.toBeInTheDocument();
+  });
+});
