@@ -29,7 +29,12 @@ on:
   workflow_dispatch: {}
 
 env:
-  NODE_VERSION: '24'
+  # Pinned to a specific patch (not floating '24') -- 24.19.0 has a native-addon
+  # cleanup-hook regression that intermittently crashes processes using native
+  # modules (e.g. better-sqlite3) during worker/environment teardown. Same fix as
+  # ci.yml -- see that file's env block for the full rationale and upstream issue
+  # link. Bump deliberately once upstream ships a fix.
+  NODE_VERSION: '24.18.0'
 
 jobs:
   # Same gate as CI — a release should never ship on top of a red build. This job is
