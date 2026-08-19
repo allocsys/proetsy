@@ -4,6 +4,9 @@
 
 - `ReviewView`'s mockup category selector now pre-checks the last-used category selection (persisted per shop via the `mockup_last_categories` setting) instead of starting from nothing on every job, and offers an "All enabled templates" quick-select alongside the per-category checkboxes.
 
+- `HistoryView` now supports row multi-select (per-batch and per-job, plus "Select all") with a bulk action bar offering "Re-run pipeline" and "Regenerate flagged" (both via the existing `POST /api/jobs/run-batch`); "Approve all" is present but disabled, since jobs have no "approved" state in the backend yet.
+- `ReviewView`'s Mockups tab now has an "Approve all non-flagged" bulk action that re-confirms every loaded mockup that doesn't need review, via the existing per-mockup variant PATCH endpoint -- no new backend route needed.
+
 ### Changed
 - Extracted `TagsSection` out of `SettingsView.jsx` into `frontend/src/components/TagsSection.jsx` so both Settings and the onboarding wizard share one implementation.
 
