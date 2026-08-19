@@ -41,7 +41,12 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '24'
+  # Pinned to a specific patch (not floating '24') -- 24.19.0 has a native-addon
+  # cleanup-hook regression that intermittently crashes processes using native
+  # modules (e.g. better-sqlite3) during worker/environment teardown. See
+  # https://github.com/nexu-io/open-design/issues/6462. Bump deliberately once
+  # upstream ships a fix, the same way package-lock.json pins other deps.
+  NODE_VERSION: '24.18.0'
 
 jobs:
   install:
