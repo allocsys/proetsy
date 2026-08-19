@@ -47,13 +47,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -1191,8 +1184,10 @@ function AutomationDiagnosticsTab({ showAdvanced }) {
   if (!showAdvanced) {
     return (
       <Card>
-        <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
-          <Bot className="size-6 text-muted-foreground" />
+        <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+          <div className="flex size-14 items-center justify-center rounded-full bg-muted">
+            <Bot className="size-7 text-muted-foreground" />
+          </div>
           <p className="text-sm font-medium text-foreground">Advanced automation settings are hidden</p>
           <p className="max-w-sm text-xs text-muted-foreground">
             Watch folders, rate limit diagnostics, and taste-filter auto-approval live here.
