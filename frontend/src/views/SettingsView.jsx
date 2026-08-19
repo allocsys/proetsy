@@ -21,6 +21,7 @@ import {
   Gauge,
   Wand2,
   Save,
+  CheckCircle2,
 } from 'lucide-react';
 import { api } from '@/hooks/useApi';
 import { useAsyncTask } from '@/hooks/useAsyncTask';
@@ -52,6 +53,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import ShopConventions from '@/ShopConventions';
 import { getModuleLabel } from '@/lib/pipelineModules';
 import TagsSection from '@/components/TagsSection.jsx';
@@ -546,10 +555,9 @@ function ShopAndPipelineTab({ showAdvanced }) {
 
 function ApiKeysTab({ onSetupStatusChange }) {
   const [keys, setKeys] = useState([]);
-  const [newProvider, setNewProvider] = useState('');
   const [newKeyValue, setNewKeyValue] = useState('');
-  const [newLabel, setNewLabel] = useState('');
   const [showKey, setShowKey] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const loadTask = useAsyncTask();
   const addTask = useAsyncTask();
   const toggleTask = useAsyncTask();
@@ -569,24 +577,23 @@ function ApiKeysTab({ onSetupStatusChange }) {
   }, []);
 
   const handleAddKey = useCallback(() => {
-    if (!newProvider || !newKeyValue.trim()) {
-      toast.error('Provider and key value are required');
+    if (!newKeyValue.trim()) {
+      toast.error('Enter your Gemini API key');
       return;
     }
     addTask.run(async () => {
       await api.apiKeys.add({
-        provider: newProvider,
+        provider: 'gemini',
         key_value: newKeyValue.trim(),
-        label: newLabel.trim() || null,
+        label: 'Gemini',
       });
-      toast.success('API key added');
-      setNewProvider('');
+      toast.success('Gemini API key connected');
       setNewKeyValue('');
-      setNewLabel('');
+      setIsModalOpen(false);
       loadKeys();
       onSetupStatusChange?.();
     });
-  }, [newProvider, newKeyValue, newLabel, addTask, loadKeys, onSetupStatusChange]);
+  }, [newKeyValue, addTask, loadKeys, onSetupStatusChange]);
 
   const handleToggleKey = useCallback((id, enabled) => {
     toggleTask.run(async () => {
@@ -621,41 +628,84 @@ function ApiKeysTab({ onSetupStatusChange }) {
     return key.slice(0, 4) + '••••••••' + key.slice(-4);
   }
 
+  const geminiKey = keys.find((k) => k.provider === 'gemini');
+
   return (
     <div className="space-y-6">
-      {/* Add key form */}
+      {/* Connect Gemini card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-sm">
             <Key className="size-4" />
-            Add API Key
+            Gemini API Key
           </CardTitle>
+          <CardDescription>
+            Proetsy uses Gemini to analyze artwork and generate listings.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="w-full space-y-1.5 sm:w-40">
-              <Label className="text-xs text-muted-foreground">Provider</Label>
-              <Select value={newProvider} onValueChange={setNewProvider}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select…" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="gemini">Gemini</SelectItem>
-                  <SelectItem value="openai">OpenAI</SelectItem>
-                  <SelectItem value="midjourney">Midjourney</SelectItem>
-                  <SelectItem value="replicate">Replicate</SelectItem>
-                </SelectContent>
-              </Select>
+          {geminiKey ? (
+            <div className="flex items-center justify-between gap-4 rounded-lg border border-border px-4 py-3 bg-muted/20">
+              <div className="flex items-center gap-3 min-w-0">
+                <CheckCircle2 className="size-5 text-emerald-500 shrink-0" />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-foreground">Gemini</span>
+                    <Badge variant="default" className="text-[10px]">Connected</Badge>
+                  </div>
+                  <p className="font-mono text-xs text-muted-foreground truncate mt-0.5">
+                    {maskKey(geminiKey.maskedKey)} {geminiKey.label ? `(${geminiKey.label})` : ''}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button variant="outline" size="sm" onClick={() => setIsModalOpen(true)}>
+                  Change
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDeleteKey(geminiKey)}
+                  disabled={deleteTask.pending}
+                  className="text-destructive hover:text-destructive"
+                >
+                  Disconnect
+                </Button>
+              </div>
             </div>
-            <div className="flex-1 space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Key Value</Label>
+          ) : (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">No Gemini API key connected yet.</p>
+              <Button onClick={() => setIsModalOpen(true)} className="gap-1.5 shrink-0">
+                <Key className="size-3.5" />
+                Connect Gemini
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Connect modal */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Connect Gemini API Key</DialogTitle>
+            <DialogDescription>
+              Enter your Gemini API key to enable listing generation and artwork analysis.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="gemini-key-input" className="text-xs text-muted-foreground">API Key</Label>
               <div className="relative">
                 <Input
+                  id="gemini-key-input"
                   type={showKey ? 'text' : 'password'}
                   value={newKeyValue}
                   onChange={(e) => setNewKeyValue(e.target.value)}
-                  placeholder="sk-… or API key"
+                  placeholder="AIza…"
                   className="pr-8"
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddKey()}
                 />
                 <button
                   type="button"
@@ -667,22 +717,19 @@ function ApiKeysTab({ onSetupStatusChange }) {
                 </button>
               </div>
             </div>
-            <div className="w-full space-y-1.5 sm:w-48">
-              <Label className="text-xs text-muted-foreground">Label</Label>
-              <Input
-                value={newLabel}
-                onChange={(e) => setNewLabel(e.target.value)}
-                placeholder="e.g. Primary Gemini Key"
-              />
-            </div>
-            <Button onClick={handleAddKey} disabled={addTask.pending} className="gap-1.5 shrink-0">
-              {addTask.pending ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
-              Add Key
-            </Button>
+            {addTask.error && <p className="text-xs text-destructive">{addTask.error}</p>}
           </div>
-          {addTask.error && <p className="mt-2 text-xs text-destructive">{addTask.error}</p>}
-        </CardContent>
-      </Card>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddKey} disabled={addTask.pending} className="gap-1.5">
+              {addTask.pending ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+              Save Key
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Keys table */}
       <Card>
@@ -705,7 +752,7 @@ function ApiKeysTab({ onSetupStatusChange }) {
             <p className="text-sm text-destructive">{loadTask.error}</p>
           ) : keys.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
-              No API keys configured. Add one above to get started.
+              No API keys configured. Connect Gemini above to get started.
             </p>
           ) : (
             <Table>
