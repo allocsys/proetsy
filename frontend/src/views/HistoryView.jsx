@@ -105,7 +105,7 @@ function BatchGroup({ batchId, jobs, onOpenJob, selectedIds, onToggleJob, onTogg
               </Badge>
               {someSelected && (
                 <Badge variant="outline" className="text-[10px]">
-                  {jobs.filter((j) => selectedIds.has(j.id)).length} selected
+                  {jobs.filter((j) => selectedIds.has(j.id)).length} of {jobs.length} selected
                 </Badge>
               )}
             </div>
