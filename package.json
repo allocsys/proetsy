@@ -55,8 +55,8 @@
     },
     "files": [
       "electron/**/*",
-      "frontend/dist/**/*",
-      "backend/**/*",
+      "frontend/dist/**",
+      "backend/**",
       "!backend/data/**",
       "!backend/**/*.test.js",
       "!backend/lib/__fixtures__/**",
