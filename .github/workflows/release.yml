@@ -154,12 +154,8 @@ jobs:
       contents: write
     env:
       # Deliberately NOT env.NODE_VERSION (24) for this job -- see ARCHITECTURE.md
-      # "Electron packaging -- build sequence" for the finding: better-sqlite3 has no
-      # prebuilt binary for Node 24 on win32-x64 yet, so `npm ci` fell back to a
-      # from-source node-gyp compile, which then failed on windows-latest with
-      # "Could not find any Visual Studio installation to use". Pinning this job to a
-      # well-established LTS avoids the compile-from-source path entirely rather than
-      # fighting node-gyp's VS detection. Every other job keeps using env.NODE_VERSION.
+      # "Electron packaging -- build sequence". Every other job keeps using
+      # env.NODE_VERSION; this one stays pinned to a well-established LTS.
       ELECTRON_JOB_NODE_VERSION: '22'
     steps:
       - uses: actions/checkout@v5
@@ -167,6 +163,18 @@ jobs:
         with:
           node-version: ${{ env.ELECTRON_JOB_NODE_VERSION }}
           cache: npm
+
+      # better-sqlite3 (>=13, N-API) bundles a win32-x64 prebuild and has no
+      # install/postinstall script of its own -- but it still ships binding.gyp
+      # for platforms without a prebuild, which makes npm implicitly run
+      # `node-gyp rebuild` on install regardless. On Windows, node-gyp's
+      # `configure` step needs a VS toolchain just to start, before it can even
+      # evaluate binding.gyp's own "skip the build, a prebuild exists" logic.
+      # This activates the VS toolchain already on the windows-latest image so
+      # that configure succeeds; the resulting build is still a no-op and the
+      # bundled prebuild is what ships. See #97 for the full investigation.
+      - uses: ilammy/msvc-dev-cmd@v1
+
       - run: npm ci
       - name: Verify electron:build script includes frontend build
         shell: bash
