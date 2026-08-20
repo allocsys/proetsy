@@ -10,6 +10,9 @@
 ### Changed
 - Extracted `TagsSection` out of `SettingsView.jsx` into `frontend/src/components/TagsSection.jsx` so both Settings and the onboarding wizard share one implementation.
 
+### Fixed
+- Electron packaged builds: a backend crash-at-startup or window-load failure with no error dialog and no diagnosable trace (#97, recurrence of #86). Backend stdout/stderr is now captured to a log file under `userData/logs` in packaged builds (previously invisible when launched via Start menu/double-click); `createWindow()`'s `loadFile()` failure, `did-fail-load`, `render-process-gone`, and a synchronous `createWindow()` throw are now all routed through the existing `reportBackendStartupFailure()` error dialog instead of failing silently. Release CI now also verifies `better-sqlite3` actually loads and runs a query under Electron's Node ABI (previously only checked that the file was present, not that it worked) -- this doesn't yet confirm the fix on a real end-user machine, so #97 stays open pending that verification.
+
 ## [0.11.5] - 2026-08-18
 ### Fixed
 - Windows Electron installer now includes `frontend/dist` and `backend/` in the packaged app -- previously the release workflow was missing the `npm run build -w frontend` step, causing installed apps to have no UI and fail immediately on startup (#86).
