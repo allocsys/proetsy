@@ -355,6 +355,109 @@ jobs:
             exit 1
           fi
 
+      # Issue #97's literal reported symptom: processes running (visible in Task
+      # Manager), no window ever appears, no error dialog. The two steps above verify
+      # the native module in isolation but never actually run the app the way a user
+      # does. This step does: launches the real win-unpacked exe as a normal packaged
+      # Electron app (no ELECTRON_RUN_AS_NODE), polls the same /api/health endpoint
+      # waitForBackend() polls from inside the app -- but from outside, exercising the
+      # real spawnBackend() -> Express-binds-the-port sequence rather than a mocked or
+      # isolated check -- then confirms a real window (non-zero MainWindowHandle)
+      # actually appears afterward. `--disable-gpu` works around windows-latest runners
+      # being GPU-less VMs (Chromium's GPU process can otherwise fail to init and hang
+      # window creation for CI-environment reasons unrelated to #97's actual bug); a
+      # real user's machine doesn't need it.
+      - name: Launch packaged app and verify health check + window
+        if: always()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
+
+          $unpackedDir = Get-ChildItem -Path release-builds -Directory -Filter 'win-unpacked' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $unpackedDir) {
+            Write-Host "SKIP: no win-unpacked directory found (packaging step above already failed/produced nothing to test)"
+            exit 0
+          }
+          $exe = Get-ChildItem -Path $unpackedDir.FullName -Filter '*.exe' -File | Select-Object -First 1
+          if (-not $exe) {
+            Write-Host "SKIP: no packaged .exe found under $($unpackedDir.FullName)"
+            exit 0
+          }
+
+          Write-Host "Launching $($exe.FullName) (real packaged app, not ELECTRON_RUN_AS_NODE) ..."
+          $proc = Start-Process -FilePath $exe.FullName -ArgumentList '--disable-gpu' -PassThru
+
+          try {
+            $healthy = $false
+            $deadline = (Get-Date).AddSeconds(45)
+            while ((Get-Date) -lt $deadline) {
+              if ($proc.HasExited) {
+                Write-Host "::error::App process exited early (code $($proc.ExitCode)) before becoming healthy -- consistent with issue #97 (silent startup failure)."
+                exit 1
+              }
+              try {
+                $resp = Invoke-WebRequest -Uri 'http://localhost:4000/api/health' -UseBasicParsing -TimeoutSec 2
+                if ($resp.StatusCode -eq 200) { $healthy = $true; break }
+              } catch {
+                Start-Sleep -Milliseconds 500
+              }
+            }
+
+            if (-not $healthy) {
+              Write-Host "::error::Backend never became healthy within 45s -- either it crashed silently or waitForBackend()'s health check never passed."
+              exit 1
+            }
+            Write-Host "OK: backend responded on /api/health"
+
+            # createWindow()/loadFile() run only after waitForBackend() resolves, so a
+            # window-side bug (the actual #97 symptom) would show up here even with a
+            # confirmed-healthy backend -- give it a grace period rather than checking
+            # immediately.
+            $windowFound = $false
+            $windowDeadline = (Get-Date).AddSeconds(15)
+            while ((Get-Date) -lt $windowDeadline) {
+              $running = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
+              if (-not $running) {
+                Write-Host "::error::App process exited after passing the health check, before a window appeared."
+                exit 1
+              }
+              if ($running.MainWindowHandle -ne 0) {
+                $windowFound = $true
+                Write-Host "OK: window detected (title: '$($running.MainWindowTitle)')"
+                break
+              }
+              Start-Sleep -Milliseconds 500
+            }
+
+            if (-not $windowFound) {
+              Write-Host "::error::No window appeared within 15s of the backend becoming healthy -- this is exactly issue #97's symptom (processes running, no window)."
+              exit 1
+            }
+
+            Write-Host "PASS: packaged app launched, backend became healthy, and a window appeared."
+          }
+          finally {
+            # Kill the whole process tree (Electron main + GPU/utility helper + spawned
+            # backend node process) -- #97 itself is about these surviving with no
+            # window, so leaving any running here would be the same leak, times three
+            # orphaned processes on the runner.
+            if ($proc -and -not $proc.HasExited) {
+              taskkill /PID $proc.Id /T /F | Out-Null
+            }
+
+            # Best-effort: surface the packaged app's own backend.log (spawnBackend()'s
+            # #97 logging) if it exists -- confirms that diagnostic actually gets
+            # written, and useful in the workflow log regardless of pass/fail.
+            $logCandidate = Get-ChildItem -Path "$env:APPDATA" -Recurse -Filter 'backend.log' -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($logCandidate) {
+              Write-Host "--- backend.log ($($logCandidate.FullName)) ---"
+              Get-Content $logCandidate.FullName -ErrorAction SilentlyContinue
+            } else {
+              Write-Host "(no backend.log found under `$env:APPDATA -- expected if packaged startup never got far enough to spawn the backend, or logging itself is broken)"
+            }
+          }
+
       - name: Upload build summary
         if: always()
         uses: actions/upload-artifact@v6
