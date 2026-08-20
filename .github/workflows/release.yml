@@ -12,16 +12,30 @@ name: Release
 # which stays useful for anyone who'd rather run the app locally via `npm ci && npm
 # start` without installing anything.
 #
-# IMPORTANT: This workflow builds a Windows installer but does NOT end-to-end test it --
-# no window is ever opened, no UI is exercised. Manual verification on first release to a
-# new OS/architecture is still recommended. The sanity-check step below verifies that
-# frontend/dist, backend, and native modules are present in the packaged asar, and a
-# separate step ("Verify better-sqlite3 loads under Electron's Node ABI") actually
-# require()s the unpacked native module and runs a query against it under
-# ELECTRON_RUN_AS_NODE -- added for issue #97, since file-presence alone had already
-# passed on a build that silently failed at runtime. Neither substitutes for actually
-# running the installed app. See ARCHITECTURE.md's "Electron packaging -- build
-# sequence" for the full debugging trail.
+# IMPORTANT: three layers of increasingly-real verification run after packaging, added
+# incrementally while investigating issue #97 (each layer catches a different class of
+# failure the previous one couldn't):
+#   1. "Verify asar contents" -- checks frontend/dist, backend/server.js, and the
+#      better-sqlite3 native binary are present in the packaged output. File presence
+#      only; doesn't catch a present-but-broken file.
+#   2. "Verify better-sqlite3 loads under Electron's Node ABI" -- actually require()s the
+#      unpacked native module and runs a query, under ELECTRON_RUN_AS_NODE (the same
+#      execution mode backendExecutable() uses for the real spawned backend). Catches an
+#      ABI mismatch or bad rebuild that step 1 can't see, but only exercises the module
+#      in isolation, not the app's real startup sequence.
+#   3. "Launch packaged app and verify health check + window" -- runs the actual
+#      win-unpacked exe as a normal packaged Electron app (not ELECTRON_RUN_AS_NODE),
+#      polls the real /api/health endpoint from outside the app the same way
+#      waitForBackend() does from inside it, then checks a window actually appears. This
+#      is the first step that exercises the literal failure mode reported in #97
+#      ("processes running, no window, Task Manager-visible").
+#
+# None of this is a substitute for manual verification on a real end-user machine,
+# especially on first release to a new OS/architecture: the CI runner is a fresh VM
+# without a real GPU (step 3 passes `--disable-gpu` to work around that, which a real
+# user's machine doesn't need), and step 3 launches win-unpacked directly rather than
+# going through the NSIS installer's actual install path. See ARCHITECTURE.md's
+# "Electron packaging -- build sequence" for the full debugging trail.
 
 on:
   push:
