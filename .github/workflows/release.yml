@@ -292,12 +292,19 @@ jobs:
             MISSING=1
           fi
           
-          # Verify better-sqlite3 native binary was unpacked correctly
+          # Verify better-sqlite3 native binary was unpacked correctly.
+          # v13 (N-API) removed prebuild-install and ships its prebuilt .node
+          # binary directly under prebuilds/<platform-arch>/ (see upstream
+          # package.json: "files" includes "prebuilds/**", "gypfile": false) --
+          # NOT the old v11-era build/Release/better_sqlite3.node path that
+          # node-gyp/prebuild-install used to populate. Glob for any .node file
+          # under prebuilds/ rather than assuming an exact filename, since the
+          # per-platform folder/file naming isn't pinned down by our own code.
           UNPACKED_DIR=$(dirname "$ASAR")/app.asar.unpacked
-          if [ -f "$UNPACKED_DIR/node_modules/better-sqlite3/build/Release/better_sqlite3.node" ]; then
-            echo "✓ better-sqlite3 native binary unpacked correctly"
+          if find "$UNPACKED_DIR/node_modules/better-sqlite3/prebuilds" -name '*.node' 2>/dev/null | grep -q .; then
+            echo "✓ better-sqlite3 native binary present under prebuilds/"
           else
-            echo "✗ MISSING: better-sqlite3 native binary"
+            echo "✗ MISSING: better-sqlite3 native binary (checked prebuilds/**/*.node)"
             MISSING=1
           fi
           
