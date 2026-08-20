@@ -9,11 +9,14 @@
 // the backend's data directories at a writable per-user location instead of paths
 // relative to the (read-only, once installed) app directory.
 //
-// Sub-step 3 (electron-builder config) and sub-step 4 (better-sqlite3 native-module ABI
-// handling for a packaged build) are NOT done yet -- see the "Known gap" comment near
-// spawnBackend(). Without sub-step 4, a packaged build's spawned backend will fail at
-// require-time on better-sqlite3, even though the paths/loading logic here is otherwise
-// ready for it.
+// Sub-step 3 (electron-builder config, root package.json's `build` key) and sub-step 4
+// (better-sqlite3 native-module ABI handling, backendExecutable() below +
+// `build.npmRebuild`) are both implemented. What issue #97 found is that "configured"
+// and "actually loads on a clean machine" are different questions: the release CI's
+// asar-verify step only checked that better_sqlite3.node was *present* after unpacking,
+// not that it *loads* under Electron's ABI -- see release.yml's "Verify better-sqlite3
+// loads under Electron's Node ABI" step, added for #97, which actually require()s it
+// and runs a query.
 //
 // ESM, not CJS: Vitest's vi.mock() only intercepts static `import` statements (it
 // rewrites them to check the mock registry); a literal require() call is never
