@@ -1,4 +1,6 @@
 ## [Unreleased]
+
+## [0.11.8] - 2026-08-20
 ### Added
 - First-run onboarding wizard (`OnboardingWizard`): a 3-step flow (Connect Gemini → starter tags → product sizes) that auto-triggers on first launch when nothing is configured yet, reusing the same endpoints and components (`TagsSection`, `MockupTemplates`) as Settings -- no new backend routes.
 
@@ -69,7 +71,8 @@
 ## [0.1.0] - 2026-08-02
 - Initial release.
 
-[Unreleased]: https://github.com/allocsys/proetsy/compare/v0.11.1...HEAD
+[Unreleased]: https://github.com/allocsys/proetsy/compare/v0.11.8...HEAD
+[0.11.8]: https://github.com/allocsys/proetsy/compare/v0.11.1...v0.11.8
 [0.11.1]: https://github.com/allocsys/proetsy/compare/v0.11.0...v0.11.1
 [0.9.0]: https://github.com/allocsys/proetsy/compare/v0.1.0...v0.9.0
 [0.1.0]: https://github.com/allocsys/proetsy/releases/tag/v0.1.0
