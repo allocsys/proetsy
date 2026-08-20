@@ -76,7 +76,7 @@
     "asarUnpack": [
       "**/node_modules/better-sqlite3/**/*"
     ],
-    "npmRebuild": true,
+    "npmRebuild": false,
     "publish": {
       "provider": "github",
       "owner": "allocsys",
