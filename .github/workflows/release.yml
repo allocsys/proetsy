@@ -12,11 +12,16 @@ name: Release
 # which stays useful for anyone who'd rather run the app locally via `npm ci && npm
 # start` without installing anything.
 #
-# IMPORTANT: This workflow builds a Windows installer but does NOT end-to-end test it.
-# Manual verification on first release to new OS/architecture is recommended. The
-# sanity-check step below verifies that frontend/dist, backend, and native modules are
-# present in the packaged asar, but does not actually run the installed app. See
-# ARCHITECTURE.md's "Electron packaging -- build sequence" for the full debugging trail.
+# IMPORTANT: This workflow builds a Windows installer but does NOT end-to-end test it --
+# no window is ever opened, no UI is exercised. Manual verification on first release to a
+# new OS/architecture is still recommended. The sanity-check step below verifies that
+# frontend/dist, backend, and native modules are present in the packaged asar, and a
+# separate step ("Verify better-sqlite3 loads under Electron's Node ABI") actually
+# require()s the unpacked native module and runs a query against it under
+# ELECTRON_RUN_AS_NODE -- added for issue #97, since file-presence alone had already
+# passed on a build that silently failed at runtime. Neither substitutes for actually
+# running the installed app. See ARCHITECTURE.md's "Electron packaging -- build
+# sequence" for the full debugging trail.
 
 on:
   push:
