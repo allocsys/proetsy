@@ -175,6 +175,15 @@ jobs:
       # bundled prebuild is what ships. See #97 for the full investigation.
       - uses: ilammy/msvc-dev-cmd@v1
 
+      # windows-latest now images Visual Studio 2026 (internal major version 18)
+      # by default. node-gyp doesn't recognize that version number until
+      # v12.1.0 (bundled starting npm@11.6.3) -- older node-gyp reports "unknown
+      # version 'undefined'" and rejects the install outright, regardless of
+      # whether the VS toolchain itself is correctly detected/activated above.
+      # setup-node's Node 22 install bundles an npm below that threshold, so
+      # upgrade npm explicitly before npm ci needs its node-gyp to work.
+      - run: npm install -g npm@latest
+
       - run: npm ci
       - name: Verify electron:build script includes frontend build
         shell: bash
