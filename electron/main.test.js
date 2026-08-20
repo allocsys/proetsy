@@ -24,7 +24,8 @@ const mockBrowserWindowInstance = {
   loadFile: vi.fn().mockResolvedValue(undefined),
   loadURL: vi.fn().mockResolvedValue(undefined),
   on: vi.fn(),
-  webContents: { send: vi.fn() },
+  // on: regression coverage for issue #97's did-fail-load/render-process-gone handlers.
+  webContents: { send: vi.fn(), on: vi.fn() },
   isDestroyed: vi.fn(() => false),
 };
 // A plain function expression, not an arrow function -- arrow functions are never
@@ -99,6 +100,8 @@ beforeEach(async () => {
   mockBrowserWindowInstance.loadFile.mockClear();
   mockBrowserWindowInstance.loadURL.mockClear();
   mockBrowserWindowInstance.webContents.send.mockClear();
+  mockBrowserWindowInstance.webContents.on.mockClear();
+  mockBrowserWindowInstance.loadFile.mockReset().mockResolvedValue(undefined);
   mockBrowserWindowInstance.isDestroyed.mockReset().mockReturnValue(false);
   mockIpcMain.handle.mockClear();
   mockDialog.showOpenDialog.mockReset();
@@ -379,6 +382,69 @@ describe('createWindow', () => {
       path.join(__dirname, '..', 'frontend', 'dist', 'index.html')
     );
     expect(mockBrowserWindowInstance.loadURL).not.toHaveBeenCalled();
+  });
+});
+
+// Regression tests for issue #97: packaged builds that spawned three background
+// processes with no window and no error dialog. getBackendLogPath() covers the new
+// backend-log-file diagnostics; the createWindow() block below covers the new
+// did-fail-load/render-process-gone handlers and the loadFile() rejection path.
+describe('getBackendLogPath (regression -- issue #97)', () => {
+  it('returns null in dev mode (no log file needed outside a packaged build)', () => {
+    mockApp.isPackaged = false;
+    expect(main.getBackendLogPath()).toBeNull();
+  });
+});
+
+describe('createWindow failure reporting (regression -- issue #97)', () => {
+  it('reports via the error dialog (and does not throw) if loadFile() rejects when packaged', async () => {
+    mockApp.isPackaged = true;
+    mockBrowserWindowInstance.loadFile.mockRejectedValueOnce(new Error('ENOENT: no such file or directory'));
+
+    await expect(main.createWindow()).resolves.toBeUndefined();
+
+    expect(mockDialog.showErrorBox).toHaveBeenCalledTimes(1);
+    expect(mockDialog.showErrorBox.mock.calls[0][1]).toMatch(/ENOENT/);
+    expect(mockApp.quit).toHaveBeenCalledTimes(1);
+  });
+
+  it('registers a did-fail-load handler that reports non-ERR_ABORTED failures via the error dialog', async () => {
+    mockApp.isPackaged = false;
+    await main.createWindow();
+
+    const call = mockBrowserWindowInstance.webContents.on.mock.calls.find(([ch]) => ch === 'did-fail-load');
+    expect(call).toBeDefined();
+    const [, handler] = call;
+
+    handler(null, -6, 'FILE_NOT_FOUND', 'file:///app/frontend/dist/index.html');
+
+    expect(mockDialog.showErrorBox).toHaveBeenCalledTimes(1);
+    expect(mockDialog.showErrorBox.mock.calls[0][1]).toMatch(/FILE_NOT_FOUND/);
+  });
+
+  it('ignores ERR_ABORTED (-3) from did-fail-load as a benign redirect/cancel', async () => {
+    mockApp.isPackaged = false;
+    await main.createWindow();
+
+    const [, handler] = mockBrowserWindowInstance.webContents.on.mock.calls.find(([ch]) => ch === 'did-fail-load');
+
+    handler(null, -3, 'ERR_ABORTED', 'http://localhost:5173/');
+
+    expect(mockDialog.showErrorBox).not.toHaveBeenCalled();
+  });
+
+  it('registers a render-process-gone handler that reports renderer crashes via the error dialog', async () => {
+    mockApp.isPackaged = false;
+    await main.createWindow();
+
+    const [, handler] = mockBrowserWindowInstance.webContents.on.mock.calls.find(
+      ([ch]) => ch === 'render-process-gone'
+    );
+
+    handler(null, { reason: 'crashed' });
+
+    expect(mockDialog.showErrorBox).toHaveBeenCalledTimes(1);
+    expect(mockDialog.showErrorBox.mock.calls[0][1]).toMatch(/crashed/);
   });
 });
 
