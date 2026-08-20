@@ -44,7 +44,7 @@
     "vitest": "^4.1.10"
   },
   "optionalDependencies": {
-    "electron": "^33.0.0",
+    "electron": "^35.0.0",
     "electron-builder": "^25.1.0"
   },
   "build": {
@@ -76,7 +76,7 @@
     "asarUnpack": [
       "**/node_modules/better-sqlite3/**/*"
     ],
-    "npmRebuild": true,
+    "npmRebuild": false,
     "publish": {
       "provider": "github",
       "owner": "allocsys",
