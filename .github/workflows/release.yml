@@ -356,7 +356,13 @@ jobs:
 
           cat > verify-better-sqlite3.cjs <<'EOF'
           'use strict';
-          const modulePath = process.argv[1];
+          // argv[0] = exe, argv[1] = this script's own path, argv[2] = the actual
+          // MODULE_DIR argument passed on the command line below. Previously read
+          // argv[1] by mistake, which required this script's own (still-executing,
+          // exports-less) module instead of better-sqlite3 -- see commit message for
+          // why that always threw "Database is not a constructor" independent of
+          // whether the real binary worked.
+          const modulePath = process.argv[2];
           const Database = require(modulePath);
           const db = new Database(':memory:');
           db.exec('CREATE TABLE t (id INTEGER)');
