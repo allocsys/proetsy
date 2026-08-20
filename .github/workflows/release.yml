@@ -12,11 +12,30 @@ name: Release
 # which stays useful for anyone who'd rather run the app locally via `npm ci && npm
 # start` without installing anything.
 #
-# IMPORTANT: This workflow builds a Windows installer but does NOT end-to-end test it.
-# Manual verification on first release to new OS/architecture is recommended. The
-# sanity-check step below verifies that frontend/dist, backend, and native modules are
-# present in the packaged asar, but does not actually run the installed app. See
-# ARCHITECTURE.md's "Electron packaging -- build sequence" for the full debugging trail.
+# IMPORTANT: three layers of increasingly-real verification run after packaging, added
+# incrementally while investigating issue #97 (each layer catches a different class of
+# failure the previous one couldn't):
+#   1. "Verify asar contents" -- checks frontend/dist, backend/server.js, and the
+#      better-sqlite3 native binary are present in the packaged output. File presence
+#      only; doesn't catch a present-but-broken file.
+#   2. "Verify better-sqlite3 loads under Electron's Node ABI" -- actually require()s the
+#      unpacked native module and runs a query, under ELECTRON_RUN_AS_NODE (the same
+#      execution mode backendExecutable() uses for the real spawned backend). Catches an
+#      ABI mismatch or bad rebuild that step 1 can't see, but only exercises the module
+#      in isolation, not the app's real startup sequence.
+#   3. "Launch packaged app and verify health check + window" -- runs the actual
+#      win-unpacked exe as a normal packaged Electron app (not ELECTRON_RUN_AS_NODE),
+#      polls the real /api/health endpoint from outside the app the same way
+#      waitForBackend() does from inside it, then checks a window actually appears. This
+#      is the first step that exercises the literal failure mode reported in #97
+#      ("processes running, no window, Task Manager-visible").
+#
+# None of this is a substitute for manual verification on a real end-user machine,
+# especially on first release to a new OS/architecture: the CI runner is a fresh VM
+# without a real GPU (step 3 passes `--disable-gpu` to work around that, which a real
+# user's machine doesn't need), and step 3 launches win-unpacked directly rather than
+# going through the NSIS installer's actual install path. See ARCHITECTURE.md's
+# "Electron packaging -- build sequence" for the full debugging trail.
 
 on:
   push:
@@ -275,6 +294,169 @@ jobs:
           
           echo ""
           echo "✓ All required app components verified in asar"
+
+      # Issue #97 lead: "Worth checking whether better-sqlite3's native binary is
+      # actually loadable at runtime on a clean machine (not just present in the asar
+      # per the CI verification step, which only checks file presence, not that it
+      # loads/executes correctly)." The step above only confirms the .node file exists
+      # post-unpack; a bad @electron/rebuild run (wrong ABI, missing runtime dep, etc.)
+      # can still leave a file there that's present but throws on require(). This step
+      # actually loads it -- via the packaged app's own exe running in
+      # ELECTRON_RUN_AS_NODE mode, the same execution path backendExecutable() uses for
+      # the real spawned backend in production, not a plain system `node` (which would
+      # be a different ABI and prove nothing about whether the packaged app itself can
+      # load it) -- and runs a real query against an in-memory DB, not just an import.
+      - name: Verify better-sqlite3 loads under Electron's Node ABI
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          UNPACKED_APP_DIR=$(find release-builds -maxdepth 1 -type d -name 'win-unpacked' | head -n1 || true)
+          if [ -z "$UNPACKED_APP_DIR" ]; then
+            echo "SKIP: no win-unpacked directory found (packaging step above already failed/produced nothing to test)"
+            exit 0
+          fi
+
+          EXE=$(find "$UNPACKED_APP_DIR" -maxdepth 1 -name '*.exe' | head -n1 || true)
+          MODULE_DIR="$UNPACKED_APP_DIR/resources/app.asar.unpacked/node_modules/better-sqlite3"
+
+          if [ -z "$EXE" ]; then
+            echo "SKIP: no packaged .exe found under $UNPACKED_APP_DIR"
+            exit 0
+          fi
+          if [ ! -d "$MODULE_DIR" ]; then
+            echo "SKIP: $MODULE_DIR not found -- unpacked-binary check above should already have failed this build"
+            exit 0
+          fi
+
+          cat > verify-better-sqlite3.cjs <<'EOF'
+          'use strict';
+          const modulePath = process.argv[1];
+          const Database = require(modulePath);
+          const db = new Database(':memory:');
+          db.exec('CREATE TABLE t (id INTEGER)');
+          db.prepare('INSERT INTO t (id) VALUES (?)').run(1);
+          const row = db.prepare('SELECT id FROM t').get();
+          if (!row || row.id !== 1) {
+            throw new Error('better-sqlite3 loaded but query returned an unexpected result: ' + JSON.stringify(row));
+          }
+          db.close();
+          console.log('OK: better-sqlite3 loaded and executed a real query under Electron\'s Node ABI (ELECTRON_RUN_AS_NODE)');
+          EOF
+
+          echo "Requiring $MODULE_DIR via $EXE (ELECTRON_RUN_AS_NODE=1)..."
+          if ELECTRON_RUN_AS_NODE=1 "$EXE" verify-better-sqlite3.cjs "$MODULE_DIR"; then
+            echo "✓ better-sqlite3 loads and runs correctly under the packaged app's Electron ABI"
+          else
+            echo "✗ better-sqlite3 failed to load/execute under the packaged app's Electron ABI"
+            echo "This is consistent with issue #97: a binary that's present but unloadable would"
+            echo "crash the spawned backend at require-time with no window ever appearing."
+            exit 1
+          fi
+
+      # Issue #97's literal reported symptom: processes running (visible in Task
+      # Manager), no window ever appears, no error dialog. The two steps above verify
+      # the native module in isolation but never actually run the app the way a user
+      # does. This step does: launches the real win-unpacked exe as a normal packaged
+      # Electron app (no ELECTRON_RUN_AS_NODE), polls the same /api/health endpoint
+      # waitForBackend() polls from inside the app -- but from outside, exercising the
+      # real spawnBackend() -> Express-binds-the-port sequence rather than a mocked or
+      # isolated check -- then confirms a real window (non-zero MainWindowHandle)
+      # actually appears afterward. `--disable-gpu` works around windows-latest runners
+      # being GPU-less VMs (Chromium's GPU process can otherwise fail to init and hang
+      # window creation for CI-environment reasons unrelated to #97's actual bug); a
+      # real user's machine doesn't need it.
+      - name: Launch packaged app and verify health check + window
+        if: always()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
+
+          $unpackedDir = Get-ChildItem -Path release-builds -Directory -Filter 'win-unpacked' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $unpackedDir) {
+            Write-Host "SKIP: no win-unpacked directory found (packaging step above already failed/produced nothing to test)"
+            exit 0
+          }
+          $exe = Get-ChildItem -Path $unpackedDir.FullName -Filter '*.exe' -File | Select-Object -First 1
+          if (-not $exe) {
+            Write-Host "SKIP: no packaged .exe found under $($unpackedDir.FullName)"
+            exit 0
+          }
+
+          Write-Host "Launching $($exe.FullName) (real packaged app, not ELECTRON_RUN_AS_NODE) ..."
+          $proc = Start-Process -FilePath $exe.FullName -ArgumentList '--disable-gpu' -PassThru
+
+          try {
+            $healthy = $false
+            $deadline = (Get-Date).AddSeconds(45)
+            while ((Get-Date) -lt $deadline) {
+              if ($proc.HasExited) {
+                Write-Host "::error::App process exited early (code $($proc.ExitCode)) before becoming healthy -- consistent with issue #97 (silent startup failure)."
+                exit 1
+              }
+              try {
+                $resp = Invoke-WebRequest -Uri 'http://localhost:4000/api/health' -UseBasicParsing -TimeoutSec 2
+                if ($resp.StatusCode -eq 200) { $healthy = $true; break }
+              } catch {
+                Start-Sleep -Milliseconds 500
+              }
+            }
+
+            if (-not $healthy) {
+              Write-Host "::error::Backend never became healthy within 45s -- either it crashed silently or waitForBackend()'s health check never passed."
+              exit 1
+            }
+            Write-Host "OK: backend responded on /api/health"
+
+            # createWindow()/loadFile() run only after waitForBackend() resolves, so a
+            # window-side bug (the actual #97 symptom) would show up here even with a
+            # confirmed-healthy backend -- give it a grace period rather than checking
+            # immediately.
+            $windowFound = $false
+            $windowDeadline = (Get-Date).AddSeconds(15)
+            while ((Get-Date) -lt $windowDeadline) {
+              $running = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
+              if (-not $running) {
+                Write-Host "::error::App process exited after passing the health check, before a window appeared."
+                exit 1
+              }
+              if ($running.MainWindowHandle -ne 0) {
+                $windowFound = $true
+                Write-Host "OK: window detected (title: '$($running.MainWindowTitle)')"
+                break
+              }
+              Start-Sleep -Milliseconds 500
+            }
+
+            if (-not $windowFound) {
+              Write-Host "::error::No window appeared within 15s of the backend becoming healthy -- this is exactly issue #97's symptom (processes running, no window)."
+              exit 1
+            }
+
+            Write-Host "PASS: packaged app launched, backend became healthy, and a window appeared."
+          }
+          finally {
+            # Kill the whole process tree (Electron main + GPU/utility helper + spawned
+            # backend node process) -- #97 itself is about these surviving with no
+            # window, so leaving any running here would be the same leak, times three
+            # orphaned processes on the runner.
+            if ($proc -and -not $proc.HasExited) {
+              taskkill /PID $proc.Id /T /F | Out-Null
+            }
+
+            # Best-effort: surface the packaged app's own backend.log (spawnBackend()'s
+            # #97 logging) if it exists -- confirms that diagnostic actually gets
+            # written, and useful in the workflow log regardless of pass/fail.
+            $logCandidate = Get-ChildItem -Path "$env:APPDATA" -Recurse -Filter 'backend.log' -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($logCandidate) {
+              Write-Host "--- backend.log ($($logCandidate.FullName)) ---"
+              Get-Content $logCandidate.FullName -ErrorAction SilentlyContinue
+            } else {
+              Write-Host "(no backend.log found under `$env:APPDATA -- expected if packaged startup never got far enough to spawn the backend, or logging itself is broken)"
+            }
+          }
 
       - name: Upload build summary
         if: always()
