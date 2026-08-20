@@ -101,9 +101,12 @@ export function packagedBackendEnv() {
 // automatically via `@electron/rebuild` during packaging; `npm run electron:rebuild`
 // (`electron-builder install-app-deps`) does the same rebuild on demand -- e.g. after
 // changing backend dependencies -- without doing a full package build.
-// NOT YET VERIFIED end-to-end on a real packaged build -- this is the standard,
-// documented fix for this exact situation, wired up per electron-builder's own guidance,
-// but nothing here has actually been packaged and run on a real machine yet.
+// release.yml's "Verify better-sqlite3 loads under Electron's Node ABI" step (added for
+// #97) now checks this on every release build by running the packaged exe itself in
+// ELECTRON_RUN_AS_NODE mode and requiring the unpacked module -- the same execution path
+// this function sets up -- but that's still CI on a fresh runner, not a real end user's
+// machine; #97 remains open until a v0.11.8 build with this verification in place is
+// confirmed working on an actual clean Windows install.
 export function backendExecutable() {
   if (!app.isPackaged) return { command: 'node', extraEnv: {} };
   return { command: process.execPath, extraEnv: { ELECTRON_RUN_AS_NODE: '1' } };
