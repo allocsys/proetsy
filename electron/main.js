@@ -27,6 +27,7 @@ import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import electronUpdaterPkg from 'electron-updater';
 const { autoUpdater } = electronUpdaterPkg;
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 import { get } from 'node:http';
 import { fileURLToPath } from 'node:url';
@@ -105,13 +106,52 @@ export function backendExecutable() {
   return { command: process.execPath, extraEnv: { ELECTRON_RUN_AS_NODE: '1' } };
 }
 
+// Issue #97: a packaged build whose spawned backend crashes at startup (e.g. a native
+// module ABI mismatch) previously left no trace anywhere reachable by someone who just
+// double-clicked the exe -- spawnBackend() used `stdio: 'inherit'`, which only goes
+// somewhere visible when Electron itself was launched from a terminal. In packaged
+// mode, redirect the backend's stdout/stderr to a log file under
+// app.getPath('userData') instead, so "why didn't anything happen" is answerable
+// without attaching a debugger. Best-effort: if the log directory can't be created for
+// any reason, this quietly falls back to no logging rather than taking down
+// spawnBackend() over a diagnostics feature.
+function ensureLogDir() {
+  try {
+    const logDir = path.join(app.getPath('userData'), 'logs');
+    fs.mkdirSync(logDir, { recursive: true });
+    return logDir;
+  } catch {
+    return null;
+  }
+}
+
+export function getBackendLogPath() {
+  if (!app.isPackaged) return null;
+  const logDir = ensureLogDir();
+  return logDir ? path.join(logDir, 'backend.log') : null;
+}
+
 export function spawnBackend() {
   const backendDir = path.join(__dirname, '..', 'backend');
   const { command, extraEnv } = backendExecutable();
+
+  let stdio = 'inherit';
+  const logPath = getBackendLogPath();
+  if (logPath) {
+    try {
+      const logStream = fs.createWriteStream(logPath, { flags: 'a' });
+      logStream.write(`\n--- ProEtsy backend starting ${new Date().toISOString()} ---\n`);
+      stdio = ['ignore', logStream, logStream];
+    } catch {
+      // Fall back to 'inherit' -- see ensureLogDir()'s comment above.
+      stdio = 'inherit';
+    }
+  }
+
   const child = spawn(command, ['server.js'], {
     cwd: backendDir,
     env: { ...process.env, PORT: String(BACKEND_PORT), ...packagedBackendEnv(), ...extraEnv },
-    stdio: 'inherit',
+    stdio,
   });
   child.on('exit', (code, signal) => {
     console.log(`[electron] backend process exited (code=${code}, signal=${signal})`);
@@ -180,7 +220,9 @@ export function acquireSingleInstanceLock() {
 // no BrowserWindow to already exist, so it works even when createWindow() was never
 // reached.
 export function reportBackendStartupFailure(err) {
-  dialog.showErrorBox('ProEtsy failed to start', err.message);
+  const logPath = getBackendLogPath();
+  const hint = logPath ? `\n\nBackend logs: ${logPath}` : '';
+  dialog.showErrorBox('ProEtsy failed to start', `${err.message}${hint}`);
   app.quit();
 }
 
@@ -270,6 +312,11 @@ export async function createWindow() {
     },
   });
 
+  // Issue #97: previously an error thrown/rejected here (e.g. `frontend/dist/index.html`
+  // missing from a bad package) propagated out of createWindow() uncaught by anything in
+  // the isMainModule startup chain, leaving the backend + Electron helper processes
+  // running with no window and no explanation. Now surfaced via the same
+  // reportBackendStartupFailure() error dialog used for a failed backend startup.
   if (app.isPackaged) {
     // Loads the built frontend straight from disk (or transparently from inside the
     // asar archive -- Electron's loadFile/net stack understands asar paths natively, no
@@ -280,10 +327,31 @@ export async function createWindow() {
     // in the packaged output; nothing exists to enforce it yet, so this is the expected
     // contract that step still needs to satisfy, not a verified one.
     const indexHtml = path.join(__dirname, '..', 'frontend', 'dist', 'index.html');
-    await mainWindow.loadFile(indexHtml);
+    try {
+      await mainWindow.loadFile(indexHtml);
+    } catch (err) {
+      reportBackendStartupFailure(new Error(`Failed to load app UI (${indexHtml}): ${err.message}`));
+      return;
+    }
   } else {
     await mainWindow.loadURL(DEV_FRONTEND_URL);
   }
+
+  // Issue #97: a load that *resolves* (or a navigation after load) can still fail --
+  // did-fail-load fires for those cases (e.g. a bad asar path that Electron's loader
+  // doesn't reject loadFile()'s promise for) and render-process-gone fires if the
+  // renderer crashes outright. Both previously left the window blank/gone with nothing
+  // in Task Manager to explain why; both now go through the same error dialog.
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    if (errorCode === -3) return; // ERR_ABORTED -- typically a benign redirect/cancel, not a real failure.
+    reportBackendStartupFailure(
+      new Error(`Failed to load ${validatedURL || 'app UI'}: ${errorDescription} (${errorCode})`)
+    );
+  });
+
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    reportBackendStartupFailure(new Error(`Renderer process crashed (reason: ${details.reason})`));
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -313,7 +381,17 @@ if (isMainModule) {
         reportBackendStartupFailure(err);
         return;
       }
-      await createWindow();
+      try {
+        await createWindow();
+      } catch (err) {
+        // Issue #97: createWindow() throwing synchronously (as opposed to the
+        // did-fail-load/render-process-gone handlers registered inside it, which cover
+        // failures *after* construction) is the last uncovered silent-failure path --
+        // route it through the same error dialog rather than letting it propagate
+        // uncaught out of this .then().
+        reportBackendStartupFailure(err);
+        return;
+      }
 
       // Silent startup check -- only fires 'checking-for-update'/'update-available'/etc.
       // events to the renderer (see above); never auto-downloads (autoDownload is false).
