@@ -281,6 +281,66 @@ jobs:
           echo ""
           echo "✓ All required app components verified in asar"
 
+      # Issue #97 lead: "Worth checking whether better-sqlite3's native binary is
+      # actually loadable at runtime on a clean machine (not just present in the asar
+      # per the CI verification step, which only checks file presence, not that it
+      # loads/executes correctly)." The step above only confirms the .node file exists
+      # post-unpack; a bad @electron/rebuild run (wrong ABI, missing runtime dep, etc.)
+      # can still leave a file there that's present but throws on require(). This step
+      # actually loads it -- via the packaged app's own exe running in
+      # ELECTRON_RUN_AS_NODE mode, the same execution path backendExecutable() uses for
+      # the real spawned backend in production, not a plain system `node` (which would
+      # be a different ABI and prove nothing about whether the packaged app itself can
+      # load it) -- and runs a real query against an in-memory DB, not just an import.
+      - name: Verify better-sqlite3 loads under Electron's Node ABI
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          UNPACKED_APP_DIR=$(find release-builds -maxdepth 1 -type d -name 'win-unpacked' | head -n1 || true)
+          if [ -z "$UNPACKED_APP_DIR" ]; then
+            echo "SKIP: no win-unpacked directory found (packaging step above already failed/produced nothing to test)"
+            exit 0
+          fi
+
+          EXE=$(find "$UNPACKED_APP_DIR" -maxdepth 1 -name '*.exe' | head -n1 || true)
+          MODULE_DIR="$UNPACKED_APP_DIR/resources/app.asar.unpacked/node_modules/better-sqlite3"
+
+          if [ -z "$EXE" ]; then
+            echo "SKIP: no packaged .exe found under $UNPACKED_APP_DIR"
+            exit 0
+          fi
+          if [ ! -d "$MODULE_DIR" ]; then
+            echo "SKIP: $MODULE_DIR not found -- unpacked-binary check above should already have failed this build"
+            exit 0
+          fi
+
+          cat > verify-better-sqlite3.cjs <<'EOF'
+          'use strict';
+          const modulePath = process.argv[1];
+          const Database = require(modulePath);
+          const db = new Database(':memory:');
+          db.exec('CREATE TABLE t (id INTEGER)');
+          db.prepare('INSERT INTO t (id) VALUES (?)').run(1);
+          const row = db.prepare('SELECT id FROM t').get();
+          if (!row || row.id !== 1) {
+            throw new Error('better-sqlite3 loaded but query returned an unexpected result: ' + JSON.stringify(row));
+          }
+          db.close();
+          console.log('OK: better-sqlite3 loaded and executed a real query under Electron\'s Node ABI (ELECTRON_RUN_AS_NODE)');
+          EOF
+
+          echo "Requiring $MODULE_DIR via $EXE (ELECTRON_RUN_AS_NODE=1)..."
+          if ELECTRON_RUN_AS_NODE=1 "$EXE" verify-better-sqlite3.cjs "$MODULE_DIR"; then
+            echo "✓ better-sqlite3 loads and runs correctly under the packaged app's Electron ABI"
+          else
+            echo "✗ better-sqlite3 failed to load/execute under the packaged app's Electron ABI"
+            echo "This is consistent with issue #97: a binary that's present but unloadable would"
+            echo "crash the spawned backend at require-time with no window ever appearing."
+            exit 1
+          fi
+
       - name: Upload build summary
         if: always()
         uses: actions/upload-artifact@v6
