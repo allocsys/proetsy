@@ -422,7 +422,14 @@ jobs:
           }
 
           Write-Host "Launching $($exe.FullName) (real packaged app, not ELECTRON_RUN_AS_NODE) ..."
-          $proc = Start-Process -FilePath $exe.FullName -ArgumentList '--disable-gpu' -PassThru
+          # Previously nothing captured Electron's OWN stdout/stderr here -- only the
+          # spawned backend's (via backend.log, written inside spawnBackend()). If
+          # Electron itself fails/hangs before ever calling spawnBackend() (e.g. during
+          # app.whenReady()), backend.log never gets created and we had no other signal
+          # at all. Redirect this process's own output to files so that's visible too.
+          $stdoutLog = Join-Path $env:RUNNER_TEMP 'proetsy-app-stdout.log'
+          $stderrLog = Join-Path $env:RUNNER_TEMP 'proetsy-app-stderr.log'
+          $proc = Start-Process -FilePath $exe.FullName -ArgumentList '--disable-gpu' -PassThru -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog
 
           try {
             $healthy = $false
@@ -492,6 +499,14 @@ jobs:
             } else {
               Write-Host "(no backend.log found under `$env:APPDATA -- expected if packaged startup never got far enough to spawn the backend, or logging itself is broken)"
             }
+
+            # Electron's own process output -- see the redirect set up above. Printed
+            # unconditionally (best-effort) so a hang/crash before spawnBackend() ever
+            # ran is now visible, not just silence.
+            Write-Host "--- packaged app stdout ($stdoutLog) ---"
+            Get-Content $stdoutLog -ErrorAction SilentlyContinue
+            Write-Host "--- packaged app stderr ($stderrLog) ---"
+            Get-Content $stderrLog -ErrorAction SilentlyContinue
           }
 
       - name: Upload build summary
