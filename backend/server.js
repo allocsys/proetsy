@@ -462,17 +462,16 @@ app.post('/api/tags/bulk', (req, res) => {
   const db = getDb();
   const existing = new Set(db.prepare('SELECT tag_text FROM tags').all().map((r) => r.tag_text));
   const insert = db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)');
-  const run = db.transaction(() => {
-    let inserted = 0;
+  const inserted = withTransaction(db, () => {
+    let count = 0;
     for (const tag of list) {
       if (existing.has(tag)) continue;
       insert.run(tag, category || null, source || 'manual');
       existing.add(tag);
-      inserted += 1;
+      count += 1;
     }
-    return inserted;
+    return count;
   });
-  const inserted = run();
   res.status(201).json({ inserted, total: existing.size, tags: db.prepare('SELECT * FROM tags ORDER BY tag_text').all() });
 });
 
