@@ -29,7 +29,7 @@ function parseModelJson(rawText) {
  * Module 7 is built and the user has labeled enough images for a term to show a real
  * kept/discarded skew; this link being "opt-in" is a natural consequence of there being
  * no data to opt into yet, not a separate feature flag.
- * @param {import('better-sqlite3').Database} db
+ * @param {import('node:sqlite').DatabaseSync} db
  * @param {number} limit
  * @returns {string[]}
  */
