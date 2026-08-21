@@ -1,4 +1,4 @@
-import { getDb } from '../../db/init.js';
+import { getDb, withTransaction } from '../../db/init.js';
 import { getProductSizes } from '../../config/index.js';
 import { LISTING_VARIATIONS } from '../../config/shop-conventions.js';
 import { generateText } from '../llm/index.js';
@@ -83,8 +83,8 @@ export async function generateListingsForJob(jobId, { trendId = null } = {}) {
       edited_at = excluded.edited_at
   `);
 
-  const persistAll = db.transaction((variations) => {
-    for (const v of variations) {
+  withTransaction(db, () => {
+    for (const v of cleanedVariations) {
       upsert.run({
         job_id: jobId,
         variation: v.angle,
@@ -95,7 +95,6 @@ export async function generateListingsForJob(jobId, { trendId = null } = {}) {
       });
     }
   });
-  persistAll(cleanedVariations);
 
   return cleanedVariations;
 }
