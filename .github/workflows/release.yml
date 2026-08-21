@@ -362,7 +362,13 @@ jobs:
           // exports-less) module instead of better-sqlite3 -- see commit message for
           // why that always threw "Database is not a constructor" independent of
           // whether the real binary worked.
-          const modulePath = process.argv[2];
+          // require() only treats a specifier as a filesystem path when it starts with
+          // "./", "../", or "/" -- MODULE_DIR is passed in as a plain relative path
+          // (e.g. "release-builds/win-unpacked/..."), which require() would otherwise
+          // treat as a bare package-name lookup in node_modules and fail with
+          // MODULE_NOT_FOUND. path.resolve() makes it absolute first.
+          const path = require('path');
+          const modulePath = path.resolve(process.argv[2]);
           const Database = require(modulePath);
           const db = new Database(':memory:');
           db.exec('CREATE TABLE t (id INTEGER)');
