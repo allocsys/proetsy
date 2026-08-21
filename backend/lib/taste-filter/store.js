@@ -10,6 +10,21 @@ import { extractPromptTerms } from './prompt-terms.js';
 
 const VALID_LABELS = new Set(['keep', 'discard']);
 
+// node:sqlite's DatabaseSync has no db.transaction() (unlike better-sqlite3) -- this is
+// a manual BEGIN/COMMIT/ROLLBACK wrapper reproducing the same commit/rollback behavior,
+// including rollback on a mid-transaction throw. See PLAN_ISSUE_104.md.
+function withTransaction(db, fn) {
+  db.exec('BEGIN');
+  try {
+    const result = fn();
+    db.exec('COMMIT');
+    return result;
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+}
+
 /**
  * Float32Array <-> Buffer helpers for the `embedding`/`kept_centroid`/`discarded_centroid`
  * BLOB columns. A Float32Array's `.buffer` is a plain ArrayBuffer, which better-sqlite3
@@ -151,7 +166,7 @@ export function recomputeCentroids() {
   );
 
   const counts = new Map();
-  const writeAll = db.transaction(() => {
+  withTransaction(db, () => {
     for (const [category, pair] of centroidPairs) {
       const params = {
         category,
@@ -169,7 +184,6 @@ export function recomputeCentroids() {
       counts.set(category, { keptCount: pair.keptCount, discardedCount: pair.discardedCount });
     }
   });
-  writeAll();
 
   return counts;
 }
@@ -247,10 +261,9 @@ function adjustPromptTermCounts(db, promptId, label, delta) {
         db.prepare(
           `UPDATE prompt_terms SET ${column} = MAX(${column} - 1, 0), updated_at = datetime('now') WHERE term = ?`
         );
-  const run = db.transaction((termList) => {
-    for (const term of termList) statement.run(term);
+  withTransaction(db, () => {
+    for (const term of terms) statement.run(term);
   });
-  run(Array.from(terms));
 }
 
 /**
@@ -317,7 +330,7 @@ export function tallyPromptTermsForLabel(promptId, label, previous = null) {
 export function recomputePromptTerms() {
   const db = getDb();
 
-  const run = db.transaction(() => {
+  withTransaction(db, () => {
     db.prepare('UPDATE prompt_terms SET kept_count = 0, discarded_count = 0').run();
 
     const labeledRows = db
@@ -345,5 +358,4 @@ export function recomputePromptTerms() {
       for (const term of terms) upsert.run(term);
     }
   });
-  run();
 }
