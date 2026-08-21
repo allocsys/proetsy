@@ -23,6 +23,24 @@ export function getDb() {
   return db;
 }
 
+// node:sqlite's DatabaseSync has no db.transaction() (unlike better-sqlite3) -- this is
+// a manual BEGIN/COMMIT/ROLLBACK wrapper reproducing the same commit/rollback behavior,
+// including rollback on a mid-transaction throw. See PLAN_ISSUE_104.md. Shared by every
+// module that needs an atomic multi-statement write (previously duplicated locally in
+// taste-filter/store.js; call sites elsewhere had been missed and still called the
+// now-nonexistent db.transaction() until this fix).
+export function withTransaction(db, fn) {
+  db.exec('BEGIN');
+  try {
+    const result = fn();
+    db.exec('COMMIT');
+    return result;
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+}
+
 // `CREATE TABLE IF NOT EXISTS` above only creates a table's *initial* shape — it does
 // nothing for a column added to schema.sql after a dev DB already has that table. There's
 // no real migration system yet (see ARCHITECTURE.md -> Module 3 -> "Schema for the review
