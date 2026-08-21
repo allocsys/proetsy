@@ -4,7 +4,7 @@
 // centroids.js; this file is the DB-touching glue around it: reading labeled examples
 // out, handing them to computeAllCentroidPairs(), and writing the result back.
 
-import { getDb } from '../../db/init.js';
+import { getDb, withTransaction } from '../../db/init.js';
 import { computeAllCentroidPairs } from './centroids.js';
 import { extractPromptTerms } from './prompt-terms.js';
 
