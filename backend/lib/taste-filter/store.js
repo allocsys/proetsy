@@ -4,26 +4,11 @@
 // centroids.js; this file is the DB-touching glue around it: reading labeled examples
 // out, handing them to computeAllCentroidPairs(), and writing the result back.
 
-import { getDb } from '../../db/init.js';
+import { getDb, withTransaction } from '../../db/init.js';
 import { computeAllCentroidPairs } from './centroids.js';
 import { extractPromptTerms } from './prompt-terms.js';
 
 const VALID_LABELS = new Set(['keep', 'discard']);
-
-// node:sqlite's DatabaseSync has no db.transaction() (unlike better-sqlite3) -- this is
-// a manual BEGIN/COMMIT/ROLLBACK wrapper reproducing the same commit/rollback behavior,
-// including rollback on a mid-transaction throw. See PLAN_ISSUE_104.md.
-function withTransaction(db, fn) {
-  db.exec('BEGIN');
-  try {
-    const result = fn();
-    db.exec('COMMIT');
-    return result;
-  } catch (err) {
-    db.exec('ROLLBACK');
-    throw err;
-  }
-}
 
 /**
  * Float32Array <-> Buffer helpers for the `embedding`/`kept_centroid`/`discarded_centroid`
