@@ -1,4 +1,4 @@
-import { getDb } from '../../db/init.js';
+import { getDb, withTransaction } from '../../db/init.js';
 import { parseCsv, firstColumn } from '../csv.js';
 
 // v1 implementation: trends entered by the user directly (dashboard) or via CSV import
@@ -28,16 +28,15 @@ export function importFromCsvRows(rows) {
   // like it was already in the DB and get silently skipped instead of inserted again.
   const existingBeforeThisCall = new Set(db.prepare('SELECT term FROM trends').all().map((r) => r.term));
   const insert = db.prepare('INSERT INTO trends (term, category, source) VALUES (?, ?, ?)');
-  const insertMany = db.transaction((items) => {
+  return withTransaction(db, () => {
     let inserted = 0;
-    for (const item of items) {
+    for (const item of rows) {
       if (existingBeforeThisCall.has(item.term)) continue;
       insert.run(item.term, item.category ?? null, 'csv');
       inserted += 1;
     }
     return inserted;
   });
-  return insertMany(rows);
 }
 
 // Turns raw CSV text (e.g. an eRank/EverBee export, or a hand-made spreadsheet export)
