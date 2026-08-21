@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
-import { getDb } from './db/init.js';
+import { getDb, withTransaction } from './db/init.js';
 import {
   getPipelineConfig,
   getProductSizes,
@@ -361,12 +361,11 @@ app.patch('/api/settings', (req, res) => {
   const upsert = db.prepare(
     'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
   );
-  const run = db.transaction(() => {
+  withTransaction(db, () => {
     for (const [key, value] of Object.entries(updates)) {
       upsert.run(key, value === null || value === undefined ? null : String(value));
     }
   });
-  run();
   // getPipelineConfig() is memoized (config/index.js) -- any settings PATCH could have
   // touched a pipeline_module_<name>_enabled key, so invalidate unconditionally rather
   // than trying to detect which keys changed. Cheap: the next getPipelineConfig() call
