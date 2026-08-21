@@ -703,7 +703,7 @@ app.patch('/api/jobs/:id/listings/:listingId', (req, res) => {
   // this is future-proofing against the atomicity guarantee silently breaking if
   // async work (e.g. an await) is ever added to the merge/validation step, not a fix
   // for an active race condition.
-  const result = db.transaction(() => {
+  const result = withTransaction(db, () => {
     const existing = db.prepare('SELECT * FROM listings WHERE id = ? AND job_id = ?').get(listingId, jobId);
     if (!existing) return null;
 
@@ -721,7 +721,7 @@ app.patch('/api/jobs/:id/listings/:listingId', (req, res) => {
     ).run(cleaned.title, cleaned.description, JSON.stringify(cleaned.tags), JSON.stringify(cleaned.tagAlternates), listingId);
 
     return { updated: db.prepare('SELECT * FROM listings WHERE id = ?').get(listingId), cleaned };
-  })();
+  });
 
   if (!result) return res.status(404).json({ error: 'Listing not found for this job' });
 
