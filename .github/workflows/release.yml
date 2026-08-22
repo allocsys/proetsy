@@ -12,18 +12,15 @@ name: Release
 # which stays useful for anyone who'd rather run the app locally via `npm ci && npm
 # start` without installing anything.
 #
-# IMPORTANT: three layers of increasingly-real verification run after packaging, added
+# IMPORTANT: two layers of increasingly-real verification run after packaging, added
 # incrementally while investigating issue #97 (each layer catches a different class of
-# failure the previous one couldn't):
-#   1. "Verify asar contents" -- checks frontend/dist, backend/server.js, and the
-#      better-sqlite3 native binary are present in the packaged output. File presence
-#      only; doesn't catch a present-but-broken file.
-#   2. "Verify better-sqlite3 loads under Electron's Node ABI" -- actually require()s the
-#      unpacked native module and runs a query, under ELECTRON_RUN_AS_NODE (the same
-#      execution mode backendExecutable() uses for the real spawned backend). Catches an
-#      ABI mismatch or bad rebuild that step 1 can't see, but only exercises the module
-#      in isolation, not the app's real startup sequence.
-#   3. "Launch packaged app and verify health check + window" -- runs the actual
+# failure the previous one couldn't). A third layer -- requiring the better-sqlite3
+# native binary under Electron's Node ABI -- was removed once #104 replaced
+# better-sqlite3 with node:sqlite, leaving no native module to verify:
+#   1. "Verify asar contents" -- checks frontend/dist and backend/server.js are present
+#      in the packaged output. File presence only; doesn't catch a present-but-broken
+#      file.
+#   2. "Launch packaged app and verify health check + window" -- runs the actual
 #      win-unpacked exe as a normal packaged Electron app (not ELECTRON_RUN_AS_NODE),
 #      polls the real /api/health endpoint from outside the app the same way
 #      waitForBackend() does from inside it, then checks a window actually appears. This
@@ -139,50 +136,25 @@ jobs:
             The built frontend (`frontend/dist`) is included but not yet served by the
             backend directly.
 
-  # Electron packaging build-sequence sub-step 5. Runs on windows-latest rather than
-  # cross-compiling the NSIS target from Linux via Wine, since a native module
-  # (better-sqlite3) is involved and native-rebuild tooling is most reliable running on
-  # its actual target OS rather than under emulation. A separate, full `npm ci` runs here
-  # (rather than restoring `verify`'s Ubuntu node_modules cache) since native deps built
-  # on Ubuntu aren't usable on Windows regardless of caching -- npmRebuild (see root
-  # package.json's `build` config) then rebuilds better-sqlite3 specifically against
-  # Electron's own Node ABI, on top of whatever `npm ci` just installed.
+  # Electron packaging build-sequence sub-step 5. Runs on windows-latest to build the
+  # NSIS installer natively for its target OS. This used to also be required because of
+  # better-sqlite3's native-module rebuild (npmRebuild in root package.json's `build`
+  # config, rebuilding it against Electron's own Node ABI, plus the VS-toolchain/node-gyp
+  # setup below) -- #104 replaced better-sqlite3 with node:sqlite, so npmRebuild and that
+  # toolchain setup are gone. A separate, full `npm ci` still runs here (rather than
+  # restoring `verify`'s Ubuntu node_modules cache) since installed deps remain
+  # OS-specific in general.
   package-electron-win:
     needs: verify
     runs-on: windows-latest
     permissions:
       contents: write
-    env:
-      # Deliberately NOT env.NODE_VERSION (24) for this job -- see ARCHITECTURE.md
-      # "Electron packaging -- build sequence". Every other job keeps using
-      # env.NODE_VERSION; this one stays pinned to a well-established LTS.
-      ELECTRON_JOB_NODE_VERSION: '22'
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v7
         with:
-          node-version: ${{ env.ELECTRON_JOB_NODE_VERSION }}
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
-
-      # better-sqlite3 (>=13, N-API) bundles a win32-x64 prebuild and has no
-      # install/postinstall script of its own -- but it still ships binding.gyp
-      # for platforms without a prebuild, which makes npm implicitly run
-      # `node-gyp rebuild` on install regardless. On Windows, node-gyp's
-      # `configure` step needs a VS toolchain just to start, before it can even
-      # evaluate binding.gyp's own "skip the build, a prebuild exists" logic.
-      # This activates the VS toolchain already on the windows-latest image so
-      # that configure succeeds; the resulting build is still a no-op and the
-      # bundled prebuild is what ships. See #97 for the full investigation.
-      - uses: ilammy/msvc-dev-cmd@v1
-
-      # windows-latest now images Visual Studio 2026 (internal major version 18)
-      # by default. node-gyp doesn't recognize that version number until
-      # v12.1.0 (bundled starting npm@11.6.3) -- older node-gyp reports "unknown
-      # version 'undefined'" and rejects the install outright, regardless of
-      # whether the VS toolchain itself is correctly detected/activated above.
-      # setup-node's Node 22 install bundles an npm below that threshold, so
-      # upgrade npm explicitly before npm ci needs its node-gyp to work.
-      - run: npm install -g npm@latest
 
       - run: npm ci
       - name: Verify electron:build script includes frontend build
@@ -225,11 +197,10 @@ jobs:
           DEBUG: electron-builder
         run: npm run electron:build
 
-      # Sanity-check step: verifies that critical app components (frontend, backend,
-      # native modules) were actually packaged into the asar. Runs regardless of build
-      # success/failure so partial builds are visible for debugging. This catches
-      # regressions like missing frontend/dist builds, incomplete backend copies, or
-      # failed native module rebuilds.
+      # Sanity-check step: verifies that critical app components (frontend, backend)
+      # were actually packaged into the asar. Runs regardless of build success/failure
+      # so partial builds are visible for debugging. This catches regressions like
+      # missing frontend/dist builds or incomplete backend copies.
       - name: Verify asar contents
         if: always()
         shell: bash
@@ -284,30 +255,6 @@ jobs:
             MISSING=1
           fi
           
-          # Check native module
-          if grep -q -i "better-sqlite3" <<< "$LISTING"; then
-            echo "✓ better-sqlite3 found in asar"
-          else
-            echo "✗ MISSING: better-sqlite3"
-            MISSING=1
-          fi
-          
-          # Verify better-sqlite3 native binary was unpacked correctly.
-          # v13 (N-API) removed prebuild-install and ships its prebuilt .node
-          # binary directly under prebuilds/<platform-arch>/ (see upstream
-          # package.json: "files" includes "prebuilds/**", "gypfile": false) --
-          # NOT the old v11-era build/Release/better_sqlite3.node path that
-          # node-gyp/prebuild-install used to populate. Glob for any .node file
-          # under prebuilds/ rather than assuming an exact filename, since the
-          # per-platform folder/file naming isn't pinned down by our own code.
-          UNPACKED_DIR=$(dirname "$ASAR")/app.asar.unpacked
-          if find "$UNPACKED_DIR/node_modules/better-sqlite3/prebuilds" -name '*.node' 2>/dev/null | grep -q .; then
-            echo "✓ better-sqlite3 native binary present under prebuilds/"
-          else
-            echo "✗ MISSING: better-sqlite3 native binary (checked prebuilds/**/*.node)"
-            MISSING=1
-          fi
-          
           if [ "$MISSING" -eq 1 ]; then
             echo ""
             echo "ERROR: Critical app components missing from packaged asar"
@@ -318,78 +265,6 @@ jobs:
           
           echo ""
           echo "✓ All required app components verified in asar"
-
-      # Issue #97 lead: "Worth checking whether better-sqlite3's native binary is
-      # actually loadable at runtime on a clean machine (not just present in the asar
-      # per the CI verification step, which only checks file presence, not that it
-      # loads/executes correctly)." The step above only confirms the .node file exists
-      # post-unpack; a bad @electron/rebuild run (wrong ABI, missing runtime dep, etc.)
-      # can still leave a file there that's present but throws on require(). This step
-      # actually loads it -- via the packaged app's own exe running in
-      # ELECTRON_RUN_AS_NODE mode, the same execution path backendExecutable() uses for
-      # the real spawned backend in production, not a plain system `node` (which would
-      # be a different ABI and prove nothing about whether the packaged app itself can
-      # load it) -- and runs a real query against an in-memory DB, not just an import.
-      - name: Verify better-sqlite3 loads under Electron's Node ABI
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          UNPACKED_APP_DIR=$(find release-builds -maxdepth 1 -type d -name 'win-unpacked' | head -n1 || true)
-          if [ -z "$UNPACKED_APP_DIR" ]; then
-            echo "SKIP: no win-unpacked directory found (packaging step above already failed/produced nothing to test)"
-            exit 0
-          fi
-
-          EXE=$(find "$UNPACKED_APP_DIR" -maxdepth 1 -name '*.exe' | head -n1 || true)
-          MODULE_DIR="$UNPACKED_APP_DIR/resources/app.asar.unpacked/node_modules/better-sqlite3"
-
-          if [ -z "$EXE" ]; then
-            echo "SKIP: no packaged .exe found under $UNPACKED_APP_DIR"
-            exit 0
-          fi
-          if [ ! -d "$MODULE_DIR" ]; then
-            echo "SKIP: $MODULE_DIR not found -- unpacked-binary check above should already have failed this build"
-            exit 0
-          fi
-
-          cat > verify-better-sqlite3.cjs <<'EOF'
-          'use strict';
-          // argv[0] = exe, argv[1] = this script's own path, argv[2] = the actual
-          // MODULE_DIR argument passed on the command line below. Previously read
-          // argv[1] by mistake, which required this script's own (still-executing,
-          // exports-less) module instead of better-sqlite3 -- see commit message for
-          // why that always threw "Database is not a constructor" independent of
-          // whether the real binary worked.
-          // require() only treats a specifier as a filesystem path when it starts with
-          // "./", "../", or "/" -- MODULE_DIR is passed in as a plain relative path
-          // (e.g. "release-builds/win-unpacked/..."), which require() would otherwise
-          // treat as a bare package-name lookup in node_modules and fail with
-          // MODULE_NOT_FOUND. path.resolve() makes it absolute first.
-          const path = require('path');
-          const modulePath = path.resolve(process.argv[2]);
-          const Database = require(modulePath);
-          const db = new Database(':memory:');
-          db.exec('CREATE TABLE t (id INTEGER)');
-          db.prepare('INSERT INTO t (id) VALUES (?)').run(1);
-          const row = db.prepare('SELECT id FROM t').get();
-          if (!row || row.id !== 1) {
-            throw new Error('better-sqlite3 loaded but query returned an unexpected result: ' + JSON.stringify(row));
-          }
-          db.close();
-          console.log('OK: better-sqlite3 loaded and executed a real query under Electron\'s Node ABI (ELECTRON_RUN_AS_NODE)');
-          EOF
-
-          echo "Requiring $MODULE_DIR via $EXE (ELECTRON_RUN_AS_NODE=1)..."
-          if ELECTRON_RUN_AS_NODE=1 "$EXE" verify-better-sqlite3.cjs "$MODULE_DIR"; then
-            echo "✓ better-sqlite3 loads and runs correctly under the packaged app's Electron ABI"
-          else
-            echo "✗ better-sqlite3 failed to load/execute under the packaged app's Electron ABI"
-            echo "This is consistent with issue #97: a binary that's present but unloadable would"
-            echo "crash the spawned backend at require-time with no window ever appearing."
-            exit 1
-          fi
 
       # Issue #97's literal reported symptom: processes running (visible in Task
       # Manager), no window ever appears, no error dialog. The two steps above verify

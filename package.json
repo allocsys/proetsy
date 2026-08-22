@@ -72,10 +72,6 @@
       },
       "package.json"
     ],
-    "asarUnpack": [
-      "**/node_modules/better-sqlite3/**/*"
-    ],
-    "npmRebuild": false,
     "publish": {
       "provider": "github",
       "owner": "allocsys",
