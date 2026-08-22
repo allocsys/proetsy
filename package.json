@@ -52,6 +52,7 @@
     "directories": {
       "output": "release-builds"
     },
+    "asarUnpack": ["backend/**/*"],
     "files": [
       "electron/**/*",
       {
