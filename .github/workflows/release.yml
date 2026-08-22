@@ -304,6 +304,10 @@ jobs:
           # at all. Redirect this process's own output to files so that's visible too.
           $stdoutLog = Join-Path $env:RUNNER_TEMP 'proetsy-app-stdout.log'
           $stderrLog = Join-Path $env:RUNNER_TEMP 'proetsy-app-stderr.log'
+          # Recorded so the event-log query in `finally` below can scope to entries
+          # written during (or after) this specific launch, not stale entries from
+          # something else on the runner.
+          $launchTime = Get-Date
           $proc = Start-Process -FilePath $exe.FullName -ArgumentList '--disable-gpu' -PassThru -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog
 
           try {
@@ -356,6 +360,65 @@ jobs:
             Write-Host "PASS: packaged app launched, backend became healthy, and a window appeared."
           }
           finally {
+            # Issue #103 follow-up: a previous run's diagnostics (startup.log/backend.log/
+            # stdout/stderr, all captured further below) came back completely empty even
+            # though the process never exited during the 45s health-check wait -- i.e.
+            # this looks like a genuine hang, not a crash, and the hang is happening at a
+            # level none of our JS-side logging can reach (before main.js's isMainModule
+            # block even runs its first line). A silent native dialog (Windows Defender/
+            # SmartScreen holding the exe, or a Windows Error Reporting crash dialog
+            # waiting for a click that never comes) is a live theory for that shape --
+            # screenshot the runner's desktop *before* killing the process tree below, so
+            # a dialog sitting there is actually visible instead of just suspected.
+            $screenshotPath = Join-Path $env:RUNNER_TEMP 'proetsy-screenshot.png'
+            try {
+              Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+              $bounds = [System.Drawing.Rectangle]::Empty
+              foreach ($screen in [System.Windows.Forms.Screen]::AllScreens) {
+                $bounds = [System.Drawing.Rectangle]::Union($bounds, $screen.Bounds)
+              }
+              $bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
+              $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+              $graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+              $bitmap.Save($screenshotPath, [System.Drawing.Imaging.ImageFormat]::Png)
+              $graphics.Dispose()
+              $bitmap.Dispose()
+              Write-Host "Screenshot captured: $screenshotPath"
+            } catch {
+              Write-Host "Screenshot capture failed (best-effort, non-fatal): $($_.Exception.Message)"
+            }
+
+            # Also check the Windows Application/System event logs for anything logged
+            # around the launch window -- a native crash (as opposed to a hang) writes an
+            # "Application Error"/".NET Runtime"/WER event here even when nothing reaches
+            # stdout/stderr or our own log files, since Windows Error Reporting operates
+            # entirely outside the crashed process itself.
+            $eventLogPath = Join-Path $env:RUNNER_TEMP 'proetsy-eventlog.txt'
+            try {
+              $events = Get-WinEvent -FilterHashtable @{
+                LogName   = 'Application', 'System'
+                StartTime = $launchTime
+              } -ErrorAction SilentlyContinue |
+                Where-Object {
+                  $_.LevelDisplayName -in @('Error', 'Critical') -or
+                  $_.ProviderName -match 'Windows Error Reporting|Application Error|\.NET Runtime|Application Hang'
+                } |
+                Sort-Object TimeCreated
+
+              if ($events) {
+                $events | Format-List TimeCreated, ProviderName, Id, LevelDisplayName, Message |
+                  Out-String -Width 200 | Set-Content $eventLogPath
+                Write-Host "--- Windows event log entries since launch ($eventLogPath) ---"
+                Get-Content $eventLogPath
+              } else {
+                "(no matching Application/System event log entries since $launchTime)" | Set-Content $eventLogPath
+                Write-Host "(no matching Windows event log entries found since launch)"
+              }
+            } catch {
+              "(event log query failed: $($_.Exception.Message))" | Set-Content $eventLogPath
+              Write-Host "Event log query failed (best-effort, non-fatal): $($_.Exception.Message)"
+            }
+
             # Kill the whole process tree (Electron main + GPU/utility helper + spawned
             # backend node process) -- #97 itself is about these surviving with no
             # window, so leaving any running here would be the same leak, times three
@@ -402,6 +465,20 @@ jobs:
         with:
           name: release-build-summary
           path: release-builds-summary.txt
+          if-no-files-found: warn
+          retention-days: 7
+
+      # Issue #103 follow-up: screenshot + Windows event log entries captured in the
+      # launch step's `finally` block above, uploaded as their own artifact since a
+      # .png isn't something the text-only release-builds-summary.txt above can hold.
+      - name: Upload launch diagnostics (screenshot + event log)
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: electron-launch-diagnostics
+          path: |
+            ${{ runner.temp }}/proetsy-screenshot.png
+            ${{ runner.temp }}/proetsy-eventlog.txt
           if-no-files-found: warn
           retention-days: 7
 
