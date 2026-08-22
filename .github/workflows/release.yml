@@ -459,20 +459,6 @@ jobs:
             # first matters here: if the app died before spawning the backend at all,
             # backend.log won't exist and startup.log is the only signal telling you
             # which checkpoint was the last one reached.
-            # Issue #103 diagnostic: the EARLIEST checkpoint of all -- written by
-            # sequential dynamic import() calls bisecting the 'electron' vs
-            # 'electron-updater' imports (see electron/main.js), each bracketed by its
-            # own "before importing X" / "X imported successfully" pair. Whichever
-            # "before importing X" line is the last one present with no matching
-            # "imported successfully" after it is the import that's hanging.
-            $bisectionCandidate = Get-ChildItem -Path "$env:TEMP" -Recurse -Filter 'proetsy-import-bisection.log' -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($bisectionCandidate) {
-              Write-Host "--- proetsy-import-bisection.log ($($bisectionCandidate.FullName)) ---"
-              Get-Content $bisectionCandidate.FullName -ErrorAction SilentlyContinue
-            } else {
-              Write-Host "(no proetsy-import-bisection.log found under `$env:TEMP -- means execution never reached even the first dynamic import() call, i.e. before any electron/electron-updater loading starts)"
-            }
-
             # Issue #103 diagnostic: written via plain node:fs/node:os as the literal
             # first statement of main.js's isMainModule block, with no dependency on
             # Electron's `app` object at all (unlike startup.log below, which needs
