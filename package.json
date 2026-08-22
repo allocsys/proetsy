@@ -52,7 +52,7 @@
     "directories": {
       "output": "release-builds"
     },
-    "asarUnpack": ["backend/**/*"],
+    "asarUnpack": ["backend/**/*", "node_modules/**/*"],
     "files": [
       "electron/**/*",
       {
