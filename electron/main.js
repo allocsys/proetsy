@@ -440,7 +440,13 @@ export { BACKEND_PORT, BACKEND_URL, DEV_FRONTEND_URL };
 // `require.main === module` -- the equivalent here is comparing this file's own path to
 // the path Node/Electron was actually launched with (process.argv[1]), which is set the
 // same way for an ESM entry point as it is for a CJS one.
+importBisectionLog(
+  `about to evaluate isMainModule -- argv=${JSON.stringify(process.argv)} ` +
+  `argv1Resolved=${process.argv[1] ? path.resolve(process.argv[1]) : '(argv[1] is falsy)'} ` +
+  `__filename=${__filename}`
+);
 const isMainModule = process.argv[1] && path.resolve(process.argv[1]) === __filename;
+importBisectionLog(`isMainModule evaluated to: ${isMainModule}`);
 
 if (isMainModule) {
   // Issue #103 diagnostic (sentinel write): every other diagnostic here -- startup.log
