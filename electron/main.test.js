@@ -88,6 +88,13 @@ let main;
 beforeEach(async () => {
   vi.resetModules();
   mockApp.isPackaged = false;
+  // process.resourcesPath is a real global Electron injects into the process at
+  // runtime (used by spawnBackend() to find the asarUnpack'd backend/ dir when
+  // packaged) -- it does not exist under plain Node, which is what Vitest actually
+  // runs under, so left unset it's `undefined` here rather than merely "unmocked".
+  // Stubbed the same way the rest of this file stubs Electron's other injected
+  // surface (mockApp, mockBrowserWindow, ...); restored in afterEach.
+  process.resourcesPath = '/fake/resources';
   mockApp.getPath.mockClear().mockReturnValue('/fake/userData');
   mockApp.quit.mockClear();
   mockApp.exit.mockClear();
@@ -114,6 +121,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   vi.useRealTimers();
+  delete process.resourcesPath;
 });
 
 describe('packagedBackendEnv', () => {
@@ -190,6 +198,20 @@ describe('spawnBackend', () => {
     expect(command).toBe(process.execPath);
     expect(options.env.ELECTRON_RUN_AS_NODE).toBe('1');
     expect(options.env.DB_PATH).toBe(path.join('/fake/userData', 'data', 'proetsy.db'));
+  });
+
+  // Regression coverage for the ENOENT root-caused in release CI run #64: backend/ is
+  // packed into app.asar (package.json's `files`) but also unpacked onto real disk via
+  // `asarUnpack`, at resources/app.asar.unpacked/backend -- cwd must point at that real
+  // path, not the __dirname-relative one, which resolves *inside* app.asar and isn't
+  // usable by spawn()'s underlying OS process-creation call.
+  it('uses the asarUnpack destination (resourcesPath/app.asar.unpacked/backend) as cwd when packaged', () => {
+    mockApp.isPackaged = true;
+    process.resourcesPath = '/fake/resources';
+    main.spawnBackend();
+
+    const [, , options] = spawnMock.mock.calls[0];
+    expect(options.cwd).toBe(path.join('/fake/resources', 'app.asar.unpacked', 'backend'));
   });
 
   it('registers an exit handler on the spawned child without throwing', () => {
