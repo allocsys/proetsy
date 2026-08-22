@@ -55,13 +55,27 @@ mistaken for a new failure signal there.
    rebuild) and remove it if so. *(commit `f8a7edf` on `chore/104-remove-native-module-build-config`
    — the original `fix/104-node-sqlite-migration` branch was merged via #105 and deleted
    after steps 1-5 landed, so remaining steps continue on this new branch.)*
-7. **`release.yml` cleanup:** remove the `better-sqlite3`-specific rebuild/verification
+7. ✅ **`release.yml` cleanup:** remove the `better-sqlite3`-specific rebuild/verification
    steps this whole saga (#97) added — the asar native-binary path check, the
    `ELECTRON_JOB_NODE_VERSION` pin, and the Windows Build Tools install step — since
-   there's no native module left to rebuild or verify.
-8. **Re-run release CI** on the branch to confirm: fewer steps, no native-module
-   failures, and the packaged exe still passes the "Launch packaged app and verify
-   health check + window" check from #97/#103.
+   there's no native module left to rebuild or verify. *(commit `026c9b3`. Also updated
+   `ARCHITECTURE.md`'s packaging notes to match — commit `83ed393`.)*
+8. ✅ **Re-run release CI** on the branch (`workflow_dispatch` run #54,
+   [32578575184](https://github.com/allocsys/proetsy/actions/runs/32578575184)) to
+   confirm: fewer steps, no native-module failures. `verify` and `package-local-bundle`
+   passed; `package-electron-win` built and asar-verified cleanly (no native-module
+   checks left to fail), but the final "Launch packaged app and verify health check +
+   window" step failed — backend never became healthy within 45s, no `backend.log`,
+   empty stdout/stderr.
+   **Confirmed pre-existing, not caused by this change:** the same step failed with
+   byte-for-byte identical symptoms on `main` at commit `c8b973c`
+   ([run #53](https://github.com/allocsys/proetsy/actions/runs/32432850573), still on
+   `better-sqlite3`, the day before this branch's changes) and on several earlier
+   `main`/pre-#104 runs (#44, #49-52). This is #103's zero-output-before-spawnBackend()
+   issue, unrelated to the DB driver. Also ruled out a `node:sqlite`
+   `--experimental-sqlite` flag concern specific to Electron's bundled Node: run #54
+   packaged against Electron `35.7.5` (Node 22.14+, past the 22.13.0 threshold where the
+   flag stopped being required), so that's not the trigger either.
 9. **Open PR**, referencing #104 and noting #103 is separate and not expected to be
    fixed by this change.
 
