@@ -487,9 +487,6 @@ if (isMainModule) {
       logStartup(`whenReady().then() chain rejected: ${err && err.stack ? err.stack : err}`);
       reportBackendStartupFailure(err instanceof Error ? err : new Error(String(err)));
     });
-  } else {
-    logStartup('lost single-instance lock, quitting');
-
     app.on('window-all-closed', () => {
       if (process.platform !== 'darwin') app.quit();
     });
@@ -502,5 +499,7 @@ if (isMainModule) {
         backendProcess.kill();
       }
     });
+  } else {
+    logStartup('lost single-instance lock, quitting');
   }
 }
