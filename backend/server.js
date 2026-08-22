@@ -2,7 +2,7 @@ import 'dotenv/config';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
@@ -1279,7 +1279,7 @@ app.post('/api/taste-filter/recompute', (req, res) => {
 // Guarded so importing this module (e.g. supertest-based integration tests, which wrap
 // the `app` export directly and don't need a real listening socket) doesn't also bind a
 // real port. Only binds when server.js is actually run as the entry point.
-const isMainModule = process.argv[1] && import.meta.url === `file://${process.argv[1]}`;
+const isMainModule = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMainModule) {
   // Fire-and-forget, started alongside (not before) app.listen() -- see this edit's
   // commit message. Logged rather than thrown: Taste Filter is one module among many,
