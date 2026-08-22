@@ -32,35 +32,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { get } from 'node:http';
 import { fileURLToPath } from 'node:url';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import electronUpdaterPkg from 'electron-updater';
+
+const { autoUpdater } = electronUpdaterPkg;
 
 // ESM has no CJS-style __dirname/__filename globals.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Issue #103 diagnostic (import-bisection sentinel) -- see the two importBisectionLog()
-// calls below for the full rationale. TEMPORARY: 'electron' and 'electron-updater' are
-// loaded via sequential dynamic import() here specifically so each can be bracketed by
-// its own sentinel write; revert to static imports once #103 is root-caused.
-function importBisectionLog(message) {
-  try {
-    fs.writeFileSync(
-      path.join(os.tmpdir(), 'proetsy-import-bisection.log'),
-      `[${new Date().toISOString()}] ${message} (pid=${process.pid})\n`,
-      { flag: 'a' }
-    );
-  } catch {
-    // Best-effort -- same rationale as every other diagnostic in this file.
-  }
-}
-
-importBisectionLog('before importing electron');
-const { app, BrowserWindow, ipcMain, dialog } = await import('electron');
-importBisectionLog('electron imported successfully');
-
-importBisectionLog('before importing electron-updater');
-const { default: electronUpdaterPkg } = await import('electron-updater');
-const { autoUpdater } = electronUpdaterPkg;
-importBisectionLog('electron-updater imported successfully');
 
 const BACKEND_PORT = process.env.PORT || 4000;
 const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
@@ -316,7 +295,6 @@ export async function selectFolder() {
 // renderer's 'select-folder' invoke always has a handler as soon as the module is
 // loaded, dev or packaged, without needing its own spot in the whenReady() chain below.
 ipcMain.handle('select-folder', selectFolder);
-importBisectionLog('after registering select-folder IPC handler');
 
 // Auto-update (release.yml already tags+publishes NSIS installers to GitHub Releases --
 // this wires the packaged app up to that same feed via electron-updater's default
@@ -331,7 +309,6 @@ importBisectionLog('after registering select-folder IPC handler');
 // checking happens without asking, but the (potentially large, metered-connection-
 // unfriendly) download itself only starts on an explicit click, and install only
 // happens on a second explicit click (quitAndInstall closes the app).
-importBisectionLog('before autoUpdater setup (autoDownload + listeners + ipcMain.handle calls)');
 autoUpdater.autoDownload = false;
 
 function sendToRenderer(channel, payload) {
@@ -373,7 +350,6 @@ export function quitAndInstall() {
 ipcMain.handle('check-for-updates', checkForUpdates);
 ipcMain.handle('download-update', downloadUpdate);
 ipcMain.handle('quit-and-install', quitAndInstall);
-importBisectionLog('module top-level complete (autoUpdater setup done), about to check isMainModule');
 
 export async function createWindow() {
   mainWindow = new BrowserWindow({
@@ -434,19 +410,21 @@ export async function createWindow() {
 
 export { BACKEND_PORT, BACKEND_URL, DEV_FRONTEND_URL };
 
-// Only run the actual Electron app lifecycle when this file is executed directly as the
-// app's entry point (`electron electron/main.js`, or via package.json's `main` field) --
-// not when a test file imports it just to reach the exported helpers above. ESM has no
-// `require.main === module` -- the equivalent here is comparing this file's own path to
-// the path Node/Electron was actually launched with (process.argv[1]), which is set the
-// same way for an ESM entry point as it is for a CJS one.
-importBisectionLog(
-  `about to evaluate isMainModule -- argv=${JSON.stringify(process.argv)} ` +
-  `argv1Resolved=${process.argv[1] ? path.resolve(process.argv[1]) : '(argv[1] is falsy)'} ` +
-  `__filename=${__filename}`
-);
-const isMainModule = process.argv[1] && path.resolve(process.argv[1]) === __filename;
-importBisectionLog(`isMainModule evaluated to: ${isMainModule}`);
+// Only run the actual Electron app lifecycle when this file is loaded as the app's real
+// entry point -- not when main.test.js imports it just to reach the exported helpers
+// above. ESM has no `require.main === module`, and issue #103 root-caused the previous
+// replacement for it here (`process.argv[1] === __filename`) as actively wrong for a
+// packaged Electron app: Electron doesn't put the entry-point script path in argv the
+// way `node script.js` does, so argv[1] in the packaged build was actually the first
+// CLI flag (e.g. `--disable-gpu`) rather than main.js's own path, making this evaluate
+// to false on every packaged launch -- silently skipping the entire app lifecycle below
+// (single-instance lock, app.whenReady(), backend spawn, window creation) while leaving
+// the process itself alive and idle, which is exactly #103's "nothing happens, nothing
+// crashes, nothing logs" symptom. Vitest sets `process.env.VITEST` on its own test
+// runner process (no setup needed in main.test.js itself), so checking that directly is
+// both simpler and correct in every launch mode (dev, packaged, with or without CLI
+// flags) that argv-sniffing wasn't.
+const isMainModule = !process.env.VITEST;
 
 if (isMainModule) {
   // Issue #103 diagnostic (sentinel write): every other diagnostic here -- startup.log
