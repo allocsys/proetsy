@@ -26,9 +26,6 @@
 // the real one. Root package.json now sets `"type": "module"` so this file (no local
 // package.json of its own) parses as ESM.
 
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
-import electronUpdaterPkg from 'electron-updater';
-const { autoUpdater } = electronUpdaterPkg;
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -39,6 +36,31 @@ import { fileURLToPath } from 'node:url';
 // ESM has no CJS-style __dirname/__filename globals.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Issue #103 diagnostic (import-bisection sentinel) -- see the two importBisectionLog()
+// calls below for the full rationale. TEMPORARY: 'electron' and 'electron-updater' are
+// loaded via sequential dynamic import() here specifically so each can be bracketed by
+// its own sentinel write; revert to static imports once #103 is root-caused.
+function importBisectionLog(message) {
+  try {
+    fs.writeFileSync(
+      path.join(os.tmpdir(), 'proetsy-import-bisection.log'),
+      `[${new Date().toISOString()}] ${message} (pid=${process.pid})\n`,
+      { flag: 'a' }
+    );
+  } catch {
+    // Best-effort -- same rationale as every other diagnostic in this file.
+  }
+}
+
+importBisectionLog('before importing electron');
+const { app, BrowserWindow, ipcMain, dialog } = await import('electron');
+importBisectionLog('electron imported successfully');
+
+importBisectionLog('before importing electron-updater');
+const { default: electronUpdaterPkg } = await import('electron-updater');
+const { autoUpdater } = electronUpdaterPkg;
+importBisectionLog('electron-updater imported successfully');
 
 const BACKEND_PORT = process.env.PORT || 4000;
 const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
