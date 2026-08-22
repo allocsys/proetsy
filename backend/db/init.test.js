@@ -47,8 +47,8 @@ describe('getDb', () => {
     const { getDb } = await import('./init.js');
     const db = getDb();
 
-    expect(db.pragma('journal_mode', { simple: true })).toBe('wal');
-    expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
+    expect(db.prepare('PRAGMA journal_mode').get().journal_mode).toBe('wal');
+    expect(db.prepare('PRAGMA foreign_keys').get().foreign_keys).toBe(1);
   });
 });
 
