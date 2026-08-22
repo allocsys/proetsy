@@ -27,21 +27,29 @@ mistaken for a new failure signal there.
 
 ## Steps (do in order)
 
-1. **Branch:** `fix/104-node-sqlite-migration` off default branch.
-2. **`backend/db/init.js`:** swap `import Database from 'better-sqlite3'` for
+1. ✅ **Branch:** `fix/104-node-sqlite-migration` off default branch.
+2. ✅ **`backend/db/init.js`:** swap `import Database from 'better-sqlite3'` for
    `import { DatabaseSync } from 'node:sqlite'`; replace `new Database(DB_PATH)` with
    `new DatabaseSync(DB_PATH)`; replace both `db.pragma(...)` calls with
    `db.exec('PRAGMA ...')`.
-3. **`backend/lib/taste-filter/store.js`:** add a small `withTransaction(db, fn)` helper
+3. ✅ **`backend/lib/taste-filter/store.js`:** add a small `withTransaction(db, fn)` helper
    (`BEGIN` / `COMMIT` / `ROLLBACK` on throw) and use it in place of `db.transaction()`
    in `recomputeCentroids()`, `recomputePromptTerms()`, and `adjustPromptTermCounts()`'s
    inner `run`. Update the JSDoc `@param {import('better-sqlite3').Database} db` type
    reference in `prompt-helper/index.js` to `node:sqlite`'s `DatabaseSync`.
-4. **Run the existing test suite** (`npm run test:electron`, `npm run test -w backend`)
+   *(Landed as `withTransaction()` shared from `db/init.js` rather than duplicated in
+   `store.js`. Also caught several `db.transaction()` call sites the spike missed —
+   `server.js` (×3), `trends/manual.js`, `tags/user-list.js`,
+   `listing-generator/index.js` — plus a `recomputeCentroids()` bug where `DatabaseSync`
+   rejects named params not referenced in a statement's SQL, unlike better-sqlite3's
+   silent-ignore behavior.)*
+4. ✅ **Run the existing test suite** (`npm run test:electron`, `npm run test -w backend`)
    against the branch — `init.js`, `init.test.js`, and `store.js`'s callers
-   (`taste-filter` tests) are the ones that touch the DB layer directly.
-5. **If clean:** remove `better-sqlite3` from `backend/package.json` and root
-   `package.json` dependencies.
+   (`taste-filter` tests) are the ones that touch the DB layer directly. CI green across
+   all jobs (`backend-test`, `electron-test`, `lint`, `frontend-test`, `frontend-build`,
+   `install`) at commit `556c2e1`.
+5. ✅ **If clean:** remove `better-sqlite3` from `backend/package.json` and root
+   `package.json` dependencies. *(commit `77c65d2`)*
 6. **`package.json` build config cleanup:** remove `asarUnpack` entry for
    `better-sqlite3`, confirm `npmRebuild: false` is now moot (no native module left to
    rebuild) and remove it if so.
