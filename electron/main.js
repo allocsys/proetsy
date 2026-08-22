@@ -173,12 +173,22 @@ export function spawnBackend() {
   const { command, extraEnv } = backendExecutable();
 
   let stdio = 'inherit';
+  let logFd = null;
   const logPath = getBackendLogPath();
   if (logPath) {
     try {
-      const logStream = fs.createWriteStream(logPath, { flags: 'a' });
-      logStream.write(`\n--- ProEtsy backend starting ${new Date().toISOString()} ---\n`);
-      stdio = ['ignore', logStream, logStream];
+      fs.appendFileSync(logPath, `\n--- ProEtsy backend starting ${new Date().toISOString()} ---\n`);
+      // fs.createWriteStream()'s underlying file descriptor opens asynchronously --
+      // handing that Stream object straight to spawn()'s `stdio` here previously raced
+      // that open and threw `ERR_INVALID_ARG_VALUE: The argument 'stdio' is invalid.
+      // Received WriteStream { fd: null, ... }` (confirmed on Node 24.18.0, the version
+      // release.yml pins). Never caught by main.test.js since getBackendLogPath()
+      // silently returns null there (the mocked userData path isn't writable in CI), so
+      // this whole branch never actually ran in tests. fs.openSync() opens the fd
+      // synchronously instead -- spawn()'s stdio array accepts a raw fd number
+      // directly, which sidesteps the async-open race entirely.
+      logFd = fs.openSync(logPath, 'a');
+      stdio = ['ignore', logFd, logFd];
     } catch {
       // Fall back to 'inherit' -- see ensureLogDir()'s comment above.
       stdio = 'inherit';
@@ -190,6 +200,18 @@ export function spawnBackend() {
     env: { ...process.env, PORT: String(BACKEND_PORT), ...packagedBackendEnv(), ...extraEnv },
     stdio,
   });
+
+  if (logFd !== null) {
+    // The child gets its own handle to the fd once spawned; close this process's copy
+    // rather than leaking it open for the Electron process's entire remaining lifetime.
+    child.on('spawn', () => {
+      try {
+        fs.closeSync(logFd);
+      } catch {
+        // Best-effort cleanup only.
+      }
+    });
+  }
   // Issue #103: spawn() reports a failure to actually launch the child (bad `command`,
   // ENOENT, EACCES, etc.) via an 'error' event, not 'exit' -- distinct from the 'exit'
   // handler below, which only fires for a process that did start. An EventEmitter's
