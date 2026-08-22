@@ -31,6 +31,7 @@ import electronUpdaterPkg from 'electron-updater';
 const { autoUpdater } = electronUpdaterPkg;
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { get } from 'node:http';
 import { fileURLToPath } from 'node:url';
@@ -417,6 +418,28 @@ export { BACKEND_PORT, BACKEND_URL, DEV_FRONTEND_URL };
 const isMainModule = process.argv[1] && path.resolve(process.argv[1]) === __filename;
 
 if (isMainModule) {
+  // Issue #103 diagnostic (sentinel write): every other diagnostic here -- startup.log
+  // via logStartup() below, backend.log, even plain console.log -- either depends on
+  // Electron's `app` module (app.getPath('userData')) having done enough native init to
+  // answer that call, or on this process's stdout actually being a valid, captured
+  // stream. A prior run's artifact showed NONE of them fired, not even this next line,
+  // which means the hang could be at or before acquireSingleInstanceLock() below, or
+  // even earlier -- during ESM evaluation of the electron-updater import above, before
+  // this block's first statement ever runs. This write uses only node:fs + node:os --
+  // no Electron API at all -- so its presence/absence in %TEMP% (searched for in
+  // release.yml's diagnostics dump) definitively answers "did execution reach this
+  // literal line" independent of every other diagnostic's own dependencies.
+  try {
+    fs.writeFileSync(
+      path.join(os.tmpdir(), 'proetsy-sentinel.log'),
+      `[${new Date().toISOString()}] isMainModule block entered (pid=${process.pid})\n`,
+      { flag: 'a' }
+    );
+  } catch {
+    // Best-effort -- if even this fails, there's nothing more primitive left to fall
+    // back to; logStartup()/console.log below will try their own independent paths.
+  }
+
   logStartup('main process entry reached');
 
   // Issue #103: these are the actual last line of defense for the silent-crash reports
