@@ -316,6 +316,7 @@ export async function selectFolder() {
 // renderer's 'select-folder' invoke always has a handler as soon as the module is
 // loaded, dev or packaged, without needing its own spot in the whenReady() chain below.
 ipcMain.handle('select-folder', selectFolder);
+importBisectionLog('after registering select-folder IPC handler');
 
 // Auto-update (release.yml already tags+publishes NSIS installers to GitHub Releases --
 // this wires the packaged app up to that same feed via electron-updater's default
@@ -330,6 +331,7 @@ ipcMain.handle('select-folder', selectFolder);
 // checking happens without asking, but the (potentially large, metered-connection-
 // unfriendly) download itself only starts on an explicit click, and install only
 // happens on a second explicit click (quitAndInstall closes the app).
+importBisectionLog('before autoUpdater setup (autoDownload + listeners + ipcMain.handle calls)');
 autoUpdater.autoDownload = false;
 
 function sendToRenderer(channel, payload) {
@@ -371,6 +373,7 @@ export function quitAndInstall() {
 ipcMain.handle('check-for-updates', checkForUpdates);
 ipcMain.handle('download-update', downloadUpdate);
 ipcMain.handle('quit-and-install', quitAndInstall);
+importBisectionLog('module top-level complete (autoUpdater setup done), about to check isMainModule');
 
 export async function createWindow() {
   mainWindow = new BrowserWindow({
