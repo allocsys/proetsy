@@ -162,7 +162,12 @@ export function recomputeCentroids() {
       };
       const existing = findExisting.get(category);
       if (existing) {
-        update.run({ ...params, id: existing.id });
+        // node:sqlite's DatabaseSync throws "Unknown named parameter" for any bound key
+        // not referenced in the statement's own SQL (better-sqlite3 silently ignored
+        // extras) -- `update`'s SQL has no @category placeholder, so it must get an
+        // object without that key rather than the full `params` spread.
+        const { category: _category, ...updateParams } = params;
+        update.run({ ...updateParams, id: existing.id });
       } else {
         insert.run(params);
       }
