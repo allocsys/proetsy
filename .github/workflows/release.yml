@@ -308,15 +308,40 @@ jobs:
           # written during (or after) this specific launch, not stale entries from
           # something else on the runner.
           $launchTime = Get-Date
-          $proc = Start-Process -FilePath $exe.FullName -ArgumentList '--disable-gpu' -PassThru -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog
+          # Issue #103 follow-up: a prior run's screenshot + event-log diagnostics ruled
+          # out a JS exception, a spawn() failure, a native crash, and a blocking dialog
+          # -- the process just stays alive and invisible for the full 45s. That's
+          # consistent with a hang inside Electron's own native bootstrap (sandbox or
+          # GPU-process init) before a window is ever registered with the OS. Adding
+          # --disable-gpu-sandbox and --no-sandbox alongside the existing --disable-gpu
+          # to test whether sandbox init itself is what's stalling.
+          $launchArgs = @('--disable-gpu', '--disable-gpu-sandbox', '--no-sandbox')
+          $proc = Start-Process -FilePath $exe.FullName -ArgumentList $launchArgs -PassThru -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog
 
           try {
             $healthy = $false
             $deadline = (Get-Date).AddSeconds(45)
+            # Issue #103 follow-up: prior runs showed the process staying alive (never
+            # tripping the HasExited branch below) with zero output anywhere -- so it's
+            # either genuinely stuck (near-zero CPU, no progress) or busy doing *something*
+            # with nothing else surfacing what. Sample OS-visible process state periodically
+            # so those two cases are distinguishable from the outside.
+            $lastDiagLog = Get-Date
             while ((Get-Date) -lt $deadline) {
               if ($proc.HasExited) {
                 Write-Host "::error::App process exited early (code $($proc.ExitCode)) before becoming healthy -- consistent with issue #97 (silent startup failure)."
                 exit 1
+              }
+              if (((Get-Date) - $lastDiagLog).TotalSeconds -ge 5) {
+                try {
+                  $procRefresh = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
+                  if ($procRefresh) {
+                    Write-Host "  [diag] pid=$($proc.Id) cpu=$([math]::Round($procRefresh.CPU, 2))s handles=$($procRefresh.HandleCount) threads=$($procRefresh.Threads.Count) workingSetMB=$([math]::Round($procRefresh.WorkingSet64 / 1MB, 1))"
+                  }
+                } catch {
+                  Write-Host "  [diag] process state sample failed: $($_.Exception.Message)"
+                }
+                $lastDiagLog = Get-Date
               }
               try {
                 $resp = Invoke-WebRequest -Uri 'http://localhost:4000/api/health' -UseBasicParsing -TimeoutSec 2
