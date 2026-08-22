@@ -396,6 +396,45 @@ describe('getBackendLogPath (regression -- issue #97)', () => {
   });
 });
 
+// Regression tests for issue #103: packaged runs with no backend.log, no window, and no
+// visible stdout/stderr at all -- meaning the failure happens before spawnBackend() ever
+// creates that log stream. logStartup() is the earlier, separate log this adds to catch
+// that window; child.on('error', ...) covers the specific silent-crash mechanism a failed
+// spawn() call could otherwise cause (an unhandled 'error' event throwing back out of the
+// emit site with no trace left anywhere).
+describe('logStartup (regression -- issue #103)', () => {
+  it('always logs to console, even in dev mode where there is no startup.log file', () => {
+    mockApp.isPackaged = false;
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    main.logStartup('some checkpoint reached');
+
+    expect(consoleSpy).toHaveBeenCalledWith('[electron] some checkpoint reached');
+    consoleSpy.mockRestore();
+  });
+
+  it('does not throw when packaged and the log directory is unavailable (best-effort diagnostics only)', () => {
+    mockApp.isPackaged = true;
+    mockApp.getPath.mockImplementation(() => {
+      throw new Error('no such path');
+    });
+
+    expect(() => main.logStartup('checkpoint')).not.toThrow();
+  });
+});
+
+describe("spawnBackend's child 'error' handler (regression -- issue #103)", () => {
+  it('does not throw when the spawned child emits an unhandled-by-default \'error\' event', () => {
+    mockApp.isPackaged = false;
+    const child = main.spawnBackend();
+
+    // Node's EventEmitter re-throws an 'error' event synchronously if no listener is
+    // attached -- this only stays silent (the #103 failure mode) if spawnBackend()
+    // itself attaches one, which is exactly what this asserts.
+    expect(() => child.emit('error', new Error('spawn ENOENT'))).not.toThrow();
+  });
+});
+
 describe('createWindow failure reporting (regression -- issue #97)', () => {
   it('reports via the error dialog (and does not throw) if loadFile() rejects when packaged', async () => {
     mockApp.isPackaged = true;

@@ -137,6 +137,35 @@ export function getBackendLogPath() {
   return logDir ? path.join(logDir, 'backend.log') : null;
 }
 
+// Issue #103: some packaged runs never produce backend.log, no window, and no visible
+// stdout/stderr at all -- meaning whatever's failing happens before spawnBackend() ever
+// gets to create that log stream (e.g. during app.whenReady() itself, or an unhandled
+// exception/rejection in the startup chain that .then()/.catch() below wasn't wired to
+// catch). backend.log can't diagnose that by definition, since it doesn't exist yet at
+// that point. This is a separate, earlier log -- written from the very first line of
+// the isMainModule startup block, appended to (not truncated) at each checkpoint, so a
+// crash between two checkpoints narrows down exactly which phase never completed even
+// when nothing else survives to tell that story.
+function getStartupLogPath() {
+  if (!app.isPackaged) return null;
+  const logDir = ensureLogDir();
+  return logDir ? path.join(logDir, 'startup.log') : null;
+}
+
+export function logStartup(message) {
+  // Always goes to console too -- in dev mode (no startup.log) this is the only trace,
+  // and it's a normal 'inherit'-stdio child in dev so it's genuinely visible there.
+  console.log(`[electron] ${message}`);
+  const logPath = getStartupLogPath();
+  if (!logPath) return;
+  try {
+    fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${message}\n`);
+  } catch {
+    // Best-effort diagnostics only -- logging itself must never be what takes down
+    // startup (same rationale as ensureLogDir()/getBackendLogPath() above).
+  }
+}
+
 export function spawnBackend() {
   const backendDir = path.join(__dirname, '..', 'backend');
   const { command, extraEnv } = backendExecutable();
@@ -159,8 +188,21 @@ export function spawnBackend() {
     env: { ...process.env, PORT: String(BACKEND_PORT), ...packagedBackendEnv(), ...extraEnv },
     stdio,
   });
+  // Issue #103: spawn() reports a failure to actually launch the child (bad `command`,
+  // ENOENT, EACCES, etc.) via an 'error' event, not 'exit' -- distinct from the 'exit'
+  // handler below, which only fires for a process that did start. An EventEmitter's
+  // 'error' event with zero listeners throws synchronously back on the emit call site,
+  // which -- called from inside app.whenReady().then() with no surrounding try/catch
+  // for this specific path -- would surface only as an unhandled rejection: exactly the
+  // silent-crash shape #103 describes (no backend.log, since the stream above was only
+  // ever opened, never written to by a process that never started; no console output
+  // reaching a redirected stdio handle either, since the crash happens in the Electron
+  // main process, not the child).
+  child.on('error', (err) => {
+    logStartup(`FATAL: backend process failed to spawn (command=${command}): ${err.message}`);
+  });
   child.on('exit', (code, signal) => {
-    console.log(`[electron] backend process exited (code=${code}, signal=${signal})`);
+    logStartup(`backend process exited (code=${code}, signal=${signal})`);
     backendProcess = null;
   });
   return child;
@@ -375,26 +417,54 @@ export { BACKEND_PORT, BACKEND_URL, DEV_FRONTEND_URL };
 const isMainModule = process.argv[1] && path.resolve(process.argv[1]) === __filename;
 
 if (isMainModule) {
+  logStartup('main process entry reached');
+
+  // Issue #103: these are the actual last line of defense for the silent-crash reports
+  // -- an exception thrown or a promise rejected anywhere in the startup chain that
+  // *isn't* already inside one of the try/catch blocks below (e.g. a synchronous throw
+  // inside acquireSingleInstanceLock() itself, or a rejection from a spot the existing
+  // .then()/.catch() wiring doesn't cover) would otherwise propagate out of the process
+  // with Electron's own default handling -- which, for a packaged Windows GUI-subsystem
+  // app with no attached console, is not guaranteed to write anything anywhere a person
+  // (or this release workflow's stdout/stderr redirect) can see. Logging first, then
+  // still surfacing via the same error dialog as every other startup failure path.
+  process.on('uncaughtException', (err) => {
+    logStartup(`FATAL uncaughtException: ${err && err.stack ? err.stack : err}`);
+    reportBackendStartupFailure(err instanceof Error ? err : new Error(String(err)));
+  });
+  process.on('unhandledRejection', (reason) => {
+    const err = reason instanceof Error ? reason : new Error(String(reason));
+    logStartup(`FATAL unhandledRejection: ${err.stack || err.message}`);
+    reportBackendStartupFailure(err);
+  });
+
   // Must happen before any backend/window spawning -- see acquireSingleInstanceLock()
   // above. A losing second instance already called app.quit() inside that function and
   // has nothing further to do here.
   if (acquireSingleInstanceLock()) {
+    logStartup('single-instance lock acquired');
     app.whenReady().then(async () => {
+      logStartup('app.whenReady() resolved');
       backendProcess = spawnBackend();
+      logStartup(`spawnBackend() returned (pid=${backendProcess.pid})`);
       try {
         await waitForBackend(`${BACKEND_URL}/api/health`);
+        logStartup('backend health check passed');
       } catch (err) {
+        logStartup(`backend health check failed: ${err.message}`);
         reportBackendStartupFailure(err);
         return;
       }
       try {
         await createWindow();
+        logStartup('createWindow() resolved');
       } catch (err) {
         // Issue #97: createWindow() throwing synchronously (as opposed to the
         // did-fail-load/render-process-gone handlers registered inside it, which cover
         // failures *after* construction) is the last uncovered silent-failure path --
         // route it through the same error dialog rather than letting it propagate
         // uncaught out of this .then().
+        logStartup(`createWindow() threw: ${err.message}`);
         reportBackendStartupFailure(err);
         return;
       }
@@ -410,8 +480,13 @@ if (isMainModule) {
       app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();
       });
+    }).catch((err) => {
+      // Belt-and-braces alongside the uncaughtException/unhandledRejection handlers
+      // above: a rejection from this specific promise chain lands here directly rather
+      // than needing to escalate all the way to the process-level handlers.
+      logStartup(`whenReady().then() chain rejected: ${err && err.stack ? err.stack : err}`);
+      reportBackendStartupFailure(err instanceof Error ? err : new Error(String(err)));
     });
-
     app.on('window-all-closed', () => {
       if (process.platform !== 'darwin') app.quit();
     });
@@ -424,5 +499,7 @@ if (isMainModule) {
         backendProcess.kill();
       }
     });
+  } else {
+    logStartup('lost single-instance lock, quitting');
   }
 }
