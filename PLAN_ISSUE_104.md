@@ -50,9 +50,11 @@ mistaken for a new failure signal there.
    `install`) at commit `556c2e1`.
 5. ✅ **If clean:** remove `better-sqlite3` from `backend/package.json` and root
    `package.json` dependencies. *(commit `77c65d2`)*
-6. **`package.json` build config cleanup:** remove `asarUnpack` entry for
+6. ✅ **`package.json` build config cleanup:** remove `asarUnpack` entry for
    `better-sqlite3`, confirm `npmRebuild: false` is now moot (no native module left to
-   rebuild) and remove it if so.
+   rebuild) and remove it if so. *(commit `f8a7edf` on `chore/104-remove-native-module-build-config`
+   — the original `fix/104-node-sqlite-migration` branch was merged via #105 and deleted
+   after steps 1-5 landed, so remaining steps continue on this new branch.)*
 7. **`release.yml` cleanup:** remove the `better-sqlite3`-specific rebuild/verification
    steps this whole saga (#97) added — the asar native-binary path check, the
    `ELECTRON_JOB_NODE_VERSION` pin, and the Windows Build Tools install step — since
