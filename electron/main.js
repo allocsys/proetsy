@@ -169,7 +169,20 @@ export function logStartup(message) {
 }
 
 export function spawnBackend() {
-  const backendDir = path.join(__dirname, '..', 'backend');
+  // Issue #97/#103 follow-up: backend/ is packed into app.asar (see package.json's
+  // `files` config) but also unpacked onto real disk alongside it via `asarUnpack`,
+  // at resources/app.asar.unpacked/backend. That unpacked copy is required here --
+  // spawn() below hands `cwd` (and `server.js` as a bare argument) to the OS's real
+  // process-creation API, which has no concept of asar and can't resolve either one
+  // against a path that only exists inside the archive. The __dirname-relative path
+  // resolves *inside* app.asar in a packaged build (e.g. resources\app.asar\electron\
+  // ..\backend), which is exactly why a packaged spawnBackend() previously failed
+  // with ENOENT while everything Electron itself loads (main.js, frontend/dist via
+  // loadFile()) kept working fine -- those go through Electron's own asar-aware
+  // fs/module loader, which a spawned child process never does.
+  const backendDir = app.isPackaged
+    ? path.join(process.resourcesPath, 'app.asar.unpacked', 'backend')
+    : path.join(__dirname, '..', 'backend');
   const { command, extraEnv } = backendExecutable();
 
   let stdio = 'inherit';
