@@ -43,9 +43,13 @@ concurrency:
 env:
   # Pinned to a specific patch (not floating '24') -- 24.19.0 has a native-addon
   # cleanup-hook regression that intermittently crashes processes using native
-  # modules (e.g. better-sqlite3) during worker/environment teardown. See
+  # modules during worker/environment teardown. See
   # https://github.com/nexu-io/open-design/issues/6462. Bump deliberately once
   # upstream ships a fix, the same way package-lock.json pins other deps.
+  # (Predates #104's better-sqlite3 -> node:sqlite migration -- node:sqlite is a
+  # built-in, not a native addon pulled from node_modules, so it isn't itself a
+  # reason for this pin, but nothing else has changed that would make the pin
+  # unnecessary.)
   NODE_VERSION: '24.18.0'
 
 jobs:
@@ -122,7 +126,7 @@ jobs:
             frontend/node_modules
           key: ${{ needs.install.outputs.node-modules-key }}
       # Vitest — unit + Supertest integration tests, per ARCHITECTURE.md's Module 1/2/3
-      # status notes. better-sqlite3 (backend/db) needs no external service or Gemini
+      # status notes. node:sqlite (backend/db) needs no external service or Gemini
       # key: every test touching the LLM provider layer mocks lib/llm/index.js, and DB
       # tests point DB_PATH at a throwaway temp-file SQLite DB instead of the real local
       # one.

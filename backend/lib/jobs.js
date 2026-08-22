@@ -1,4 +1,4 @@
-import { getDb } from '../db/init.js';
+import { getDb, withTransaction } from '../db/init.js';
 import { getPipelineConfig } from '../config/index.js';
 
 // Creates a job for an artwork and seeds a job_modules row per module in the current
@@ -21,7 +21,7 @@ export function createJob(artworkId, overrides = {}, batchId = null) {
   const insertJob = db.prepare("INSERT INTO jobs (artwork_id, overall_status, batch_id) VALUES (?, 'pending', ?)");
   const insertModule = db.prepare('INSERT INTO job_modules (job_id, module_name, status) VALUES (?, ?, ?)');
 
-  const run = db.transaction(() => {
+  return withTransaction(db, () => {
     const { lastInsertRowid: jobId } = insertJob.run(artworkId, batchId || null);
     const { pipeline } = getPipelineConfig();
     for (const { module, enabled, required } of pipeline) {
@@ -31,8 +31,6 @@ export function createJob(artworkId, overrides = {}, batchId = null) {
     }
     return jobId;
   });
-
-  return run();
 }
 
 // plan.md step 6: bulk-upload previously fired one POST /api/jobs per artwork,
@@ -54,9 +52,9 @@ export function createJobsBulk(artworkIds, overrides = {}, batchId = null) {
   const insertModule = db.prepare('INSERT INTO job_modules (job_id, module_name, status) VALUES (?, ?, ?)');
   const { pipeline } = getPipelineConfig();
 
-  const run = db.transaction((ids) => {
+  return withTransaction(db, () => {
     const jobIds = [];
-    for (const artworkId of ids) {
+    for (const artworkId of artworkIds) {
       const artwork = getArtwork.get(artworkId);
       if (!artwork) throw new Error(`Artwork ${artworkId} not found`);
 
@@ -70,8 +68,6 @@ export function createJobsBulk(artworkIds, overrides = {}, batchId = null) {
     }
     return jobIds;
   });
-
-  return run(artworkIds);
 }
 
 export function getJobWithModules(jobId) {

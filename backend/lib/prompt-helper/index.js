@@ -1,4 +1,4 @@
-import { getDb } from '../../db/init.js';
+import { getDb, withTransaction } from '../../db/init.js';
 import { generateText } from '../llm/index.js';
 import { buildPromptHelperPrompt } from './prompt.js';
 import { enforceMidjourneyConventions } from './validate.js';
@@ -29,7 +29,7 @@ function parseModelJson(rawText) {
  * Module 7 is built and the user has labeled enough images for a term to show a real
  * kept/discarded skew; this link being "opt-in" is a natural consequence of there being
  * no data to opt into yet, not a separate feature flag.
- * @param {import('better-sqlite3').Database} db
+ * @param {import('node:sqlite').DatabaseSync} db
  * @param {number} limit
  * @returns {string[]}
  */
@@ -82,15 +82,14 @@ export async function generatePromptsForTrend({ trendId = null, orientation }) {
   const insert = db.prepare(
     `INSERT INTO prompts (trend_id, orientation, prompt_text, created_at) VALUES (?, ?, ?, datetime('now'))`
   );
-  const insertAll = db.transaction((items) => {
-    const ids = [];
-    for (const item of items) {
+  const ids = withTransaction(db, () => {
+    const result = [];
+    for (const item of cleaned) {
       const { lastInsertRowid } = insert.run(trendId || null, orientation, item.text);
-      ids.push(lastInsertRowid);
+      result.push(lastInsertRowid);
     }
-    return ids;
+    return result;
   });
-  const ids = insertAll(cleaned);
 
   return cleaned.map((c, i) => ({
     id: ids[i],

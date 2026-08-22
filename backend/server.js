@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
-import { getDb } from './db/init.js';
+import { getDb, withTransaction } from './db/init.js';
 import {
   getPipelineConfig,
   getProductSizes,
@@ -361,12 +361,11 @@ app.patch('/api/settings', (req, res) => {
   const upsert = db.prepare(
     'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
   );
-  const run = db.transaction(() => {
+  withTransaction(db, () => {
     for (const [key, value] of Object.entries(updates)) {
       upsert.run(key, value === null || value === undefined ? null : String(value));
     }
   });
-  run();
   // getPipelineConfig() is memoized (config/index.js) -- any settings PATCH could have
   // touched a pipeline_module_<name>_enabled key, so invalidate unconditionally rather
   // than trying to detect which keys changed. Cheap: the next getPipelineConfig() call
@@ -463,17 +462,16 @@ app.post('/api/tags/bulk', (req, res) => {
   const db = getDb();
   const existing = new Set(db.prepare('SELECT tag_text FROM tags').all().map((r) => r.tag_text));
   const insert = db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)');
-  const run = db.transaction(() => {
-    let inserted = 0;
+  const inserted = withTransaction(db, () => {
+    let count = 0;
     for (const tag of list) {
       if (existing.has(tag)) continue;
       insert.run(tag, category || null, source || 'manual');
       existing.add(tag);
-      inserted += 1;
+      count += 1;
     }
-    return inserted;
+    return count;
   });
-  const inserted = run();
   res.status(201).json({ inserted, total: existing.size, tags: db.prepare('SELECT * FROM tags ORDER BY tag_text').all() });
 });
 
@@ -705,7 +703,7 @@ app.patch('/api/jobs/:id/listings/:listingId', (req, res) => {
   // this is future-proofing against the atomicity guarantee silently breaking if
   // async work (e.g. an await) is ever added to the merge/validation step, not a fix
   // for an active race condition.
-  const result = db.transaction(() => {
+  const result = withTransaction(db, () => {
     const existing = db.prepare('SELECT * FROM listings WHERE id = ? AND job_id = ?').get(listingId, jobId);
     if (!existing) return null;
 
@@ -723,7 +721,7 @@ app.patch('/api/jobs/:id/listings/:listingId', (req, res) => {
     ).run(cleaned.title, cleaned.description, JSON.stringify(cleaned.tags), JSON.stringify(cleaned.tagAlternates), listingId);
 
     return { updated: db.prepare('SELECT * FROM listings WHERE id = ?').get(listingId), cleaned };
-  })();
+  });
 
   if (!result) return res.status(404).json({ error: 'Listing not found for this job' });
 

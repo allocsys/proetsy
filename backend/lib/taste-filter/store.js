@@ -4,7 +4,7 @@
 // centroids.js; this file is the DB-touching glue around it: reading labeled examples
 // out, handing them to computeAllCentroidPairs(), and writing the result back.
 
-import { getDb } from '../../db/init.js';
+import { getDb, withTransaction } from '../../db/init.js';
 import { computeAllCentroidPairs } from './centroids.js';
 import { extractPromptTerms } from './prompt-terms.js';
 
@@ -151,7 +151,7 @@ export function recomputeCentroids() {
   );
 
   const counts = new Map();
-  const writeAll = db.transaction(() => {
+  withTransaction(db, () => {
     for (const [category, pair] of centroidPairs) {
       const params = {
         category,
@@ -162,14 +162,18 @@ export function recomputeCentroids() {
       };
       const existing = findExisting.get(category);
       if (existing) {
-        update.run({ ...params, id: existing.id });
+        // node:sqlite's DatabaseSync throws "Unknown named parameter" for any bound key
+        // not referenced in the statement's own SQL (better-sqlite3 silently ignored
+        // extras) -- `update`'s SQL has no @category placeholder, so it must get an
+        // object without that key rather than the full `params` spread.
+        const { category: _category, ...updateParams } = params;
+        update.run({ ...updateParams, id: existing.id });
       } else {
         insert.run(params);
       }
       counts.set(category, { keptCount: pair.keptCount, discardedCount: pair.discardedCount });
     }
   });
-  writeAll();
 
   return counts;
 }
@@ -247,10 +251,9 @@ function adjustPromptTermCounts(db, promptId, label, delta) {
         db.prepare(
           `UPDATE prompt_terms SET ${column} = MAX(${column} - 1, 0), updated_at = datetime('now') WHERE term = ?`
         );
-  const run = db.transaction((termList) => {
-    for (const term of termList) statement.run(term);
+  withTransaction(db, () => {
+    for (const term of terms) statement.run(term);
   });
-  run(Array.from(terms));
 }
 
 /**
@@ -317,7 +320,7 @@ export function tallyPromptTermsForLabel(promptId, label, previous = null) {
 export function recomputePromptTerms() {
   const db = getDb();
 
-  const run = db.transaction(() => {
+  withTransaction(db, () => {
     db.prepare('UPDATE prompt_terms SET kept_count = 0, discarded_count = 0').run();
 
     const labeledRows = db
@@ -345,5 +348,4 @@ export function recomputePromptTerms() {
       for (const term of terms) upsert.run(term);
     }
   });
-  run();
 }

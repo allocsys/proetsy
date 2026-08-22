@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getDb } from '../db/init.js';
+import { getDb, withTransaction } from '../db/init.js';
 import { SHOP_CONVENTIONS, MIDJOURNEY_CONVENTIONS } from './shop-conventions.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -50,15 +50,14 @@ export function migratePipelineConfigSeed() {
   const insert = db.prepare(
     'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING'
   );
-  const run = db.transaction(() => {
-    let inserted = 0;
+  const inserted = withTransaction(db, () => {
+    let count = 0;
     for (const entry of modules) {
       const { changes } = insert.run(pipelineEnabledSettingKey(entry.module), String(Boolean(entry.enabled)));
-      inserted += changes;
+      count += changes;
     }
-    return inserted;
+    return count;
   });
-  const inserted = run();
   if (inserted > 0) invalidatePipelineConfigCache();
   return { migrated: inserted > 0, inserted };
 }
@@ -340,7 +339,7 @@ export function importAllConfig(bundle = {}) {
   const db = getDb();
   const counts = { settings: 0, productSizes: 0, tags: 0, apiKeys: 0 };
 
-  const run = db.transaction(() => {
+  withTransaction(db, () => {
     if (Array.isArray(bundle.settings)) {
       const upsert = db.prepare(
         'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
@@ -405,7 +404,6 @@ export function importAllConfig(bundle = {}) {
       }
     }
   });
-  run();
 
   // A settings-table import may have touched a pipeline_module_<n>_enabled key.
   invalidatePipelineConfigCache();
@@ -437,12 +435,11 @@ export function setShopConventions(partial = {}) {
   const upsert = db.prepare(
     'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
   );
-  const run = db.transaction(() => {
+  withTransaction(db, () => {
     for (const { def, value } of toWrite) {
       upsert.run(def.key, serializeValue(def, value));
     }
   });
-  run();
 
   return getShopConventions();
 }

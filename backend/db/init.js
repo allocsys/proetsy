@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,14 +13,32 @@ let db;
 export function getDb() {
   if (!db) {
     fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-    db = new Database(DB_PATH);
-    db.pragma('journal_mode = WAL');
-    db.pragma('foreign_keys = ON');
+    db = new DatabaseSync(DB_PATH);
+    db.exec('PRAGMA journal_mode = WAL');
+    db.exec('PRAGMA foreign_keys = ON');
     const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf-8');
     db.exec(schema);
     runDefensiveMigrations(db);
   }
   return db;
+}
+
+// node:sqlite's DatabaseSync has no db.transaction() (unlike better-sqlite3) -- this is
+// a manual BEGIN/COMMIT/ROLLBACK wrapper reproducing the same commit/rollback behavior,
+// including rollback on a mid-transaction throw. See PLAN_ISSUE_104.md. Shared by every
+// module that needs an atomic multi-statement write (previously duplicated locally in
+// taste-filter/store.js; several other call sites had been missed and still called the
+// now-nonexistent db.transaction() until this fix).
+export function withTransaction(db, fn) {
+  db.exec('BEGIN');
+  try {
+    const result = fn();
+    db.exec('COMMIT');
+    return result;
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
 }
 
 // `CREATE TABLE IF NOT EXISTS` above only creates a table's *initial* shape — it does

@@ -1,4 +1,4 @@
-import { getDb } from '../../db/init.js';
+import { getDb, withTransaction } from '../../db/init.js';
 import { parseCsv, firstColumn } from '../csv.js';
 
 // plan.md Rollout step 3: "Suggest categories for uncategorized tags" one-time admin
@@ -47,7 +47,7 @@ export function suggestCategoriesForUncategorizedTags({ dryRun = false } = {}) {
   if (dryRun) {
     computeMatches();
   } else {
-    db.transaction(computeMatches)();
+    withTransaction(db, computeMatches);
   }
 
   return {
@@ -122,9 +122,9 @@ export function importTagsFromCsvRows(rows) {
   const db = getDb();
   const existing = new Set(db.prepare('SELECT tag_text FROM tags').all().map((r) => r.tag_text));
   const insert = db.prepare('INSERT INTO tags (tag_text, category, source) VALUES (?, ?, ?)');
-  const insertMany = db.transaction((items) => {
+  return withTransaction(db, () => {
     let inserted = 0;
-    for (const item of items) {
+    for (const item of rows) {
       if (existing.has(item.tagText)) continue;
       insert.run(item.tagText, item.category ?? null, 'csv');
       existing.add(item.tagText);
@@ -132,5 +132,4 @@ export function importTagsFromCsvRows(rows) {
     }
     return inserted;
   });
-  return insertMany(rows);
 }
