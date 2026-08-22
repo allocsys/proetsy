@@ -364,9 +364,21 @@ jobs:
               taskkill /PID $proc.Id /T /F | Out-Null
             }
 
-            # Best-effort: surface the packaged app's own backend.log (spawnBackend()'s
-            # #97 logging) if it exists -- confirms that diagnostic actually gets
-            # written, and useful in the workflow log regardless of pass/fail.
+            # Best-effort: surface the packaged app's own startup.log (#103 diagnostics --
+            # written from the very first line of the isMainModule startup block, so it
+            # can catch a crash before spawnBackend() ever gets far enough to create
+            # backend.log) FIRST, then backend.log (#97 logging). Printing startup.log
+            # first matters here: if the app died before spawning the backend at all,
+            # backend.log won't exist and startup.log is the only signal telling you
+            # which checkpoint was the last one reached.
+            $startupLogCandidate = Get-ChildItem -Path "$env:APPDATA" -Recurse -Filter 'startup.log' -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($startupLogCandidate) {
+              Write-Host "--- startup.log ($($startupLogCandidate.FullName)) ---"
+              Get-Content $startupLogCandidate.FullName -ErrorAction SilentlyContinue
+            } else {
+              Write-Host "(no startup.log found under `$env:APPDATA -- expected if Electron's own module load/import failed before the isMainModule block's first line ran)"
+            }
+
             $logCandidate = Get-ChildItem -Path "$env:APPDATA" -Recurse -Filter 'backend.log' -ErrorAction SilentlyContinue | Select-Object -First 1
             if ($logCandidate) {
               Write-Host "--- backend.log ($($logCandidate.FullName)) ---"
