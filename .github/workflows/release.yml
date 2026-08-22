@@ -371,6 +371,21 @@ jobs:
             # first matters here: if the app died before spawning the backend at all,
             # backend.log won't exist and startup.log is the only signal telling you
             # which checkpoint was the last one reached.
+            # Issue #103 diagnostic: earliest possible checkpoint -- written via plain
+            # node:fs/node:os as the literal first statement of main.js's isMainModule
+            # block, with no dependency on Electron's `app` object at all (unlike
+            # startup.log below, which needs app.getPath('userData') to already work).
+            # os.tmpdir() on Windows resolves against the user's TEMP/TMP env vars, not
+            # $env:RUNNER_TEMP (a GitHub Actions-specific path) -- search $env:TEMP the
+            # same best-effort way the lookups below search $env:APPDATA.
+            $sentinelCandidate = Get-ChildItem -Path "$env:TEMP" -Recurse -Filter 'proetsy-sentinel.log' -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($sentinelCandidate) {
+              Write-Host "--- proetsy-sentinel.log ($($sentinelCandidate.FullName)) ---"
+              Get-Content $sentinelCandidate.FullName -ErrorAction SilentlyContinue
+            } else {
+              Write-Host "(no proetsy-sentinel.log found under `$env:TEMP -- means execution never reached the isMainModule block's first statement at all, ruling out acquireSingleInstanceLock() and everything after it)"
+            }
+
             $startupLogCandidate = Get-ChildItem -Path "$env:APPDATA" -Recurse -Filter 'startup.log' -ErrorAction SilentlyContinue | Select-Object -First 1
             if ($startupLogCandidate) {
               Write-Host "--- startup.log ($($startupLogCandidate.FullName)) ---"
