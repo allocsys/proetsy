@@ -9,7 +9,6 @@
   },
   "dependencies": {
     "ag-psd": "^31.0.2",
-    "better-sqlite3": "^13.0.0",
     "chokidar": "^4.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
