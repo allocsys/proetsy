@@ -176,19 +176,29 @@ export function logStartup(message) {
 }
 
 export function spawnBackend() {
-  // Issue #97/#103 follow-up: backend/ is packed into app.asar (see package.json's
-  // `files` config) but also unpacked onto real disk alongside it via `asarUnpack`,
-  // at resources/app.asar.unpacked/backend. That unpacked copy is required here --
+  // Issue #97/#103 follow-up: backend/dist (the esbuild bundle -- see issue #111) is
+  // packed into app.asar (see package.json's `files` config) but also unpacked onto
+  // real disk alongside it via `asarUnpack`, at
+  // resources/app.asar.unpacked/backend/dist. That unpacked copy is required here --
   // spawn() below hands `cwd` (and `server.js` as a bare argument) to the OS's real
   // process-creation API, which has no concept of asar and can't resolve either one
   // against a path that only exists inside the archive. The __dirname-relative path
   // resolves *inside* app.asar in a packaged build (e.g. resources\app.asar\electron\
-  // ..\backend), which is exactly why a packaged spawnBackend() previously failed
+  // ..\backend\dist), which is exactly why a packaged spawnBackend() previously failed
   // with ENOENT while everything Electron itself loads (main.js, frontend/dist via
   // loadFile()) kept working fine -- those go through Electron's own asar-aware
   // fs/module loader, which a spawned child process never does.
+  //
+  // Issue #112: previously pointed at the unpacked *raw* backend/ source tree
+  // (asarUnpack: ["backend/**/*", "node_modules/**/*"], unpacking thousands of loose
+  // files). Now points at backend/dist, the single bundled server.js (+ schema.sql)
+  // esbuild produces -- only that directory is unpacked. onnxruntime-web stays inside
+  // app.asar (kept external by the bundle rather than unpacked -- see
+  // backend/scripts/bundle.js): Electron's asar-aware fs works for a spawned
+  // ELECTRON_RUN_AS_NODE child the same as it does for the main process, so its WASM
+  // assets still resolve fine unpacked or not.
   const backendDir = app.isPackaged
-    ? path.join(process.resourcesPath, 'app.asar.unpacked', 'backend')
+    ? path.join(process.resourcesPath, 'app.asar.unpacked', 'backend', 'dist')
     : path.join(__dirname, '..', 'backend');
   const { command, extraEnv } = backendExecutable();
 
