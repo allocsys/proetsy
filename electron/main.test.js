@@ -382,7 +382,7 @@ describe('createWindow', () => {
     expect(MockBrowserWindow).toHaveBeenCalledTimes(1);
     const [options] = MockBrowserWindow.mock.calls[0];
     expect(options.webPreferences).toMatchObject({
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
     });
