@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "node --watch server.js",
     "start": "node server.js",
+    "bundle": "node scripts/bundle.js",
     "test": "vitest run"
   },
   "dependencies": {
@@ -20,6 +21,7 @@
     "smartcrop-jimp": "^1.0.3"
   },
   "devDependencies": {
+    "esbuild": "^0.24.0",
     "supertest": "^7.2.2",
     "vitest": "^4.1.10"
   }
