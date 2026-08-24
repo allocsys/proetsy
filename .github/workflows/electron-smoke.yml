@@ -1,0 +1,141 @@
+name: Electron Smoke Test
+
+# Catches the class of bug that ci.yml's mocked electron-test job structurally cannot:
+# a packaged app that fails only under Electron's real file:// asset loading and real
+# sandboxed preload loader (e.g. the #97/#103 white-screen incidents, and the vite
+# base-path + preload ESM bugs fixed in the last release). Previously the only job that
+# actually launched a packaged build was release.yml's package-electron-win, which only
+# runs on a version tag -- i.e. at/after release time, not during regular development.
+# This workflow runs the same launch-and-verify check much earlier, on PRs that touch
+# the surface area where these bugs live, without waiting for a tag.
+#
+# Deliberately NOT run on every push/PR (unlike ci.yml) -- packaging + a windows-latest
+# runner is slow and comparatively expensive. Path-filtered to the files that can
+# actually cause a packaging/white-screen regression, plus workflow_dispatch for
+# on-demand runs.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'electron/**'
+      - 'frontend/vite.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch: {}
+
+env:
+  # Keep in sync with ci.yml/release.yml's pin -- see release.yml's env block for the
+  # native-addon cleanup-hook rationale.
+  NODE_VERSION: '24.18.0'
+
+jobs:
+  package-and-launch:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build -w frontend
+
+      - name: Build Windows installer
+        run: npm run electron:build
+
+      - name: Launch packaged app and verify health check + window
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
+
+          $unpackedDir = Get-ChildItem -Path release-builds -Directory -Filter 'win-unpacked' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $unpackedDir) {
+            Write-Host "::error::No win-unpacked directory found -- packaging step above did not produce output."
+            exit 1
+          }
+          $exe = Get-ChildItem -Path $unpackedDir.FullName -Filter '*.exe' -File | Select-Object -First 1
+          if (-not $exe) {
+            Write-Host "::error::No packaged .exe found under $($unpackedDir.FullName)."
+            exit 1
+          }
+
+          Write-Host "Launching $($exe.FullName) (real packaged app, not ELECTRON_RUN_AS_NODE) ..."
+          $stdoutLog = Join-Path $env:RUNNER_TEMP 'proetsy-app-stdout.log'
+          $stderrLog = Join-Path $env:RUNNER_TEMP 'proetsy-app-stderr.log'
+          # windows-latest runners have no real GPU -- Chromium's GPU process can fail to
+          # init and hang window creation for reasons unrelated to any real app bug. A
+          # real user's machine doesn't need this flag.
+          $launchArgs = @('--disable-gpu', '--disable-gpu-sandbox', '--no-sandbox')
+          $proc = Start-Process -FilePath $exe.FullName -ArgumentList $launchArgs -PassThru -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog
+
+          try {
+            $healthy = $false
+            $deadline = (Get-Date).AddSeconds(45)
+            while ((Get-Date) -lt $deadline) {
+              if ($proc.HasExited) {
+                Write-Host "::error::App process exited early (code $($proc.ExitCode)) before becoming healthy."
+                exit 1
+              }
+              try {
+                $resp = Invoke-WebRequest -Uri 'http://localhost:4000/api/health' -UseBasicParsing -TimeoutSec 2
+                if ($resp.StatusCode -eq 200) { $healthy = $true; break }
+              } catch {
+                Start-Sleep -Milliseconds 500
+              }
+            }
+
+            if (-not $healthy) {
+              Write-Host "::error::Backend never became healthy within 45s."
+              exit 1
+            }
+            Write-Host "OK: backend responded on /api/health"
+
+            # createWindow()/loadFile() run only after waitForBackend() resolves, so a
+            # window-side bug (white screen / file:// asset loading / preload failure)
+            # would show up here even with a confirmed-healthy backend.
+            $windowFound = $false
+            $windowDeadline = (Get-Date).AddSeconds(15)
+            while ((Get-Date) -lt $windowDeadline) {
+              $running = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
+              if (-not $running) {
+                Write-Host "::error::App process exited after passing the health check, before a window appeared."
+                exit 1
+              }
+              if ($running.MainWindowHandle -ne 0) {
+                $windowFound = $true
+                Write-Host "OK: window detected (title: '$($running.MainWindowTitle)')"
+                break
+              }
+              Start-Sleep -Milliseconds 500
+            }
+
+            if (-not $windowFound) {
+              Write-Host "::error::No window appeared within 15s of the backend becoming healthy -- this is the white-screen/#97 symptom (processes running, no window)."
+              exit 1
+            }
+
+            Write-Host "PASS: packaged app launched, backend became healthy, and a window appeared."
+          }
+          finally {
+            if ($proc -and -not $proc.HasExited) {
+              taskkill /PID $proc.Id /T /F | Out-Null
+            }
+            Write-Host "--- packaged app stdout ($stdoutLog) ---"
+            Get-Content $stdoutLog -ErrorAction SilentlyContinue
+            Write-Host "--- packaged app stderr ($stderrLog) ---"
+            Get-Content $stderrLog -ErrorAction SilentlyContinue
+          }
+
+      - name: Upload launch diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: electron-smoke-diagnostics
+          path: |
+            ${{ runner.temp }}/proetsy-app-stdout.log
+            ${{ runner.temp }}/proetsy-app-stderr.log
+          if-no-files-found: warn
+          retention-days: 7
