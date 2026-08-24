@@ -14,7 +14,7 @@
 // call -- naming is scoped to this feature (`mockupTemplatesAPI`), not a generic
 // grab-bag `window.electronAPI`, so a future privileged need gets its own similarly
 // scoped bridge call rather than everything piling into one shared object.
-import { contextBridge, ipcRenderer } from 'electron';
+const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('mockupTemplatesAPI', {
   selectFolder: () => ipcRenderer.invoke('select-folder'),
