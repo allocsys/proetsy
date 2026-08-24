@@ -72,13 +72,13 @@
       "owner": "allocsys",
       "repo": "proetsy"
     },
+    "compression": "maximum",
     "win": {
       "target": "nsis"
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "compression": "maximum"
+      "allowToChangeInstallationDirectory": true
     }
   }
 }
