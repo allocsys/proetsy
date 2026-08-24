@@ -248,10 +248,14 @@ jobs:
           fi
           
           # Check backend
-          if grep -q "backend/server.js" <<< "$LISTING"; then
-            echo "✓ backend/server.js found"
+          # #111's bundle.js bundles the backend to backend/dist/server.js, and
+          # package.json's electron-builder `files` config packages backend/dist/**
+          # into the asar -- not raw backend/server.js -- so that's the path that
+          # actually ends up in the asar.
+          if grep -q "backend/dist/server.js" <<< "$LISTING"; then
+            echo "✓ backend/dist/server.js found"
           else
-            echo "✗ MISSING: backend/server.js"
+            echo "✗ MISSING: backend/dist/server.js"
             MISSING=1
           fi
           
