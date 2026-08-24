@@ -391,7 +391,7 @@ export async function createWindow() {
     width: 1280,
     height: 860,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
     },
