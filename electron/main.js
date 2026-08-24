@@ -37,6 +37,13 @@ import electronUpdaterPkg from 'electron-updater';
 
 const { autoUpdater } = electronUpdaterPkg;
 
+// Issue #110: the dashboard is just CRUD UI (forms, tables, image previews) with no
+// need for GPU-accelerated compositing, and GPU acceleration is a common source of
+// crashes/rendering glitches on weaker or older GPUs (and some Windows driver setups).
+// Must be called before the app is ready -- there's no supported way to toggle this
+// once Electron/Chromium has already initialized the GPU process.
+app.disableHardwareAcceleration();
+
 // ESM has no CJS-style __dirname/__filename globals.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
