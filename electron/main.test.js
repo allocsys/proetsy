@@ -13,6 +13,7 @@ const mockApp = {
   on: vi.fn(),
   quit: vi.fn(),
   exit: vi.fn(),
+  disableHardwareAcceleration: vi.fn(),
   // Regression coverage for debug.md's "no single-instance lock" root-cause candidate:
   // defaults to granting the lock (true) so existing tests that don't care about this
   // behavior aren't affected; individual tests below override this to simulate a
