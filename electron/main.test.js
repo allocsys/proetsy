@@ -13,6 +13,7 @@ const mockApp = {
   on: vi.fn(),
   quit: vi.fn(),
   exit: vi.fn(),
+  disableHardwareAcceleration: vi.fn(),
   // Regression coverage for debug.md's "no single-instance lock" root-cause candidate:
   // defaults to granting the lock (true) so existing tests that don't care about this
   // behavior aren't affected; individual tests below override this to simulate a
@@ -200,18 +201,22 @@ describe('spawnBackend', () => {
     expect(options.env.DB_PATH).toBe(path.join('/fake/userData', 'data', 'proetsy.db'));
   });
 
-  // Regression coverage for the ENOENT root-caused in release CI run #64: backend/ is
-  // packed into app.asar (package.json's `files`) but also unpacked onto real disk via
-  // `asarUnpack`, at resources/app.asar.unpacked/backend -- cwd must point at that real
-  // path, not the __dirname-relative one, which resolves *inside* app.asar and isn't
-  // usable by spawn()'s underlying OS process-creation call.
-  it('uses the asarUnpack destination (resourcesPath/app.asar.unpacked/backend) as cwd when packaged', () => {
+  // Regression coverage for the ENOENT root-caused in release CI run #64: backend/dist
+  // (the esbuild bundle -- issue #111) is packed into app.asar (package.json's `files`)
+  // but also unpacked onto real disk via `asarUnpack`, at
+  // resources/app.asar.unpacked/backend/dist -- cwd must point at that real path, not
+  // the __dirname-relative one, which resolves *inside* app.asar and isn't usable by
+  // spawn()'s underlying OS process-creation call.
+  //
+  // Issue #112: updated from .../backend to .../backend/dist now that asarUnpack only
+  // unpacks the bundle output, not the raw backend/ source tree.
+  it('uses the asarUnpack destination (resourcesPath/app.asar.unpacked/backend/dist) as cwd when packaged', () => {
     mockApp.isPackaged = true;
     process.resourcesPath = '/fake/resources';
     main.spawnBackend();
 
     const [, , options] = spawnMock.mock.calls[0];
-    expect(options.cwd).toBe(path.join('/fake/resources', 'app.asar.unpacked', 'backend'));
+    expect(options.cwd).toBe(path.join('/fake/resources', 'app.asar.unpacked', 'backend', 'dist'));
   });
 
   it('registers an exit handler on the spawned child without throwing', () => {

@@ -190,8 +190,8 @@ describe('runDefensiveMigrations (via getDb — not exported separately)', () =>
     const dbPath = path.join(tmpRoot, 'proetsy.db');
     process.env.DB_PATH = dbPath;
 
-    const Database = (await import('better-sqlite3')).default;
-    const seedDb = new Database(dbPath);
+    const { DatabaseSync } = await import('node:sqlite');
+    const seedDb = new DatabaseSync(dbPath);
     seedDb.exec(`
       CREATE TABLE image_preferences (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

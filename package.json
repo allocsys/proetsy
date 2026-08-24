@@ -12,7 +12,7 @@
     "dev": "concurrently -n backend,frontend -c blue,green \"npm run dev -w backend\" \"npm run dev -w frontend\"",
     "electron:dev": "concurrently -n frontend,electron -c green,magenta \"npm run dev -w frontend\" \"electron electron/main.js\"",
     "electron:rebuild": "electron-builder install-app-deps",
-    "electron:build": "npm run build -w frontend && electron-builder --win --publish=never",
+    "electron:build": "npm run bundle -w backend && npm run build -w frontend && electron-builder --win --publish=never",
     "lint": "eslint backend frontend/src",
     "test": "npm run test -w backend && npm run test:electron && npm run test -w frontend",
     "test:electron": "vitest run",
@@ -52,7 +52,7 @@
     "directories": {
       "output": "release-builds"
     },
-    "asarUnpack": ["backend/**/*", "node_modules/**/*"],
+    "asarUnpack": ["backend/dist/**/*"],
     "files": [
       "electron/**/*",
       {
@@ -61,15 +61,9 @@
         "filter": ["**/*"]
       },
       {
-        "from": "backend",
-        "to": "backend",
-        "filter": [
-          "**/*",
-          "!data/**",
-          "!**/*.test.js",
-          "!lib/__fixtures__/**",
-          "!.env"
-        ]
+        "from": "backend/dist",
+        "to": "backend/dist",
+        "filter": ["**/*"]
       },
       "package.json"
     ],
@@ -78,6 +72,7 @@
       "owner": "allocsys",
       "repo": "proetsy"
     },
+    "compression": "maximum",
     "win": {
       "target": "nsis"
     },
