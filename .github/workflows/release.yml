@@ -258,6 +258,25 @@ jobs:
             echo "✗ MISSING: backend/dist/server.js"
             MISSING=1
           fi
+
+          # Check onnxruntime-web (#114). bundle.js deliberately keeps onnxruntime-web
+          # external rather than bundling it (bundling breaks its WASM asset
+          # resolution), so the bundled backend/dist/server.js still does a real
+          # runtime `import 'onnxruntime-web'` (transitively, via
+          # taste-filter/embeddings.js) expecting to find it under node_modules.
+          # package.json's `build.files` is a custom array, which REPLACES
+          # electron-builder's default file set rather than merging with it -- the
+          # default set is what normally brings production node_modules along, so an
+          # entry for onnxruntime-web has to be listed explicitly or it silently never
+          # ships, crashing the backend on startup with MODULE_NOT_FOUND on every real
+          # install despite CI's own smoke steps passing (they run from source, never
+          # from the packaged asar's node_modules).
+          if grep -q "node_modules/onnxruntime-web/" <<< "$LISTING"; then
+            echo "✓ node_modules/onnxruntime-web found"
+          else
+            echo "✗ MISSING: node_modules/onnxruntime-web"
+            MISSING=1
+          fi
           
           if [ "$MISSING" -eq 1 ]; then
             echo ""
