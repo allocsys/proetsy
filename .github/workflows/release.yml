@@ -237,7 +237,17 @@ jobs:
           # `set -e -o pipefail` that 141 exit status wins over grep's real (successful)
           # match, so every check below reported MISSING even when the file was present.
           # Using a captured variable + here-strings (<<<) avoids the live pipe entirely.
-          LISTING=$(npx asar list "$ASAR" | tr '\\' '/')
+          # Explicitly the scoped @electron/asar package -- NOT the deprecated
+          # unscoped 'asar' package, which is a different, unmaintained tool that
+          # cannot reliably parse archives written by @electron/asar (see commit
+          # message / issue history for the extract-file crash this caused).
+          # --no-install forces npx to use the copy already installed by this job's
+          # `npm ci` (the same one electron-builder used to pack the archive) instead
+          # of silently fetching anything from the registry; if it's somehow missing,
+          # this now fails loudly rather than substituting a different package.
+          echo "=== @electron/asar version used for verification ==="
+          npx --no-install @electron/asar --version
+          LISTING=$(npx --no-install @electron/asar list "$ASAR" | tr '\\' '/')
           
           # Check frontend
           if grep -q "frontend/dist/index.html" <<< "$LISTING"; then
@@ -295,7 +305,7 @@ jobs:
           TMP_CHECK=$(mktemp -d)
 
           mkdir -p "$TMP_CHECK/frontend"
-          if (cd "$TMP_CHECK/frontend" && npx asar extract-file "$ASAR_ABS" frontend/dist/index.html); then
+          if (cd "$TMP_CHECK/frontend" && npx --no-install @electron/asar extract-file "$ASAR_ABS" frontend/dist/index.html); then
             SIZE=$(wc -c < "$TMP_CHECK/frontend/index.html")
             if [ "$SIZE" -eq 0 ]; then
               echo "✗ frontend/dist/index.html is present but empty (0 bytes)"
@@ -309,7 +319,7 @@ jobs:
           fi
 
           mkdir -p "$TMP_CHECK/backend"
-          if (cd "$TMP_CHECK/backend" && npx asar extract-file "$ASAR_ABS" backend/dist/server.js); then
+          if (cd "$TMP_CHECK/backend" && npx --no-install @electron/asar extract-file "$ASAR_ABS" backend/dist/server.js); then
             SIZE=$(wc -c < "$TMP_CHECK/backend/server.js")
             if [ "$SIZE" -eq 0 ]; then
               echo "✗ backend/dist/server.js is present but empty (0 bytes)"
