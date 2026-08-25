@@ -326,7 +326,7 @@ jobs:
           # a leading slash. `asar list` itself proves the archive's own paths are
           # backslash-form on Windows (see the `tr` above). Match that here.
           mkdir -p "$TMP_CHECK/frontend"
-          if (cd "$TMP_CHECK/frontend" && node "$ASAR_BIN" extract-file "$ASAR_ABS" frontend\dist\index.html); then
+          if (cd "$TMP_CHECK/frontend" && node "$ASAR_BIN" extract-file "$ASAR_ABS" 'frontend\dist\index.html'); then
             SIZE=$(wc -c < "$TMP_CHECK/frontend/index.html")
             if [ "$SIZE" -eq 0 ]; then
               echo "✗ frontend/dist/index.html is present but empty (0 bytes)"
@@ -340,7 +340,7 @@ jobs:
           fi
 
           mkdir -p "$TMP_CHECK/backend"
-          if (cd "$TMP_CHECK/backend" && node "$ASAR_BIN" extract-file "$ASAR_ABS" backend\dist\server.js); then
+          if (cd "$TMP_CHECK/backend" && node "$ASAR_BIN" extract-file "$ASAR_ABS" 'backend\dist\server.js'); then
             SIZE=$(wc -c < "$TMP_CHECK/backend/server.js")
             if [ "$SIZE" -eq 0 ]; then
               echo "✗ backend/dist/server.js is present but empty (0 bytes)"
