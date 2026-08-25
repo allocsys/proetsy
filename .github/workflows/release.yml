@@ -204,14 +204,6 @@ jobs:
       - name: Verify asar contents
         if: always()
         shell: bash
-        env:
-          # Git Bash (MSYS) rewrites any argv starting with a single "/" into a
-          # Windows path prefixed with the Git install dir before the program ever
-          # sees it -- e.g. "/frontend/dist/index.html" silently became
-          # "C:/Program Files/Git/frontend/dist/index.html". The leading slash below
-          # is required to match @electron/asar's internal (list-style) file keys, so
-          # disable that rewriting for this step rather than dropping the slash.
-          MSYS_NO_PATHCONV: '1'
         run: |
           set -x
           # Everything below is also tee'd into release-builds-summary.txt (small,
@@ -328,8 +320,13 @@ jobs:
           ASAR_ABS="$PWD/$ASAR"
           TMP_CHECK=$(mktemp -d)
 
+          # @electron/asar's Filesystem.searchNodeFromDirectory() splits the given
+          # path on `path.sep`, which is '\' on this Windows runner -- a forward-slash
+          # path is never split at all there and fails as "not found", regardless of
+          # a leading slash. `asar list` itself proves the archive's own paths are
+          # backslash-form on Windows (see the `tr` above). Match that here.
           mkdir -p "$TMP_CHECK/frontend"
-          if (cd "$TMP_CHECK/frontend" && node "$ASAR_BIN" extract-file "$ASAR_ABS" /frontend/dist/index.html); then
+          if (cd "$TMP_CHECK/frontend" && node "$ASAR_BIN" extract-file "$ASAR_ABS" frontend\dist\index.html); then
             SIZE=$(wc -c < "$TMP_CHECK/frontend/index.html")
             if [ "$SIZE" -eq 0 ]; then
               echo "✗ frontend/dist/index.html is present but empty (0 bytes)"
@@ -343,7 +340,7 @@ jobs:
           fi
 
           mkdir -p "$TMP_CHECK/backend"
-          if (cd "$TMP_CHECK/backend" && node "$ASAR_BIN" extract-file "$ASAR_ABS" /backend/dist/server.js); then
+          if (cd "$TMP_CHECK/backend" && node "$ASAR_BIN" extract-file "$ASAR_ABS" backend\dist\server.js); then
             SIZE=$(wc -c < "$TMP_CHECK/backend/server.js")
             if [ "$SIZE" -eq 0 ]; then
               echo "✗ backend/dist/server.js is present but empty (0 bytes)"
