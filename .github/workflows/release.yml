@@ -204,6 +204,14 @@ jobs:
       - name: Verify asar contents
         if: always()
         shell: bash
+        env:
+          # Git Bash (MSYS) rewrites any argv starting with a single "/" into a
+          # Windows path prefixed with the Git install dir before the program ever
+          # sees it -- e.g. "/frontend/dist/index.html" silently became
+          # "C:/Program Files/Git/frontend/dist/index.html". The leading slash below
+          # is required to match @electron/asar's internal (list-style) file keys, so
+          # disable that rewriting for this step rather than dropping the slash.
+          MSYS_NO_PATHCONV: '1'
         run: |
           set -x
           # Everything below is also tee'd into release-builds-summary.txt (small,
