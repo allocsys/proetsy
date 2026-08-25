@@ -285,10 +285,18 @@ jobs:
           # critical files for real and check: non-zero size for both, plus a Node
           # syntax pass on server.js (cheap and catches a truncated/corrupt bundle
           # without needing to actually run it).
+          #
+          # `asar extract-file <archive> <filename>` does NOT take a destination path --
+          # it writes the extracted file's basename into the current directory. Use an
+          # absolute path to the archive (so it's still resolvable after `cd`) and a
+          # dedicated subdir per file so the two basenames (index.html / server.js)
+          # can't collide.
+          ASAR_ABS="$PWD/$ASAR"
           TMP_CHECK=$(mktemp -d)
 
-          if npx asar extract-file "$ASAR" frontend/dist/index.html "$TMP_CHECK/index.html" 2>/dev/null; then
-            SIZE=$(wc -c < "$TMP_CHECK/index.html")
+          mkdir -p "$TMP_CHECK/frontend"
+          if (cd "$TMP_CHECK/frontend" && npx asar extract-file "$ASAR_ABS" frontend/dist/index.html); then
+            SIZE=$(wc -c < "$TMP_CHECK/frontend/index.html")
             if [ "$SIZE" -eq 0 ]; then
               echo "✗ frontend/dist/index.html is present but empty (0 bytes)"
               MISSING=1
@@ -300,12 +308,13 @@ jobs:
             MISSING=1
           fi
 
-          if npx asar extract-file "$ASAR" backend/dist/server.js "$TMP_CHECK/server.js" 2>/dev/null; then
-            SIZE=$(wc -c < "$TMP_CHECK/server.js")
+          mkdir -p "$TMP_CHECK/backend"
+          if (cd "$TMP_CHECK/backend" && npx asar extract-file "$ASAR_ABS" backend/dist/server.js); then
+            SIZE=$(wc -c < "$TMP_CHECK/backend/server.js")
             if [ "$SIZE" -eq 0 ]; then
               echo "✗ backend/dist/server.js is present but empty (0 bytes)"
               MISSING=1
-            elif ! node --check "$TMP_CHECK/server.js"; then
+            elif ! node --check "$TMP_CHECK/backend/server.js"; then
               echo "✗ backend/dist/server.js failed a Node syntax check (node --check)"
               MISSING=1
             else
