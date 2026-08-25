@@ -65,7 +65,16 @@
         "to": "backend/dist",
         "filter": ["**/*"]
       },
-      "package.json"
+      "package.json",
+      "node_modules/onnxruntime-web/**/*",
+      "node_modules/onnxruntime-common/**/*",
+      "node_modules/protobufjs/**/*",
+      "node_modules/@protobufjs/**/*",
+      "node_modules/long/**/*",
+      "node_modules/flatbuffers/**/*",
+      "node_modules/guid-typescript/**/*",
+      "node_modules/platform/**/*",
+      "node_modules/@types/node/**/*"
     ],
     "publish": {
       "provider": "github",
