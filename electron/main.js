@@ -76,20 +76,45 @@ let mainWindow;
 // generated-mockups directories are, so there's no writability problem to solve for it
 // yet. Revisit if/when template management becomes dashboard-editable rather than
 // config-file-edited (see Module 6's "product-sizes are shown read-only" status note).
+// Prefers keeping the DB/uploads/logs/model next to wherever the app is actually
+// installed (e.g. a user-chosen D:\proetsy via NSIS's
+// allowToChangeInstallationDirectory) instead of always scattering them into the OS's
+// per-user profile dir. process.resourcesPath sits inside the install directory
+// (<installDir>/resources on Windows/Linux, <installDir>/Contents/Resources on macOS),
+// so its parent is the install root; write-access there is verified with a real
+// mkdirSync rather than assumed, since plenty of installs (Program Files without
+// elevation, most Linux package-manager installs) are read-only post-install. Falls
+// back to app.getPath('userData') -- the previous, always-correct-but-scattered
+// behavior -- whenever that root can't be created/written, or when
+// process.resourcesPath isn't set at all (true for every non-Electron context,
+// including this file's own vitest suite, which is why existing tests asserting the
+// userData fallback keep passing unmodified).
+function packagedDataRoot() {
+  if (!app.isPackaged) return null;
+  try {
+    if (!process.resourcesPath) throw new Error('resourcesPath unavailable');
+    const installDir = path.dirname(process.resourcesPath);
+    fs.mkdirSync(path.join(installDir, 'data'), { recursive: true });
+    return installDir;
+  } catch {
+    return app.getPath('userData');
+  }
+}
+
 export function packagedBackendEnv() {
   if (!app.isPackaged) return {};
-  const userDataDir = app.getPath('userData');
+  const dataRoot = packagedDataRoot();
   return {
-    DB_PATH: path.join(userDataDir, 'data', 'proetsy.db'),
-    ARTWORK_UPLOADS_DIR: path.join(userDataDir, 'data', 'uploads'),
-    TASTE_FILTER_CANDIDATES_DIR: path.join(userDataDir, 'data', 'taste-filter'),
-    MOCKUP_OUTPUT_DIR: path.join(userDataDir, 'data', 'mockups'),
+    DB_PATH: path.join(dataRoot, 'data', 'proetsy.db'),
+    ARTWORK_UPLOADS_DIR: path.join(dataRoot, 'data', 'uploads'),
+    TASTE_FILTER_CANDIDATES_DIR: path.join(dataRoot, 'data', 'taste-filter'),
+    MOCKUP_OUTPUT_DIR: path.join(dataRoot, 'data', 'mockups'),
     // The downloaded CLIP model (~350MB, fetched on first use by
     // backend/lib/taste-filter/embeddings.js) -- without this override it defaults to a
     // path inside the app's own install directory, which is read-only once packaged (e.g.
     // Program Files on Windows), so every download attempt would fail with a permissions
     // error instead of succeeding once and persisting like every other directory here.
-    TASTE_FILTER_MODEL_PATH: path.join(userDataDir, 'models', 'clip-vit-base-patch32.onnx'),
+    TASTE_FILTER_MODEL_PATH: path.join(dataRoot, 'models', 'clip-vit-base-patch32.onnx'),
   };
 }
 
@@ -132,7 +157,7 @@ export function backendExecutable() {
 // spawnBackend() over a diagnostics feature.
 function ensureLogDir() {
   try {
-    const logDir = path.join(app.getPath('userData'), 'logs');
+    const logDir = path.join(packagedDataRoot() ?? app.getPath('userData'), 'logs');
     fs.mkdirSync(logDir, { recursive: true });
     return logDir;
   } catch {
