@@ -28,15 +28,16 @@ Net: there's no actual blocking/heavy-startup problem here. The one real (very m
 
 **Fix:** None needed. No action item.
 
-## 3. Resource leaks (file descriptors, watchers)
+## 3. Resource leaks: fd leak confirmed in spawnBackend; watcher cleanup claim was overstated
 
 **Files:** `electron/main.js` (`spawnBackend`), `backend/lib/taste-filter/watcher.js` (`_resetForTests`)
 
-`spawnBackend()` opens a log file descriptor via `fs.openSync(logPath, 'a')` and only closes it in the `spawn` event handler. If the child process fails to spawn or errors before `spawn` fires, the fd leaks.
+**Verified 2026-08-26:**
 
-`watcher.js` keeps a module-level chokidar watcher and relies entirely on tests manually calling `_resetForTests()` to close it. Concurrent or careless test runs leave watchers open, holding OS file handles — a likely source of flaky tests and EPERM errors on Windows.
+- **Confirmed real:** `spawnBackend()` opens the backend's log file descriptor synchronously via `fs.openSync(logPath, 'a')`, and only closes it inside the `child.on('spawn', ...)` handler. `spawn()`'s `'error'` event (bad command, `ENOENT`, `EACCES` — cases where the child process never actually launches) is mutually exclusive with `'spawn'` firing, so if the backend fails to spawn, `logFd` is never closed and leaks for the remaining life of the Electron process. Narrow in practice — it only triggers when the backend has already failed to start, a state the app already surfaces via `reportBackendStartupFailure()`'s error dialog, likely leading to an app restart anyway — but still a genuine, fixable leak.
+- **Overstated:** the claim that watcher cleanup relies entirely on tests remembering to call `_resetForTests()`, risking flaky/EPERM test runs, doesn't hold up against the actual test suite. Every `describe` block in `watcher.test.js` reliably calls `_resetForTests()` in `afterEach` — there's no current flakiness pattern. And in production, `syncWatcherFromSettings()` already correctly closes the old chokidar watcher whenever settings change (`if (watcher && (!shouldRun || folderChanged)) { watcher.close(); ... }`), so there's no production leak either. The real (much smaller) risk is just that nothing *enforces* this cleanup for a future test author who might skip it — a maintainability note, not an active bug.
 
-**Fix:** Wrap process spawning in `try/finally` to guarantee fd cleanup. Give watcher modules a proper lifecycle hook / process-exit cleanup instead of relying on test-only reset functions.
+**Fix:** Wrap the `spawn()` call and its fd handling in `electron/main.js` in `try/finally` (or close `logFd` in the `'error'` handler too) to guarantee cleanup on a failed launch. No action needed for the watcher — current behavior is already correct.
 
 ## 4. Windows packaging workarounds (tech debt from #110/#118/#119)
 
