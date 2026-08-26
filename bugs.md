@@ -55,12 +55,13 @@ Net: the workarounds are real and inherently a bit fragile (that part of the ori
 
 **Fix:** None needed. No action item.
 
-## 5. Silent failure swallowing
+## 5. Silent failure swallowing (narrower and more deliberate than first described)
 
-**Files:** `backend/lib/mockup-generator.js` (`generateMockupForJob`), `backend/lib/pipeline-runner.js` (`runPendingModulesForJob`)
+**Files:** `backend/lib/mockup-generator.js` (`generateMockupForJob`, `outpaintArtwork`), `backend/lib/pipeline-runner.js` (`runPendingModulesForJob`)
 
-`generateMockupForJob()` cleans up generated files on error, but wraps the `fs.unlinkSync` cleanup call in an empty `catch {}` — so disk permission issues or leftover orphan files go completely unlogged.
+**Verified 2026-08-26:**
 
-`runPendingModulesForJob()` catches and records per-size failures in the mockup composer step, but overall module status reporting on partial failure could be clearer for diagnosing issues client-side.
+- **Partially confirmed:** `generateMockupForJob()` does wrap its `fs.unlinkSync` cleanup (used only when a DB write fails after mockup files were already written) in an empty `catch {}`, with no logging. But it's not careless — there's an explicit comment explaining the choice: "Best-effort cleanup -- if this also fails, don't mask the original DB error." The original DB error is still re-thrown (`throw err`) and surfaces to whichever route called it, so nothing is silently lost overall — only the narrower cleanup-failure-on-top-of-an-already-failed-write detail goes unlogged. Worth noting: this same file already has a *better* pattern for exactly this kind of failure elsewhere — `outpaintArtwork()`'s own temp-file cleanup logs via `console.warn` and increments a tracked `tempCleanupFailureCount` that's surfaced through `/api/setup-status` once it crosses a threshold. The fix here is really just applying that existing pattern consistently, not inventing a new one.
+- **Not substantiated:** my claim that `runPendingModulesForJob()`'s partial-failure reporting "could be clearer" wasn't backed by anything concrete, and on inspection it's actually already quite clear — it returns a `perSize` object with an explicit `{ status: 'success' | 'failed', error }` entry per product size, plus an overall `mockup_composer` status derived from whether *any* size succeeded. There's no vagueness here to fix.
 
-**Fix:** At minimum, log cleanup failures instead of swallowing them silently. Improve pipeline status reporting to surface partial failures more clearly.
+**Fix:** In `generateMockupForJob()`'s cleanup `catch {}`, add a `console.warn` (mirroring `outpaintArtwork()`'s existing pattern) so a cleanup failure is visible without risking masking the original re-thrown error. No action needed for `pipeline-runner.js` — its status reporting is already sufficiently granular.
