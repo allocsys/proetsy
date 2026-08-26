@@ -39,19 +39,21 @@ Net: there's no actual blocking/heavy-startup problem here. The one real (very m
 
 **Fix:** Wrap the `spawn()` call and its fd handling in `electron/main.js` in `try/finally` (or close `logFd` in the `'error'` handler too) to guarantee cleanup on a failed launch. No action needed for the watcher — current behavior is already correct.
 
-## 4. Windows packaging workarounds (tech debt from #110/#118/#119)
+## 4. Windows packaging workarounds (real, but already well-managed — see correction)
 
-**Files:** `electron/main.js` (`spawnBackend`, `packagedBackendEnv`), `backend/scripts/bundle.js`
+**Files:** `electron/main.js` (`spawnBackend`, `packagedBackendEnv`), `backend/scripts/bundle.js`, `.github/workflows/release.yml`, `ARCHITECTURE.md`
 
-The recent esbuild-bundling + `node:sqlite` migration work (to fix Windows install/perf issues) introduced several fragile, undocumented workarounds:
+**Verified 2026-08-26:** the workarounds themselves are accurately described, but my "undocumented, no CI safety net" framing was wrong on both counts.
 
-- `spawnBackend` has to explicitly target `resources/app.asar.unpacked/backend/dist` because `spawn()` can't resolve paths inside `app.asar`.
-- `bundle.js` injects CJS shims (`__dirname`, `require`) via an esbuild banner to make the bundle work under Electron's runtime.
-- Multiple log files (`startup.log`, `backend.log`) exist specifically to debug silent crashes from native module ABI mismatches (`better-sqlite3` / `onnxruntime-web`).
+- `spawnBackend()` does target `resources/app.asar.unpacked/backend/dist` because `spawn()` can't resolve paths inside `app.asar` — confirmed, with a detailed explanatory comment in the code itself.
+- `bundle.js` does inject CJS shims (`__dirname`, `__filename`, `require`) via an esbuild banner, since several bundled CJS deps (e.g. Jimp's plugins) reference `__dirname` internally and esbuild's ESM output doesn't provide it — confirmed.
+- **Wrong:** "native module ABI mismatches (better-sqlite3 / onnxruntime-web)" as the reason for `startup.log`/`backend.log`. `better-sqlite3` no longer exists in this codebase at all — issue #104 replaced it with `node:sqlite` (a built-in, no native binary, no ABI to mismatch). `release.yml` explicitly confirms this: "A third layer -- requiring the better-sqlite3 native binary under Electron's Node ABI -- was removed once #104 replaced better-sqlite3 with node:sqlite, leaving no native module to verify." `onnxruntime-web` isn't a native-ABI risk either — it runs on WASM, not compiled bindings; its one real packaging issue (#114, fixed by #119) was a plain missing-dependency (`MODULE_NOT_FOUND`) from an incomplete `electron-builder` `files` list, not an ABI mismatch. The two log files exist for a broader reason: diagnosing *any* silent packaged-app startup failure (issue #97/#103), not specifically native-module ABI issues.
+- **Wrong: "no documentation."** `ARCHITECTURE.md` already exists and is referenced extensively throughout the codebase (`README.md`, every CI workflow, `electron/main.js`) with a dedicated "Electron packaging — build sequence" section covering exactly this history and rationale.
+- **Wrong: "no CI check."** `release.yml` already goes well beyond what I suggested. It doesn't just check a native module loads — it verifies the packaged asar contains the expected files (non-empty, syntax-checked), then **launches the actual packaged Windows exe**, polls its real `/api/health` endpoint from outside the process, confirms a real window appears, and captures screenshots + Windows Event Log entries + all app log files on any failure. This is more thorough than an ABI-load check would have been.
 
-None of this is wrong, but it's fragile glue with no documentation, and easy to break silently in future changes.
+Net: the workarounds are real and inherently a bit fragile (that part of the original write-up stands), but the team has already built solid documentation and CI coverage around them. There's no gap to close here.
 
-**Fix:** Document the ABI requirements and build/packaging steps in an `ARCHITECTURE.md`. Add a CI check that verifies native modules actually load under Electron's Node ABI before shipping a build artifact.
+**Fix:** None needed. No action item.
 
 ## 5. Silent failure swallowing
 
