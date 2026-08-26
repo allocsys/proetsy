@@ -2,15 +2,17 @@
 
 Findings from a code review pass on 2026-08-26. Ordered by impact, most important first.
 
-## 1. Transaction nesting bug (correctness risk)
+## 1. Transaction nesting has no savepoint support (latent risk, not currently triggered)
 
-**Files:** `backend/db/init.js` (`withTransaction`), `backend/lib/taste-filter/store.js` (`recomputeCentroids`)
+**Files:** `backend/db/init.js` (`withTransaction`)
 
-`withTransaction` wraps `node:sqlite`'s `DatabaseSync` in a manual `BEGIN`/`COMMIT`/`ROLLBACK` block. SQLite does not support nesting these statements without savepoints — if any code path calls `withTransaction` from inside another `withTransaction`, it will throw or leave the database in an inconsistent state.
+**Verified 2026-08-26:** `withTransaction(db, fn)` is a manual `db.exec('BEGIN')` / `COMMIT` / `ROLLBACK` wrapper, with no savepoint logic. `node:sqlite`'s `DatabaseSync` has no built-in `db.transaction()` helper (unlike `better-sqlite3`), so this was written as a replacement during the #104 migration. If it's ever called from inside another `withTransaction` call, the inner `BEGIN` will throw ("cannot start a transaction within a transaction").
 
-`recomputeCentroids()` in `store.js` runs multi-statement update/insert work per category inside a single transaction, which is exactly the kind of call site that's at risk if it (directly or indirectly) triggers a nested transaction.
+I checked every current call site — `store.js` (`recomputeCentroids`, `tallyPromptTermsForLabel`, `recomputePromptTerms`), `jobs.js` (`createJob`, `createJobsBulk`), `config/index.js` (`migratePipelineConfigSeed`, `importAllConfig`, `setShopConventions`), and `listing-generator/index.js` (`generateListingsForJob`) — and **none of them currently nest a `withTransaction` call inside another one**. Each opens exactly one transaction and doesn't call another `withTransaction`-wrapped function from within it. So this is not an active bug today; the database behaves correctly as of this review.
 
-**Fix:** Implement a savepoint-based nesting helper (`SAVEPOINT spX` / `RELEASE spX` / `ROLLBACK TO spX`) so `withTransaction` is safe to call from within itself.
+The risk is structural: there's no protection against a future refactor introducing nesting, and no test guards against it. It'll fail loudly (an unhandled throw) rather than silently corrupting data, which limits the blast radius, but it'll still take down whichever request triggers it.
+
+**Fix:** Implement a savepoint-based nesting helper (`SAVEPOINT spX` / `RELEASE spX` / `ROLLBACK TO spX`) so `withTransaction` is safe to call from within itself, even though nothing currently requires it.
 
 ## 2. Blocking / heavy work on startup or first request
 
