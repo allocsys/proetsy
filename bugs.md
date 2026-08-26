@@ -14,15 +14,19 @@ The risk is structural: there's no protection against a future refactor introduc
 
 **Fix:** Implement a savepoint-based nesting helper (`SAVEPOINT spX` / `RELEASE spX` / `ROLLBACK TO spX`) so `withTransaction` is safe to call from within itself, even though nothing currently requires it.
 
-## 2. Blocking / heavy work on startup or first request
+## 2. Blocking / heavy work on startup or first request (mostly not true — see correction)
 
-**Files:** `backend/lib/taste-filter/embeddings.js` (`ensureModelReady`, `getSession`), `backend/server.js` (boot sequence)
+**Files:** `backend/lib/taste-filter/embeddings.js` (`ensureModelReady`, `getSession`), `backend/server.js` (boot sequence), `backend/lib/taste-filter/watcher.js`, `backend/lib/llm/rate-limits.js`
 
-`ensureModelReady()` downloads the CLIP vision model (~350MB) via `fetch()` on first use. Even though it's async, triggering this implicitly on first request (or at startup) can cause request timeouts or memory pressure on constrained hosts.
+**Verified 2026-08-26:** most of the original claim here was wrong. Correcting it:
 
-`backend/server.js` also runs `syncWatcherFromSettings()` and `initRateLimitCache()` synchronously during boot. With a large watched folder, `chokidar`'s recursive scan can delay the server binding its port.
+- **Model download is NOT blocking.** `ensureModelReady()` (the ~350MB CLIP model fetch) is explicitly fire-and-forget in `server.js`, kicked off *alongside* (not before) `app.listen()` — there's a code comment confirming this was a deliberate design choice: "Taste Filter is one module among many, and a download/disk failure here shouldn't take down job/listing/mockup routes." A failure is logged, not thrown, and the port binds regardless. `embedImage()` also calls `ensureModelReady()` itself on first real use, so a boot-time failure just means the first import request retries the download — it doesn't stall a request or crash the process.
+- **The watcher does NOT do a recursive scan.** `syncWatcherFromSettings()` does run synchronously before `app.listen()`, but `chokidar.watch()` itself is non-blocking (hands off to async fs internally) and is configured with `depth: 0` — it only watches the top-level folder, not subfolders. A folder with thousands of files does not cause a deep synchronous scan.
+- **`initRateLimitCache()` is real but trivial.** It does run a synchronous SQL query (`SELECT ... FROM llm_rate_limits`) before the port binds, but it's a small table read, not a meaningful delay.
 
-**Fix:** Defer model downloads and heavy watcher initialization until after `/api/health` passes and the server is listening, rather than doing this at import/module-load time.
+Net: there's no actual blocking/heavy-startup problem here. The one real (very minor) item is that `initRateLimitCache()` and `syncWatcherFromSettings()` both add a small amount of synchronous DB work to boot before `app.listen()`, but neither is a performance concern at realistic data sizes.
+
+**Fix:** None needed. No action item.
 
 ## 3. Resource leaks (file descriptors, watchers)
 
